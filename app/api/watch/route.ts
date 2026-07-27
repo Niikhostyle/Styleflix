@@ -1,0 +1,133 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+
+const upsertSchema = z.object({
+  mediaType: z.enum(["movie", "tv"]),
+  tmdbId: z.number().int().positive(),
+  title: z.string().min(1).max(300),
+  posterPath: z.string().nullable().optional(),
+  season: z.number().int().positive().nullable().optional(),
+  episode: z.number().int().positive().nullable().optional(),
+  progressPct: z.number().min(0).max(100).optional(),
+  completed: z.boolean().optional(),
+});
+
+/** Lista "Continuar viendo" del usuario autenticado */
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ items: [] });
+  }
+
+  const rows = await prisma.watchProgress.findMany({
+    where: {
+      userId: session.user.id,
+      completed: false,
+    },
+    orderBy: { lastWatchedAt: "desc" },
+    take: 24,
+  });
+
+  const items = rows.map((row) => ({
+    id: row.tmdbId,
+    title: row.mediaType === "movie" ? row.title : undefined,
+    name: row.mediaType === "tv" ? row.title : undefined,
+    poster_path: row.posterPath,
+    media_type: row.mediaType as "movie" | "tv",
+    overview: "",
+    season: row.season,
+    episode: row.episode,
+    progressPct: row.progressPct,
+    lastWatchedAt: row.lastWatchedAt.toISOString(),
+  }));
+
+  return NextResponse.json({ items });
+}
+
+/** Guarda o actualiza progreso (solo registrados) */
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ ok: false, skipped: true }, { status: 200 });
+  }
+
+  try {
+    const body = await request.json();
+    const parsed = upsertSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    }
+
+    const data = parsed.data;
+    const row = await prisma.watchProgress.upsert({
+      where: {
+        userId_mediaType_tmdbId: {
+          userId: session.user.id,
+          mediaType: data.mediaType,
+          tmdbId: data.tmdbId,
+        },
+      },
+      create: {
+        userId: session.user.id,
+        mediaType: data.mediaType,
+        tmdbId: data.tmdbId,
+        title: data.title,
+        posterPath: data.posterPath ?? null,
+        season: data.season ?? (data.mediaType === "tv" ? 1 : null),
+        episode: data.episode ?? (data.mediaType === "tv" ? 1 : null),
+        progressPct: data.progressPct ?? 5,
+        completed: data.completed ?? false,
+        lastWatchedAt: new Date(),
+      },
+      update: {
+        title: data.title,
+        posterPath: data.posterPath ?? undefined,
+        season: data.season ?? undefined,
+        episode: data.episode ?? undefined,
+        progressPct: data.progressPct ?? undefined,
+        completed: data.completed ?? undefined,
+        lastWatchedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({ ok: true, progress: row });
+  } catch {
+    return NextResponse.json(
+      { error: "No se pudo guardar el progreso" },
+      { status: 500 }
+    );
+  }
+}
+
+/** Obtener progreso de un título concreto */
+export async function PUT(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ progress: null });
+  }
+
+  try {
+    const body = await request.json();
+    const mediaType = body.mediaType as string;
+    const tmdbId = Number(body.tmdbId);
+    if (!mediaType || !tmdbId) {
+      return NextResponse.json({ error: "Faltan parámetros" }, { status: 400 });
+    }
+
+    const progress = await prisma.watchProgress.findUnique({
+      where: {
+        userId_mediaType_tmdbId: {
+          userId: session.user.id,
+          mediaType,
+          tmdbId,
+        },
+      },
+    });
+
+    return NextResponse.json({ progress });
+  } catch {
+    return NextResponse.json({ progress: null });
+  }
+}
