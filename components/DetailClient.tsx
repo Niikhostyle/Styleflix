@@ -538,6 +538,7 @@ export default function DetailClient({
           mediaType === "tv" ? onSeasonEpisodeChange : undefined
         }
         onClose={closePlayer}
+        autoStart
       />
     </div>
   );

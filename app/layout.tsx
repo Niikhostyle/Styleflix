@@ -34,6 +34,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-[#141414] text-white antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(!/ngrok/i.test(location.hostname))return;var f=window.fetch.bind(window);window.fetch=function(i,n){n=n||{};var h=new Headers(n.headers||(i&&i.headers)||{});h.set("ngrok-skip-browser-warning","1");n.headers=h;return f(i,n);};}catch(e){}})();`,
+          }}
+        />
         <GoogleAdSense />
         <Providers>{children}</Providers>
       </body>

@@ -4,8 +4,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = "admin@styleflix.com";
-  const passwordHash = await hash("Admin123!", 10);
+  const email = "niikhostyle@gmail.com";
+  const passwordHash = await hash("shadownox123", 10);
 
   await prisma.user.upsert({
     where: { email },
@@ -22,10 +22,12 @@ async function main() {
     },
   });
 
-  console.log("Seed listo:");
-  console.log("  email:    admin@styleflix.com");
-  console.log("  password: Admin123!");
-  console.log("  role:     SUPER_ADMIN");
+  // Quita el admin demo anterior si existía
+  await prisma.user.deleteMany({
+    where: { email: "admin@styleflix.com" },
+  });
+
+  console.log("Seed listo: SUPER_ADMIN actualizado.");
 }
 
 main()

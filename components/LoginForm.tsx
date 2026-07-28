@@ -95,11 +95,6 @@ export default function LoginForm() {
             Regístrate
           </Link>
         </p>
-
-        <p className="mt-4 rounded border border-white/10 bg-white/5 p-3 text-xs text-neutral-400">
-          Demo admin: <span className="text-neutral-200">admin@styleflix.com</span> /{" "}
-          <span className="text-neutral-200">Admin123!</span>
-        </p>
       </div>
     </div>
   );

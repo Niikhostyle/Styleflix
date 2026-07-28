@@ -41,6 +41,18 @@ interface ModalPlayerProps {
   seasons?: SeasonMeta[];
   onSeasonEpisodeChange?: (season: number, episode: number) => void;
   onClose: () => void;
+  /** Si true, al abrir arranca playback sin pedir un segundo clic. */
+  autoStart?: boolean;
+}
+
+function isTunnelHost() {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return (
+    h.includes("ngrok") ||
+    h.includes("loca.lt") ||
+    h.includes("trycloudflare.com")
+  );
 }
 
 export default function ModalPlayer({
@@ -55,6 +67,7 @@ export default function ModalPlayer({
   seasons = [],
   onSeasonEpisodeChange,
   onClose,
+  autoStart = true,
 }: ModalPlayerProps) {
   const { status } = useSession();
   const [chromeVisible, setChromeVisible] = useState(true);
@@ -68,14 +81,37 @@ export default function ModalPlayer({
   const [frameNonce, setFrameNonce] = useState(0);
   /** cover → preroll (opcional) → stream Vimeus */
   const [phase, setPhase] = useState<"cover" | "preroll" | "stream">("cover");
+  const [embedError, setEmbedError] = useState<string | null>(null);
   const preroll = useMemo(() => getPrerollConfig(), []);
+
+  const beginPlayback = useCallback(() => {
+    setChromeVisible(true);
+    setEmbedError(null);
+    // En túneles (ngrok) IMA/GAM suele fallar o quedarse colgado → ir directo a Vimeus
+    if (preroll.enabled && preroll.mode === "gam" && !isTunnelHost()) {
+      setPhase("preroll");
+      return;
+    }
+    if (preroll.enabled && preroll.mode === "house" && !isTunnelHost()) {
+      setPhase("preroll");
+      return;
+    }
+    setPhase("stream");
+    setFrameNonce((n) => n + 1);
+  }, [preroll.enabled, preroll.mode]);
 
   useEffect(() => {
     if (!open) return;
     setActiveSeason(season ?? 1);
     setActiveEpisode(episode ?? 1);
     setFrameNonce((n) => n + 1);
-    setPhase("cover");
+    setEmbedError(null);
+    if (autoStart) {
+      // Defer para tener window.hostname disponible
+      beginPlayback();
+    } else {
+      setPhase("cover");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -87,11 +123,13 @@ export default function ModalPlayer({
     setActiveEpisode((prev) => (prev === e ? prev : e));
   }, [open, season, episode]);
 
-  /** Al cambiar de capítulo, volver a la portada */
+  /** Al cambiar de capítulo, reiniciar playback */
   useEffect(() => {
     if (!open) return;
-    setPhase("cover");
-  }, [open, activeSeason, activeEpisode, mediaId]);
+    setEmbedError(null);
+    if (autoStart) beginPlayback();
+    else setPhase("cover");
+  }, [open, activeSeason, activeEpisode, mediaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const seasonMeta = useMemo(
     () => seasons.find((s) => s.seasonNumber === activeSeason),
@@ -128,7 +166,6 @@ export default function ModalPlayer({
 
   const goTo = useCallback(
     (nextSeason: number, nextEpisode: number) => {
-      setPhase("cover");
       setActiveSeason(nextSeason);
       setActiveEpisode(nextEpisode);
       setFrameNonce((n) => n + 1);
@@ -267,11 +304,18 @@ export default function ModalPlayer({
 
   if (!open) return null;
 
-  const embedPath =
-    getVimeusEmbedUrl(mediaType, mediaId, {
-      season: mediaType === "tv" ? activeSeason : undefined,
-      episode: mediaType === "tv" ? activeEpisode : undefined,
-    }) + `&_r=${frameNonce}`;
+  let embedPath = "";
+  let embedBuildError: string | null = null;
+  try {
+    embedPath =
+      getVimeusEmbedUrl(mediaType, mediaId, {
+        season: mediaType === "tv" ? activeSeason : undefined,
+        episode: mediaType === "tv" ? activeEpisode : undefined,
+      }) + `&_r=${frameNonce}`;
+  } catch (err) {
+    embedBuildError =
+      err instanceof Error ? err.message : "No se pudo generar el embed";
+  }
 
   const subtitle =
     mediaType === "tv" ? ` · T${activeSeason} E${activeEpisode}` : "";
@@ -282,16 +326,6 @@ export default function ModalPlayer({
       : null) ||
     (backdropPath ? `${IMAGE_BACKDROP_URL}${backdropPath}` : null) ||
     (posterPath ? `${IMAGE_BASE_URL}${posterPath}` : null);
-
-  const startPlayback = () => {
-    setChromeVisible(true);
-    if (preroll.enabled) {
-      setPhase("preroll");
-      return;
-    }
-    setPhase("stream");
-    setFrameNonce((n) => n + 1);
-  };
 
   return (
     <div
@@ -356,7 +390,25 @@ export default function ModalPlayer({
       </header>
 
       <div className="absolute inset-0 bg-black">
-        {phase === "stream" && (
+        {(embedError || embedBuildError) && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
+            <p className="text-lg font-semibold text-white">
+              No se pudo reproducir
+            </p>
+            <p className="max-w-md text-sm text-neutral-400">
+              {embedError || embedBuildError}
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded bg-white px-4 py-2 text-sm font-bold text-black"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+
+        {phase === "stream" && embedPath && (
           <iframe
             key={`player-${mediaId}-${activeSeason}-${activeEpisode}-${frameNonce}`}
             src={embedPath}
@@ -364,7 +416,7 @@ export default function ModalPlayer({
             className="absolute inset-0 h-full w-full border-0"
             allowFullScreen
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            referrerPolicy="origin"
+            referrerPolicy="no-referrer"
           />
         )}
 
@@ -390,7 +442,7 @@ export default function ModalPlayer({
         {phase === "cover" && (
           <button
             type="button"
-            onClick={startPlayback}
+            onClick={beginPlayback}
             className="group absolute inset-0 z-20 flex flex-col items-center justify-center"
             aria-label={`Reproducir ${title}${subtitle}`}
           >
