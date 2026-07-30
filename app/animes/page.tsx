@@ -7,6 +7,9 @@ import {
   getTrendingAnime,
 } from "@/lib/tmdb";
 
+/** Evita prerender en build de Vercel sin vars / fallos TMDB. */
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Animes | StyleFlix",
   description: "Animes y películas de animación japonesa en StyleFlix",

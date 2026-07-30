@@ -9,6 +9,8 @@ import {
   type MediaType,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 interface SearchPageProps {
   searchParams: Promise<{ q?: string }>;
 }

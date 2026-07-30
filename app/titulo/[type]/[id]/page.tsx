@@ -8,6 +8,8 @@ import {
   type MediaType,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ type: string; id: string }>;
 }

@@ -13,9 +13,6 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getVimeusEmbedUrl } from "@/lib/vimeus";
-import { getPrerollConfig } from "@/lib/ads";
-import PrerollAd from "@/components/PrerollAd";
-import GoogleImaPreroll from "@/components/GoogleImaPreroll";
 import {
   IMAGE_BASE_URL,
   IMAGE_BACKDROP_URL,
@@ -45,16 +42,6 @@ interface ModalPlayerProps {
   autoStart?: boolean;
 }
 
-function isTunnelHost() {
-  if (typeof window === "undefined") return false;
-  const h = window.location.hostname;
-  return (
-    h.includes("ngrok") ||
-    h.includes("loca.lt") ||
-    h.includes("trycloudflare.com")
-  );
-}
-
 export default function ModalPlayer({
   open,
   mediaId,
@@ -79,26 +66,16 @@ export default function ModalPlayer({
   const [activeSeason, setActiveSeason] = useState(season ?? 1);
   const [activeEpisode, setActiveEpisode] = useState(episode ?? 1);
   const [frameNonce, setFrameNonce] = useState(0);
-  /** cover → preroll (opcional) → stream Vimeus */
-  const [phase, setPhase] = useState<"cover" | "preroll" | "stream">("cover");
+  /** cover → stream Vimeus */
+  const [phase, setPhase] = useState<"cover" | "stream">("cover");
   const [embedError, setEmbedError] = useState<string | null>(null);
-  const preroll = useMemo(() => getPrerollConfig(), []);
 
   const beginPlayback = useCallback(() => {
     setChromeVisible(true);
     setEmbedError(null);
-    // En túneles (ngrok) IMA/GAM suele fallar o quedarse colgado → ir directo a Vimeus
-    if (preroll.enabled && preroll.mode === "gam" && !isTunnelHost()) {
-      setPhase("preroll");
-      return;
-    }
-    if (preroll.enabled && preroll.mode === "house" && !isTunnelHost()) {
-      setPhase("preroll");
-      return;
-    }
     setPhase("stream");
     setFrameNonce((n) => n + 1);
-  }, [preroll.enabled, preroll.mode]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -106,12 +83,8 @@ export default function ModalPlayer({
     setActiveEpisode(episode ?? 1);
     setFrameNonce((n) => n + 1);
     setEmbedError(null);
-    if (autoStart) {
-      // Defer para tener window.hostname disponible
-      beginPlayback();
-    } else {
-      setPhase("cover");
-    }
+    if (autoStart) beginPlayback();
+    else setPhase("cover");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -296,12 +269,6 @@ export default function ModalPlayer({
     setPickerSeason(activeSeason);
   }, [open, mediaType, listOpen, activeSeason]);
 
-  const startStreamAfterAd = useCallback(() => {
-    setPhase("stream");
-    setFrameNonce((n) => n + 1);
-    setChromeVisible(true);
-  }, []);
-
   if (!open) return null;
 
   let embedPath = "";
@@ -338,15 +305,13 @@ export default function ModalPlayer({
     >
       <div
         className={`pointer-events-none absolute inset-x-0 top-0 z-30 h-28 bg-gradient-to-b from-black/90 via-black/40 to-transparent transition-opacity duration-500 ${
-          chromeVisible || listOpen || phase === "preroll"
-            ? "opacity-100"
-            : "opacity-0"
+          chromeVisible || listOpen ? "opacity-100" : "opacity-0"
         }`}
       />
 
       <header
         className={`absolute inset-x-0 top-0 z-40 flex items-center gap-3 px-4 py-4 transition-all duration-500 md:px-8 md:py-6 ${
-          (chromeVisible || listOpen) && phase !== "preroll"
+          chromeVisible || listOpen
             ? "translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-3 opacity-0"
         }`}
@@ -420,25 +385,6 @@ export default function ModalPlayer({
           />
         )}
 
-        {phase === "preroll" && preroll.mode === "gam" && preroll.vastTag && (
-          <GoogleImaPreroll
-            vastTag={preroll.vastTag}
-            allowForceSkip={preroll.allowForceSkip}
-            loadTimeoutSec={preroll.loadTimeoutSec}
-            onDone={startStreamAfterAd}
-          />
-        )}
-
-        {phase === "preroll" && preroll.mode === "house" && (
-          <PrerollAd
-            config={preroll}
-            mediaId={mediaId}
-            mediaType={mediaType}
-            title={title}
-            onDone={startStreamAfterAd}
-          />
-        )}
-
         {phase === "cover" && (
           <button
             type="button"
@@ -473,11 +419,7 @@ export default function ModalPlayer({
                   <p className="mt-1 text-sm text-neutral-300">{currentEp.name}</p>
                 )}
                 <p className="mt-3 text-sm text-neutral-400">
-                  {preroll.enabled
-                    ? preroll.mode === "gam"
-                      ? "Pulsa para ver · anuncio Ad Manager"
-                      : "Pulsa para ver · incluye un anuncio breve"
-                    : "Pulsa para reproducir"}
+                  Pulsa para reproducir
                 </p>
               </div>
             </div>

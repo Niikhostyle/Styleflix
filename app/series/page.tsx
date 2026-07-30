@@ -9,6 +9,8 @@ import {
   getTrendingSeries,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Series | StyleFlix",
   description: "Descubre series populares y tendencias en StyleFlix",

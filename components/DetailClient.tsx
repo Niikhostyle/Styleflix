@@ -16,7 +16,6 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MediaRow from "@/components/MediaRow";
 import ModalPlayer, { type SeasonMeta } from "@/components/ModalPlayer";
-import AdSenseUnit from "@/components/AdSenseUnit";
 import {
   IMAGE_BASE_URL,
   IMAGE_BACKDROP_URL,
@@ -504,10 +503,6 @@ export default function DetailClient({
             </p>
           </div>
         </section>
-
-        <div className="my-8">
-          <AdSenseUnit slot="detail" />
-        </div>
 
         <MediaRow
           title="Títulos similares"

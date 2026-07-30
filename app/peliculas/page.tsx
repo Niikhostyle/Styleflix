@@ -11,6 +11,8 @@ import {
   getUpcomingMovies,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Películas | StyleFlix",
   description: "Explora películas populares, tendencias y géneros en StyleFlix",

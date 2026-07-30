@@ -98,10 +98,19 @@ function buildUrl(endpoint: string, extraParams = "") {
   return `${BASE_URL}${endpoint}${separator}api_key=${API_KEY}&language=es-ES${extraParams}`;
 }
 
+function assertApiKey() {
+  if (!API_KEY) {
+    throw new Error(
+      "Falta NEXT_PUBLIC_TMDB_API_KEY. Configúrala en Vercel → Settings → Environment Variables."
+    );
+  }
+}
+
 async function fetchList(
   endpoint: string,
   mediaType?: MediaType
 ): Promise<MediaItem[]> {
+  assertApiKey();
   const res = await fetch(buildUrl(endpoint), {
     // Cache agresiva: catálogo cambia poco; evita martillar TMDB
     next: { revalidate: 7200, tags: ["tmdb", `tmdb-list`] },
@@ -122,6 +131,7 @@ async function fetchDetails(
   type: MediaType,
   id: number
 ): Promise<MediaDetails> {
+  assertApiKey();
   const res = await fetch(
     buildUrl(
       `/${type}/${id}`,
@@ -369,6 +379,7 @@ export async function getSimilarMedia(type: MediaType, id: number) {
 export async function searchMulti(query: string): Promise<MediaItem[]> {
   const q = query.trim();
   if (!q) return [];
+  assertApiKey();
 
   const res = await fetch(
     buildUrl("/search/multi", `&query=${encodeURIComponent(q)}&include_adult=false`),

@@ -5,7 +5,6 @@ import Hero from "@/components/Hero";
 import MediaRow from "@/components/MediaRow";
 import Footer from "@/components/Footer";
 import PersonalizedRows from "@/components/PersonalizedRows";
-import AdSenseUnit from "@/components/AdSenseUnit";
 import type { MediaItem } from "@/lib/tmdb";
 
 interface HomeClientProps {
@@ -51,9 +50,6 @@ export default function HomeClient({
           mediaType="tv"
           priorityCount={4}
         />
-        <div className="mx-auto max-w-5xl px-4 py-6 md:px-12">
-          <AdSenseUnit slot="home" />
-        </div>
         <MediaRow
           title="Animes en tendencia"
           items={popularAnime}

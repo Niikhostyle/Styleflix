@@ -11,6 +11,8 @@ import {
   getTrendingSeries,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 /** Filas críticas: hero + lo que se ve al entrar. */
 async function getCriticalCatalog() {
   const [trendingMovies, popularMovies, popularSeries, popularAnime] =

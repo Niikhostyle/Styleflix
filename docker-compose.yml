@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: styleflix
+      POSTGRES_PASSWORD: styleflix
+      POSTGRES_DB: styleflix
+    volumes:
+      - styleflix_pg:/var/lib/postgresql/data
+
+volumes:
+  styleflix_pg:
