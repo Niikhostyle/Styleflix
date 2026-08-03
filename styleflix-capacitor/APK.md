@@ -1,7 +1,7 @@
 # StyleFlix — APK (Capacitor + Android / Android TV)
 
 Copia del proyecto Next.js preparada para generar una APK.
-La app nativa abre tu StyleFlix en WebView: `https://streaming.mublackstar.cl`
+La app nativa abre tu StyleFlix en WebView: `https://streaming.cloudmusic.cl`
 
 El proyecto web original sigue en `../netflix-clone` (sin tocar).
 
@@ -36,7 +36,7 @@ npx cap sync android
 
 Ejemplos:
 
-- Producción: `https://streaming.mublackstar.cl`
+- Producción: `https://streaming.cloudmusic.cl`
 - Local (misma WiFi): `http://192.168.x.x:3000`
 
 ## Instalar en Android TV / móvil
@@ -60,7 +60,7 @@ Salida: `android\app\build\outputs\apk\release\app-release.apk`
 
 Copia a la web para descarga fácil:
 
-`public\downloads\styleflix.apk` → `https://streaming.mublackstar.cl/descargar`
+`public\downloads\styleflix.apk` → `https://streaming.cloudmusic.cl/descargar`
 
 Guarda el `.jks` y las claves en un lugar seguro: sin ellas no podrás actualizar la misma app.
 

@@ -8,7 +8,7 @@ const config = {
   appName: "StyleFlix",
   webDir: "www",
   server: {
-    url: process.env.CAPACITOR_SERVER_URL || "https://streaming.mublackstar.cl",
+    url: process.env.CAPACITOR_SERVER_URL || "https://streaming.cloudmusic.cl",
     cleartext: true,
     androidScheme: "https",
   },

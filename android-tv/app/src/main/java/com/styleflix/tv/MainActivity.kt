@@ -174,6 +174,7 @@ class MainActivity : ComponentActivity() {
             if (url.isBlank()) return false
             val lower = url.lowercase(Locale.US)
             if (lower.contains("vimeus.com") ||
+                lower.contains("cloudmusic.cl") ||
                 lower.contains("mublackstar.cl") ||
                 lower.contains("themoviedb.org") ||
                 lower.contains("image.tmdb.org")
