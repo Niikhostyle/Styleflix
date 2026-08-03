@@ -1,100 +1,37 @@
 import { Suspense } from "react";
 import HomeClient from "@/components/HomeClient";
-import {
-  getActionMovies,
-  getAnimeMovies,
-  getPopularAnime,
-  getPopularMovies,
-  getPopularSeries,
-  getTopRatedMovies,
-  getTrendingMovies,
-  getTrendingSeries,
-} from "@/lib/tmdb";
+import { getVimeusHomeCatalog } from "@/lib/vimeus";
 
 export const dynamic = "force-dynamic";
 
-/** Filas críticas: hero + lo que se ve al entrar. */
-async function getCriticalCatalog() {
-  const [trendingMovies, popularMovies, popularSeries, popularAnime] =
-    await Promise.all([
-      getTrendingMovies(),
-      getPopularMovies(),
-      getPopularSeries(),
-      getPopularAnime(),
-    ]);
-  return { trendingMovies, popularMovies, popularSeries, popularAnime };
-}
-
-/** Filas secundarias: se hidratan en paralelo sin bloquear el primer paint. */
-async function getSecondaryCatalog() {
-  const [topRatedMovies, actionMovies, trendingSeries, animeMovies] =
-    await Promise.all([
-      getTopRatedMovies(),
-      getActionMovies(),
-      getTrendingSeries(),
-      getAnimeMovies(),
-    ]);
-  return { topRatedMovies, actionMovies, trendingSeries, animeMovies };
-}
-
 async function HomeShell() {
-  const critical = await getCriticalCatalog();
+  const catalog = await getVimeusHomeCatalog();
   const featured =
-    critical.trendingMovies[0] ??
-    critical.popularMovies[0] ??
-    critical.popularSeries[0];
+    catalog.movies[0] ?? catalog.series[0] ?? catalog.animes[0];
 
   if (!featured) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#141414] text-white">
-        No hay títulos para mostrar.
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#141414] px-6 text-center text-white">
+        <p className="text-lg font-semibold">No hay títulos de Vimeus</p>
+        <p className="max-w-md text-sm text-neutral-400">
+          Revisa <code className="text-neutral-200">VIMEUS_API_KEY</code> en
+          Coolify y que el dominio esté permitido en Vimeus → Settings.
+        </p>
       </div>
     );
   }
 
   return (
-    <Suspense
-      fallback={
-        <HomeClient
-          featured={featured}
-          trendingMovies={critical.trendingMovies}
-          popularMovies={critical.popularMovies}
-          popularSeries={critical.popularSeries}
-          popularAnime={critical.popularAnime}
-          topRatedMovies={[]}
-          actionMovies={[]}
-          trendingSeries={[]}
-          animeMovies={[]}
-        />
-      }
-    >
-      <HomeWithSecondary critical={critical} featured={featured} />
-    </Suspense>
-  );
-}
-
-async function HomeWithSecondary({
-  critical,
-  featured,
-}: {
-  critical: Awaited<ReturnType<typeof getCriticalCatalog>>;
-  featured: NonNullable<
-    Awaited<ReturnType<typeof getCriticalCatalog>>["trendingMovies"][0]
-  >;
-}) {
-  const secondary = await getSecondaryCatalog();
-
-  return (
     <HomeClient
       featured={featured}
-      trendingMovies={critical.trendingMovies}
-      popularMovies={critical.popularMovies}
-      popularSeries={critical.popularSeries}
-      popularAnime={critical.popularAnime}
-      topRatedMovies={secondary.topRatedMovies}
-      actionMovies={secondary.actionMovies}
-      trendingSeries={secondary.trendingSeries}
-      animeMovies={secondary.animeMovies}
+      trendingMovies={catalog.movies}
+      popularMovies={catalog.moreMovies}
+      popularSeries={catalog.series}
+      popularAnime={catalog.animes}
+      topRatedMovies={catalog.moreMovies}
+      actionMovies={[]}
+      trendingSeries={catalog.moreSeries}
+      animeMovies={[]}
     />
   );
 }

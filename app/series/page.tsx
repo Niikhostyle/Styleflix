@@ -1,54 +1,32 @@
 import CatalogClient from "@/components/CatalogClient";
-import {
-  getAiringTodaySeries,
-  getCrimeSeries,
-  getDramaSeries,
-  getPopularSeries,
-  getSciFiSeries,
-  getTopRatedSeries,
-  getTrendingSeries,
-} from "@/lib/tmdb";
+import { getVimeusSeries } from "@/lib/vimeus";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Series | StyleFlix",
-  description: "Descubre series populares y tendencias en StyleFlix",
+  description: "Series disponibles para reproducir en StyleFlix",
 };
 
 export default async function SeriesPage() {
-  const [
-    trending,
-    popular,
-    topRated,
-    airing,
-    drama,
-    crime,
-    sciFi,
-  ] = await Promise.all([
-    getTrendingSeries(),
-    getPopularSeries(),
-    getTopRatedSeries(),
-    getAiringTodaySeries(),
-    getDramaSeries(),
-    getCrimeSeries(),
-    getSciFiSeries(),
+  const [page1, page2, page3] = await Promise.all([
+    getVimeusSeries([1]),
+    getVimeusSeries([2]),
+    getVimeusSeries([3]),
   ]);
+
+  const featured = [...page1, ...page2];
 
   return (
     <CatalogClient
       pageTitle="Series"
-      subtitle="Historias para maratonear sin parar."
-      featured={trending}
+      subtitle="Solo series con stream disponible en Vimeus."
+      featured={featured}
       defaultMediaType="tv"
       rows={[
-        { title: "Tendencias", items: trending, mediaType: "tv" },
-        { title: "Populares", items: popular, mediaType: "tv" },
-        { title: "Se emiten hoy", items: airing, mediaType: "tv" },
-        { title: "Mejor valoradas", items: topRated, mediaType: "tv" },
-        { title: "Drama", items: drama, mediaType: "tv" },
-        { title: "Crimen", items: crime, mediaType: "tv" },
-        { title: "Sci-Fi & Fantasía", items: sciFi, mediaType: "tv" },
+        { title: "Recién sincronizadas", items: page1, mediaType: "tv" },
+        { title: "Más series", items: page2, mediaType: "tv" },
+        { title: "Seguir explorando", items: page3, mediaType: "tv" },
       ]}
     />
   );

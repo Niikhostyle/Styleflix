@@ -39,34 +39,34 @@ export default function HomeClient({
       <main className="relative z-10 -mt-14 space-y-1 pb-8 md:-mt-20">
         <PersonalizedRows />
         <MediaRow
-          title="Tendencias en películas"
+          title="Películas en Vimeus"
           items={trendingMovies}
           mediaType="movie"
           priorityCount={8}
         />
         <MediaRow
-          title="Series populares"
+          title="Series en Vimeus"
           items={popularSeries}
           mediaType="tv"
           priorityCount={4}
         />
         <MediaRow
-          title="Animes en tendencia"
+          title="Animes en Vimeus"
           items={popularAnime}
           mediaType="tv"
         />
         <MediaRow
-          title="Películas populares"
+          title="Más películas"
           items={popularMovies}
           mediaType="movie"
         />
         <MediaRow
-          title="Series en tendencia"
+          title="Más series"
           items={trendingSeries}
           mediaType="tv"
         />
         <MediaRow
-          title="Mejor valoradas"
+          title="Seguir explorando"
           items={topRatedMovies}
           mediaType="movie"
         />

@@ -1,41 +1,32 @@
 import CatalogClient from "@/components/CatalogClient";
-import {
-  getActionAnime,
-  getAnimeMovies,
-  getPopularAnime,
-  getTopRatedAnime,
-  getTrendingAnime,
-} from "@/lib/tmdb";
+import { getVimeusAnimes } from "@/lib/vimeus";
 
-/** Evita prerender en build de Vercel sin vars / fallos TMDB. */
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Animes | StyleFlix",
-  description: "Animes y películas de animación japonesa en StyleFlix",
+  description: "Animes disponibles para reproducir en StyleFlix",
 };
 
 export default async function AnimesPage() {
-  const [popular, topRated, trending, action, movies] = await Promise.all([
-    getPopularAnime(),
-    getTopRatedAnime(),
-    getTrendingAnime(),
-    getActionAnime(),
-    getAnimeMovies(),
+  const [page1, page2, page3] = await Promise.all([
+    getVimeusAnimes([1]),
+    getVimeusAnimes([2]),
+    getVimeusAnimes([3]),
   ]);
+
+  const featured = [...page1, ...page2];
 
   return (
     <CatalogClient
       pageTitle="Animes"
-      subtitle="Lo mejor de la animación japonesa."
-      featured={popular}
+      subtitle="Solo animes con stream disponible en Vimeus."
+      featured={featured}
       defaultMediaType="tv"
       rows={[
-        { title: "Populares", items: popular, mediaType: "tv" },
-        { title: "Novedades", items: trending, mediaType: "tv" },
-        { title: "Mejor valorados", items: topRated, mediaType: "tv" },
-        { title: "Acción y aventura", items: action, mediaType: "tv" },
-        { title: "Películas de anime", items: movies, mediaType: "movie" },
+        { title: "Recién sincronizados", items: page1, mediaType: "tv" },
+        { title: "Más animes", items: page2, mediaType: "tv" },
+        { title: "Seguir explorando", items: page3, mediaType: "tv" },
       ]}
     />
   );
