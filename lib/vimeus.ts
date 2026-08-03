@@ -21,17 +21,16 @@ type VimeusListItem = {
   embed_url?: string;
 };
 
-/** Personalización del player (theme, splash, UI) — misma config que el dashboard Vimeus. */
+/** Personalización del player — params del dashboard Vimeus. */
 const PLAYER_PARAMS: Record<string, string> = {
-  title: "StyleFli",
+  title: "Stylefli",
   theme: "minimal",
   loader: "v3",
   font: "v2",
   overlay: "v5",
-  selector: "v2",
-  playUI: "v2",
+  playUI: "v3",
   epanel: "v2",
-  splash: "v3",
+  splash: "v2",
 };
 
 /**
