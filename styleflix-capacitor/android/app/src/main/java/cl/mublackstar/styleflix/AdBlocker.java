@@ -92,6 +92,7 @@ public final class AdBlocker {
 
     // Nunca bloquear el origen del catálogo / player host
     if (lower.contains("vimeus.com")
+        || lower.contains("cloudmusic.cl")
         || lower.contains("mublackstar.cl")
         || lower.contains("themoviedb.org")
         || lower.contains("image.tmdb.org")
