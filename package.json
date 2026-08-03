@@ -4,14 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "prisma generate && next dev",
-    "build": "prisma generate && node scripts/db-setup.cjs && next build",
-    "start": "next start",
+    "build": "prisma generate && next build",
+    "start": "node scripts/db-setup.cjs && next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:setup": "prisma db push && npx tsx prisma/seed.ts",
     "db:up": "docker compose up -d"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

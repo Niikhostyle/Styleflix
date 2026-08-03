@@ -1,31 +1,49 @@
 #!/usr/bin/env node
 /**
- * En build (Vercel/local): crea tablas + seed admin.
- * Sin DATABASE_URL postgres: avisa y continúa (catálogo TMDB igual puede desplegarse).
+ * Crea tablas + seed admin.
+ * Se ejecuta al ARRRANCAR el contenedor (no en el build de Docker),
+ * para que Coolify pueda resolver el host interno de Postgres.
  */
 const { execSync } = require("node:child_process");
 
-function run(cmd) {
-  execSync(cmd, { stdio: "inherit", env: process.env });
+function run(cmd, env) {
+  execSync(cmd, { stdio: "inherit", env });
 }
 
-const url = process.env.DATABASE_URL || "";
+let url = (process.env.DATABASE_URL || "").trim();
+// Coolify a veces guarda el valor con comillas
+if (
+  (url.startsWith('"') && url.endsWith('"')) ||
+  (url.startsWith("'") && url.endsWith("'"))
+) {
+  url = url.slice(1, -1).trim();
+}
 
 if (!url || url.startsWith("file:")) {
   console.warn(
-    "[db-setup] Configura DATABASE_URL PostgreSQL (Neon) para login/historial. Continuando el build…"
+    "[db-setup] Sin DATABASE_URL postgres válida. Login/historial no funcionarán."
   );
   process.exit(0);
 }
 
+if (!/^postgres(ql)?:\/\//i.test(url)) {
+  console.error(
+    "[db-setup] DATABASE_URL inválida. Debe empezar con postgresql:// o postgres://"
+  );
+  console.error("[db-setup] Valor recibido (inicio):", url.slice(0, 40));
+  process.exit(1);
+}
+
+const env = { ...process.env, DATABASE_URL: url };
+
 try {
-  run("npx prisma db push --skip-generate");
-  run("npx tsx prisma/seed.ts");
+  run("npx prisma db push --skip-generate", env);
+  run("npx tsx prisma/seed.ts", env);
   console.log("[db-setup] Base de datos lista.");
 } catch (err) {
   console.error("[db-setup] Error:", err?.message || err);
   console.error(
-    "[db-setup] Revisa DATABASE_URL (debe ser postgresql://… de Neon u otro Postgres)."
+    "[db-setup] Revisa que styleflix-db esté running y DATABASE_URL sea la URL interna."
   );
   process.exit(1);
 }
