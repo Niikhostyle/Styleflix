@@ -18,6 +18,12 @@ export function getVimeusEmbedUrl(
   const params = new URLSearchParams({
     tmdb: String(tmdbId),
     view_key: viewKey,
+    // Parámetros recomendados por el generador de Vimeus
+    loader: "v3",
+    overlay: "v5",
+    playUI: "v2",
+    splash: "v2",
+    autoplay: "1",
   });
 
   if (opts?.season != null) params.set("se", String(opts.season));

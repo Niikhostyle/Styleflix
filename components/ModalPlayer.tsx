@@ -396,7 +396,7 @@ export default function ModalPlayer({
             className="absolute inset-0 h-full w-full border-0"
             allowFullScreen
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            referrerPolicy="no-referrer"
+            referrerPolicy="origin"
           />
         )}
 
