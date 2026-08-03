@@ -10,8 +10,9 @@ export const IMAGE_BACKDROP_URL = "https://image.tmdb.org/t/p/w1280";
 /** Solo cuando hace falta máxima calidad (p.ej. player cover). */
 export const IMAGE_ORIGINAL_URL = "https://image.tmdb.org/t/p/original";
 
-/** Ítems por fila en home/catálogo (menos JSON + menos imágenes). */
-const LIST_LIMIT = 12;
+/** Ítems por fila en home/catálogo (~2 páginas TMDB). */
+const LIST_PAGES = 2;
+const LIST_LIMIT = 40;
 
 export type MediaType = "movie" | "tv";
 
@@ -111,20 +112,32 @@ async function fetchList(
   mediaType?: MediaType
 ): Promise<MediaItem[]> {
   assertApiKey();
-  const res = await fetch(buildUrl(endpoint), {
-    // Cache agresiva: catálogo cambia poco; evita martillar TMDB
-    next: { revalidate: 7200, tags: ["tmdb", `tmdb-list`] },
-  });
 
-  if (!res.ok) {
-    throw new Error(`Error al consultar TMDB: ${res.status}`);
+  const pages = await Promise.all(
+    Array.from({ length: LIST_PAGES }, (_, i) => i + 1).map(async (page) => {
+      const res = await fetch(buildUrl(endpoint, `&page=${page}`), {
+        next: { revalidate: 7200, tags: ["tmdb", `tmdb-list`] },
+      });
+      if (!res.ok) {
+        throw new Error(`Error al consultar TMDB: ${res.status}`);
+      }
+      const data: TMDBListResponse = await res.json();
+      return data.results ?? [];
+    })
+  );
+
+  const seen = new Set<number>();
+  const merged: MediaItem[] = [];
+  for (const item of pages.flat()) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    merged.push({
+      ...item,
+      media_type: item.media_type ?? mediaType,
+    });
+    if (merged.length >= LIST_LIMIT) break;
   }
-
-  const data: TMDBListResponse = await res.json();
-  return (data.results ?? []).slice(0, LIST_LIMIT).map((item) => ({
-    ...item,
-    media_type: item.media_type ?? mediaType,
-  }));
+  return merged;
 }
 
 async function fetchDetails(
