@@ -52,15 +52,3 @@ skills-lock.json
 *.db-journal
 prisma/dev.db
 prisma/dev.db-journal
-
-# Android / Capacitor
-**/node_modules/
-**/.gradle/
-**/build/
-**/local.properties
-**/*.apk
-**/*.aab
-**/.idea/
-**/captures/
-styleflix-capacitor/.env*
-android-tv/local.properties
