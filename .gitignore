@@ -58,8 +58,12 @@ prisma/dev.db-journal
 **/.gradle/
 **/build/
 **/local.properties
+**/keystore.properties
+**/*.jks
+**/*.keystore
 **/*.apk
 **/*.aab
+!public/downloads/*.apk
 **/.idea/
 **/captures/
 styleflix-capacitor/.env*

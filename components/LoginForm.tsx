@@ -125,6 +125,11 @@ export default function LoginForm() {
           Las cuentas las crea el administrador. Si no tienes acceso, contacta
           al Super Admin.
         </p>
+        <p className="mt-4 text-sm text-neutral-500">
+          <a href="/descargar" className="text-neutral-300 underline">
+            Descargar app Android TV
+          </a>
+        </p>
       </div>
     </div>
   );

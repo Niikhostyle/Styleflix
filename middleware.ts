@@ -3,7 +3,11 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 function isPublicPath(pathname: string) {
-  return pathname === "/login" || pathname.startsWith("/api/auth");
+  if (pathname === "/login") return true;
+  if (pathname === "/descargar") return true;
+  if (pathname.startsWith("/downloads/")) return true;
+  if (pathname.startsWith("/api/auth")) return true;
+  return false;
 }
 
 function authSecret() {

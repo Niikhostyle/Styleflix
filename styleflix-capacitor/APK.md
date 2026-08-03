@@ -48,18 +48,19 @@ adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 
 O copia el `.apk` por USB / Drive.
 
-## Bloqueo de publicidad (APK)
-
-La APK usa un **filtro de red en el WebView** (misma idea que Brave): corta peticiones a
-DoubleClick, Google IMA, AdSense, VAST, etc. Sin tocar `vimeus.com`.
-
-En el navegador de escritorio/móvil **sin** Brave/uBlock, Chrome no puede bloquear ads
-dentro del iframe de Vimeus (limitación del navegador). Usa la APK o Brave.
-
-Tras cambiar el bloqueador:
+## APK release (para compartir)
 
 ```powershell
 cd styleflix-capacitor\android
-.\gradlew.bat assembleDebug
+# Requiere keystore.properties + styleflix-release.jks (NO se suben a git)
+.\gradlew.bat assembleRelease
 ```
+
+Salida: `android\app\build\outputs\apk\release\app-release.apk`
+
+Copia a la web para descarga fácil:
+
+`public\downloads\styleflix.apk` → `https://streaming.mublackstar.cl/descargar`
+
+Guarda el `.jks` y las claves en un lugar seguro: sin ellas no podrás actualizar la misma app.
 
