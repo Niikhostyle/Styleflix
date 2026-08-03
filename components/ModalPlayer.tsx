@@ -394,6 +394,9 @@ export default function ModalPlayer({
             src={embedPath}
             title={`${title}${subtitle}`}
             className="absolute inset-0 h-full w-full border-0"
+            width="100%"
+            height="100%"
+            frameBorder={0}
             allowFullScreen
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             referrerPolicy="origin"

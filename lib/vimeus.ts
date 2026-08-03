@@ -20,6 +20,19 @@ type VimeusListItem = {
   embed_url?: string;
 };
 
+/** Personalización del player (theme, splash, UI) — misma config que el dashboard Vimeus. */
+const PLAYER_PARAMS: Record<string, string> = {
+  title: "StyleFli",
+  theme: "minimal",
+  loader: "v3",
+  font: "v2",
+  overlay: "v5",
+  selector: "v2",
+  playUI: "v2",
+  epanel: "v2",
+  splash: "v3",
+};
+
 /**
  * URL de embed Web (view_key). Docs Vimeus: referrerpolicy=origin en el iframe.
  */
@@ -36,6 +49,7 @@ export function getVimeusEmbedUrl(
   const params = new URLSearchParams({
     tmdb: String(tmdbId),
     view_key: viewKey,
+    ...PLAYER_PARAMS,
   });
 
   if (opts?.season != null) params.set("se", String(opts.season));
@@ -94,7 +108,7 @@ function extractItems(payload: unknown, kind: VimeusKind): VimeusListItem[] {
           ? "animes"
           : "episodes";
 
-  const list = data[key] ?? data.items ?? root[key];
+  const list = data[key] ?? data.result ?? data.items ?? root[key];
   return Array.isArray(list) ? (list as VimeusListItem[]) : [];
 }
 

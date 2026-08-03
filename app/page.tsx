@@ -15,7 +15,7 @@ async function HomeShell() {
         <p className="text-lg font-semibold">No hay títulos de Vimeus</p>
         <p className="max-w-md text-sm text-neutral-400">
           Revisa <code className="text-neutral-200">VIMEUS_API_KEY</code> en
-          Coolify y que el dominio esté permitido en Vimeus → Settings.
+          Coolify (runtime) y vuelve a desplegar.
         </p>
       </div>
     );
