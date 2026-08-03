@@ -1,4 +1,5 @@
 import type { MediaItem, MediaType } from "@/lib/tmdb";
+import { getMediaDetails } from "@/lib/tmdb";
 
 const BASE = "https://vimeus.com";
 
@@ -196,4 +197,26 @@ export async function getVimeusHomeCatalog() {
     moreMovies: moviesP3,
     moreSeries: seriesP3,
   };
+}
+
+/** Completa sinopsis y metadatos desde TMDB (Vimeus listing no los trae). */
+export async function enrichWithTmdb(item: MediaItem): Promise<MediaItem> {
+  try {
+    const type = item.media_type ?? "movie";
+    const details = await getMediaDetails(type, item.id);
+    return {
+      ...item,
+      overview: details.overview || item.overview,
+      vote_average: details.vote_average ?? item.vote_average,
+      release_date: details.release_date ?? item.release_date,
+      first_air_date: details.first_air_date ?? item.first_air_date,
+      poster_path: item.poster_path || details.poster_path,
+      backdrop_path: item.backdrop_path || details.backdrop_path,
+      title: item.title || details.title,
+      name: item.name || details.name,
+      genre_ids: details.genres?.map((g) => g.id) ?? item.genre_ids,
+    };
+  } catch {
+    return item;
+  }
 }

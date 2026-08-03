@@ -1,5 +1,5 @@
 import CatalogClient from "@/components/CatalogClient";
-import { getVimeusAnimes } from "@/lib/vimeus";
+import { enrichWithTmdb, getVimeusAnimes } from "@/lib/vimeus";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,9 @@ export default async function AnimesPage() {
   ]);
 
   const featured = [...page1, ...page2];
+  if (featured[0]) {
+    featured[0] = await enrichWithTmdb(featured[0]);
+  }
 
   return (
     <CatalogClient

@@ -1,15 +1,15 @@
 import { Suspense } from "react";
 import HomeClient from "@/components/HomeClient";
-import { getVimeusHomeCatalog } from "@/lib/vimeus";
+import { enrichWithTmdb, getVimeusHomeCatalog } from "@/lib/vimeus";
 
 export const dynamic = "force-dynamic";
 
 async function HomeShell() {
   const catalog = await getVimeusHomeCatalog();
-  const featured =
+  const featuredRaw =
     catalog.movies[0] ?? catalog.series[0] ?? catalog.animes[0];
 
-  if (!featured) {
+  if (!featuredRaw) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#141414] px-6 text-center text-white">
         <p className="text-lg font-semibold">No hay títulos de Vimeus</p>
@@ -20,6 +20,8 @@ async function HomeShell() {
       </div>
     );
   }
+
+  const featured = await enrichWithTmdb(featuredRaw);
 
   return (
     <HomeClient

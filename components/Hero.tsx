@@ -70,9 +70,11 @@ export default function Hero({ item, mediaType = "movie" }: HeroProps) {
           </span>
         </div>
 
-        <p className="mb-6 max-w-xl text-sm leading-relaxed text-neutral-200 drop-shadow md:text-base">
-          {truncate(item.overview || "Sin descripción disponible.", 180)}
-        </p>
+        {item.overview ? (
+          <p className="mb-6 max-w-xl text-sm leading-relaxed text-neutral-200 drop-shadow md:text-base">
+            {truncate(item.overview, 180)}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap gap-3">
           <Link

@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -90,10 +89,8 @@ export default function LoginForm() {
         </form>
 
         <p className="mt-6 text-sm text-neutral-400">
-          ¿No tienes cuenta?{" "}
-          <Link href="/registro" className="text-white hover:underline">
-            Regístrate
-          </Link>
+          Las cuentas las crea el administrador. Si no tienes acceso, contacta
+          al Super Admin.
         </p>
       </div>
     </div>

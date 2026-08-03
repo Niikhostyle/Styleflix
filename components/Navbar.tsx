@@ -293,9 +293,18 @@ export default function Navbar() {
                       ? "Super Admin"
                       : session.user.email}
                   </div>
+                  {session.user.role === "SUPER_ADMIN" && (
+                    <Link
+                      href="/admin"
+                      className="block px-3 py-2 text-sm hover:bg-white/5"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Gestionar usuarios
+                    </Link>
+                  )}
                   <button
                     type="button"
-                    onClick={() => signOut({ callbackUrl: "/" })}
+                    onClick={() => signOut({ callbackUrl: "/login" })}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5"
                   >
                     <LogOut className="h-4 w-4" />
@@ -305,20 +314,12 @@ export default function Navbar() {
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Link
-                href="/login"
-                className="rounded px-2 py-1.5 text-sm text-neutral-200 transition hover:text-white"
-              >
-                Entrar
-              </Link>
-              <Link
-                href="/registro"
-                className="rounded bg-[#E50914] px-3 py-1.5 text-sm font-semibold transition hover:bg-[#f6121d]"
-              >
-                Registrarse
-              </Link>
-            </div>
+            <Link
+              href="/login"
+              className="rounded bg-[#E50914] px-3 py-1.5 text-sm font-semibold transition hover:bg-[#f6121d]"
+            >
+              Entrar
+            </Link>
           )}
         </div>
       </div>

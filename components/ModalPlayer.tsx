@@ -72,12 +72,10 @@ export default function ModalPlayer({
   /** cover → stream Vimeus */
   const [phase, setPhase] = useState<"cover" | "stream">("cover");
   const [embedError, setEmbedError] = useState<string | null>(null);
-  const [showVimeusHint, setShowVimeusHint] = useState(false);
 
   const beginPlayback = useCallback(() => {
     setChromeVisible(true);
     setEmbedError(null);
-    setShowVimeusHint(false);
     setPhase("stream");
     setFrameNonce((n) => n + 1);
   }, []);
@@ -92,15 +90,6 @@ export default function ModalPlayer({
     else setPhase("cover");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  useEffect(() => {
-    if (!open || phase !== "stream") {
-      setShowVimeusHint(false);
-      return;
-    }
-    const t = window.setTimeout(() => setShowVimeusHint(true), 10000);
-    return () => window.clearTimeout(t);
-  }, [open, phase, frameNonce]);
 
   useEffect(() => {
     if (!open) return;
@@ -401,21 +390,6 @@ export default function ModalPlayer({
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             referrerPolicy="origin"
           />
-        )}
-
-        {phase === "stream" && showVimeusHint && !embedError && !embedBuildError && (
-          <div className="absolute bottom-20 left-1/2 z-20 w-[min(92%,28rem)] -translate-x-1/2 rounded-lg border border-white/10 bg-black/85 px-4 py-3 text-center md:bottom-24">
-            <p className="text-sm text-neutral-200">
-              Si sigue en negro, Vimeus probablemente no tiene este título.
-            </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-2 text-xs font-semibold text-white underline"
-            >
-              Cerrar reproductor
-            </button>
-          </div>
         )}
 
         {phase === "cover" && (
