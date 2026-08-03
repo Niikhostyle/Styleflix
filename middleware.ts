@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { resolveAuthSecret } from "@/lib/auth-secret";
 
 function isPublicPath(pathname: string) {
   if (pathname === "/login") return true;
@@ -9,30 +8,51 @@ function isPublicPath(pathname: string) {
   return false;
 }
 
+/** Coolify/proxy sirve HTTPS al usuario pero el request interno puede ser http. */
+function useSecureCookies(request: NextRequest) {
+  const forwarded = request.headers.get("x-forwarded-proto");
+  if (forwarded === "https") return true;
+  if (forwarded === "http") return false;
+  if ((process.env.AUTH_URL || "").startsWith("https")) return true;
+  return request.nextUrl.protocol === "https:";
+}
+
+function authSecret() {
+  // Acceso estático para Edge + quitar comillas si Coolify las pegó
+  const raw =
+    process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
+  return raw.trim().replace(/^["']|["']$/g, "") || undefined;
+}
+
+async function readToken(request: NextRequest) {
+  const secret = authSecret();
+  const secureCookie = useSecureCookies(request);
+  return getToken({
+    req: request,
+    secret,
+    secureCookie,
+  });
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isPublicPath(pathname)) {
-    const token = await getToken({
-      req: request,
-      secret: resolveAuthSecret(),
-    });
-
-    if (pathname === "/login" && token) {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-    return NextResponse.next();
-  }
-
-  // Registro público deshabilitado
   if (pathname.startsWith("/registro")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const token = await getToken({
-    req: request,
-    secret: resolveAuthSecret(),
-  });
+  if (isPublicPath(pathname)) {
+    if (pathname === "/login") {
+      const token = await readToken(request);
+      if (token) {
+        const dest = request.nextUrl.searchParams.get("callbackUrl") || "/";
+        return NextResponse.redirect(new URL(dest, request.url));
+      }
+    }
+    return NextResponse.next();
+  }
+
+  const token = await readToken(request);
 
   if (!token) {
     const login = new URL("/login", request.url);

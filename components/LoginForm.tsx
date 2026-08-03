@@ -1,12 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Navbar from "@/components/Navbar";
+import { FormEvent, useEffect, useState } from "react";
+import { signIn, useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginForm() {
-  const router = useRouter();
+  const { status } = useSession();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
@@ -15,32 +14,53 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Si ya hay sesión (navbar “Super Admin”), salir del login
+  useEffect(() => {
+    if (status === "authenticated") {
+      window.location.replace(callbackUrl);
+    }
+  }, [status, callbackUrl]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    setLoading(false);
+      if (res?.error) {
+        setError("Email o contraseña incorrectos.");
+        setLoading(false);
+        return;
+      }
 
-    if (res?.error) {
-      setError("Email o contraseña incorrectos.");
-      return;
+      // Navegación dura: evita quedarse en /login tras setear la cookie
+      window.location.href = callbackUrl;
+    } catch {
+      setError("No se pudo iniciar sesión. Intenta de nuevo.");
+      setLoading(false);
     }
+  }
 
-    router.push(callbackUrl);
-    router.refresh();
+  if (status === "authenticated" || status === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#141414] text-neutral-300">
+        {status === "loading" ? "Cargando…" : "Entrando…"}
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#141414] text-white">
-      <Navbar />
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-24">
+        <p className="mb-2 text-2xl font-black tracking-tight text-[#E50914]">
+          STYLEFLIX
+        </p>
         <h1 className="mb-2 text-3xl font-black">Iniciar sesión</h1>
         <p className="mb-8 text-sm text-neutral-400">
           Accede a tu cuenta para reproducir contenido.
@@ -52,6 +72,7 @@ export default function LoginForm() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
@@ -66,6 +87,7 @@ export default function LoginForm() {
               type="password"
               required
               minLength={6}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
