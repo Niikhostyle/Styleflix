@@ -3,35 +3,52 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 function isPublicPath(pathname: string) {
-  if (pathname === "/login") return true;
-  if (pathname.startsWith("/api/auth")) return true;
-  return false;
-}
-
-/** Coolify/proxy sirve HTTPS al usuario pero el request interno puede ser http. */
-function useSecureCookies(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-proto");
-  if (forwarded === "https") return true;
-  if (forwarded === "http") return false;
-  if ((process.env.AUTH_URL || "").startsWith("https")) return true;
-  return request.nextUrl.protocol === "https:";
+  return pathname === "/login" || pathname.startsWith("/api/auth");
 }
 
 function authSecret() {
-  // Acceso estático para Edge + quitar comillas si Coolify las pegó
-  const raw =
-    process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
+  const raw = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
   return raw.trim().replace(/^["']|["']$/g, "") || undefined;
+}
+
+/** Detecta cookie de sesión aunque getToken falle tras el proxy HTTPS. */
+function hasSessionCookie(request: NextRequest) {
+  for (const c of request.cookies.getAll()) {
+    const n = c.name.toLowerCase();
+    if (
+      n.includes("authjs.session-token") ||
+      n.includes("next-auth.session-token")
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function readToken(request: NextRequest) {
   const secret = authSecret();
-  const secureCookie = useSecureCookies(request);
+  if (!secret) return null;
+
+  // Probar ambas variantes: Coolify puede mentir con el esquema http/https
+  const secure = await getToken({
+    req: request,
+    secret,
+    secureCookie: true,
+  });
+  if (secure) return secure;
+
   return getToken({
     req: request,
     secret,
-    secureCookie,
+    secureCookie: false,
   });
+}
+
+function isLoggedIn(
+  token: Awaited<ReturnType<typeof readToken>>,
+  request: NextRequest
+) {
+  return Boolean(token) || hasSessionCookie(request);
 }
 
 export async function middleware(request: NextRequest) {
@@ -41,26 +58,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  const token = await readToken(request);
+  const loggedIn = isLoggedIn(token, request);
+
   if (isPublicPath(pathname)) {
-    if (pathname === "/login") {
-      const token = await readToken(request);
-      if (token) {
-        const dest = request.nextUrl.searchParams.get("callbackUrl") || "/";
-        return NextResponse.redirect(new URL(dest, request.url));
-      }
+    if (pathname === "/login" && loggedIn) {
+      const dest = request.nextUrl.searchParams.get("callbackUrl") || "/";
+      // Evitar open redirect
+      const safe = dest.startsWith("/") && !dest.startsWith("//") ? dest : "/";
+      return NextResponse.redirect(new URL(safe, request.url));
     }
     return NextResponse.next();
   }
 
-  const token = await readToken(request);
-
-  if (!token) {
+  if (!loggedIn) {
     const login = new URL("/login", request.url);
     login.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(login);
   }
 
-  if (pathname.startsWith("/admin") && token.role !== "SUPER_ADMIN") {
+  // Rol: si tenemos JWT lo validamos; si solo hay cookie, la página /admin usa auth()
+  if (
+    pathname.startsWith("/admin") &&
+    token &&
+    token.role !== "SUPER_ADMIN"
+  ) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

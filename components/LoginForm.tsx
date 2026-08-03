@@ -14,11 +14,18 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Si ya hay sesión (navbar “Super Admin”), salir del login
+  // Si ya hay sesión, salir del login (aunque el middleware falle)
   useEffect(() => {
-    if (status === "authenticated") {
-      window.location.replace(callbackUrl);
-    }
+    if (status !== "authenticated") return;
+    const safe =
+      callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+        ? callbackUrl
+        : "/";
+    // Pequeño delay para asegurar cookie + evitar pelea con middleware viejo
+    const t = window.setTimeout(() => {
+      window.location.replace(safe);
+    }, 50);
+    return () => window.clearTimeout(t);
   }, [status, callbackUrl]);
 
   async function onSubmit(e: FormEvent) {
@@ -28,9 +35,10 @@ export default function LoginForm() {
 
     try {
       const res = await signIn("credentials", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
+        callbackUrl,
       });
 
       if (res?.error) {
@@ -39,8 +47,11 @@ export default function LoginForm() {
         return;
       }
 
-      // Navegación dura: evita quedarse en /login tras setear la cookie
-      window.location.href = callbackUrl;
+      const safe =
+        callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+          ? callbackUrl
+          : "/";
+      window.location.assign(safe);
     } catch {
       setError("No se pudo iniciar sesión. Intenta de nuevo.");
       setLoading(false);
