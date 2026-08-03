@@ -98,6 +98,11 @@ export default function DetailClient({
 
   const cast = details.credits?.cast?.slice(0, 8) ?? [];
   const genres = details.genres ?? [];
+  const isAnime = useMemo(() => {
+    const hasAnimation = genres.some((g) => g.id === 16 || /animaci/i.test(g.name));
+    const lang = (details.original_language || "").toLowerCase();
+    return hasAnimation && (lang === "ja" || lang === "zh" || lang === "ko");
+  }, [genres, details.original_language]);
 
   const openPlayer = useCallback(() => setPlaying(true), []);
   const closePlayer = useCallback(() => {
@@ -534,6 +539,7 @@ export default function DetailClient({
         }
         onClose={closePlayer}
         autoStart
+        isAnime={isAnime}
       />
     </div>
   );

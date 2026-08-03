@@ -40,6 +40,8 @@ interface ModalPlayerProps {
   onClose: () => void;
   /** Si true, al abrir arranca playback sin pedir un segundo clic. */
   autoStart?: boolean;
+  /** Usar embed /e/anime de Vimeus (animes). */
+  isAnime?: boolean;
 }
 
 export default function ModalPlayer({
@@ -55,6 +57,7 @@ export default function ModalPlayer({
   onSeasonEpisodeChange,
   onClose,
   autoStart = true,
+  isAnime = false,
 }: ModalPlayerProps) {
   const { status } = useSession();
   const [chromeVisible, setChromeVisible] = useState(true);
@@ -69,10 +72,12 @@ export default function ModalPlayer({
   /** cover → stream Vimeus */
   const [phase, setPhase] = useState<"cover" | "stream">("cover");
   const [embedError, setEmbedError] = useState<string | null>(null);
+  const [showVimeusHint, setShowVimeusHint] = useState(false);
 
   const beginPlayback = useCallback(() => {
     setChromeVisible(true);
     setEmbedError(null);
+    setShowVimeusHint(false);
     setPhase("stream");
     setFrameNonce((n) => n + 1);
   }, []);
@@ -87,6 +92,15 @@ export default function ModalPlayer({
     else setPhase("cover");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (!open || phase !== "stream") {
+      setShowVimeusHint(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowVimeusHint(true), 10000);
+    return () => window.clearTimeout(t);
+  }, [open, phase, frameNonce]);
 
   useEffect(() => {
     if (!open) return;
@@ -278,6 +292,7 @@ export default function ModalPlayer({
       getVimeusEmbedUrl(mediaType, mediaId, {
         season: mediaType === "tv" ? activeSeason : undefined,
         episode: mediaType === "tv" ? activeEpisode : undefined,
+        anime: isAnime,
       }) + `&_r=${frameNonce}`;
   } catch (err) {
     embedBuildError =
@@ -375,7 +390,7 @@ export default function ModalPlayer({
 
         {phase === "stream" && embedPath && (
           <iframe
-            key={`player-${mediaId}-${activeSeason}-${activeEpisode}-${frameNonce}`}
+            key={`player-${mediaId}-${activeSeason}-${activeEpisode}-${frameNonce}-${isAnime ? "a" : "s"}`}
             src={embedPath}
             title={`${title}${subtitle}`}
             className="absolute inset-0 h-full w-full border-0"
@@ -383,6 +398,21 @@ export default function ModalPlayer({
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             referrerPolicy="no-referrer"
           />
+        )}
+
+        {phase === "stream" && showVimeusHint && !embedError && !embedBuildError && (
+          <div className="absolute bottom-20 left-1/2 z-20 w-[min(92%,28rem)] -translate-x-1/2 rounded-lg border border-white/10 bg-black/85 px-4 py-3 text-center md:bottom-24">
+            <p className="text-sm text-neutral-200">
+              Si sigue en negro, Vimeus probablemente no tiene este título.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-2 text-xs font-semibold text-white underline"
+            >
+              Cerrar reproductor
+            </button>
+          </div>
         )}
 
         {phase === "cover" && (
