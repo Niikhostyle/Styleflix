@@ -1,10 +1,9 @@
-import type { CapacitorConfig } from "@capacitor/cli";
-
 /**
  * StyleFlix (Next.js) corre en el servidor; la APK abre esa URL en WebView.
  * Cambia `server.url` si usas otro dominio o IP local.
+ * @type {import('@capacitor/cli').CapacitorConfig}
  */
-const config: CapacitorConfig = {
+const config = {
   appId: "cl.mublackstar.styleflix",
   appName: "StyleFlix",
   webDir: "www",
@@ -19,4 +18,4 @@ const config: CapacitorConfig = {
   },
 };
 
-export default config;
+module.exports = config;
