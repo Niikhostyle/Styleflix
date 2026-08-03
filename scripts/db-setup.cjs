@@ -10,13 +10,37 @@ function run(cmd, env) {
   execSync(cmd, { stdio: "inherit", env });
 }
 
-let url = (process.env.DATABASE_URL || "").trim();
-if (
-  (url.startsWith('"') && url.endsWith('"')) ||
-  (url.startsWith("'") && url.endsWith("'"))
-) {
-  url = url.slice(1, -1).trim();
+function stripQuotes(value) {
+  let v = (value || "").trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
 }
+
+// Diagnóstico Auth — no imprime el secret, solo si llega al contenedor
+const authKeys = Object.keys(process.env)
+  .filter((k) => /AUTH|NEXTAUTH|SECRET/i.test(k))
+  .sort();
+const authSecret = stripQuotes(
+  process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || ""
+);
+console.log(
+  `[auth-check] AUTH_SECRET: ${authSecret ? `OK (len=${authSecret.length})` : "MISSING"}`
+);
+console.log(
+  `[auth-check] env keys relacionadas: ${authKeys.length ? authKeys.join(", ") : "(ninguna)"}`
+);
+if (!authSecret) {
+  console.error(
+    "[auth-check] En Coolify crea la variable exacta AUTH_SECRET (Runtime), sin espacios en el nombre, y Redeploy."
+  );
+}
+
+let url = stripQuotes(process.env.DATABASE_URL || "");
 
 if (!url || url.startsWith("file:")) {
   console.warn(
@@ -45,6 +69,10 @@ if (/@(localhost|127\.0\.0\.1)(:|\/|$)/i.test(url)) {
 }
 
 const env = { ...process.env, DATABASE_URL: url };
+if (authSecret) {
+  env.AUTH_SECRET = authSecret;
+  env.NEXTAUTH_SECRET = authSecret;
+}
 
 try {
   run("npx prisma db push --skip-generate", env);

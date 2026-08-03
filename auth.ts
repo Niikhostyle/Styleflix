@@ -4,6 +4,7 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/lib/access";
+import { resolveAuthSecret } from "@/lib/auth-secret";
 
 declare module "next-auth" {
   interface User {
@@ -32,8 +33,15 @@ const credentialsSchema = z.object({
   password: z.string().min(6),
 });
 
+const authSecret = resolveAuthSecret();
+if (!authSecret) {
+  console.error(
+    "[auth] Falta AUTH_SECRET (o NEXTAUTH_SECRET) en el entorno del contenedor."
+  );
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET,
+  secret: authSecret,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
