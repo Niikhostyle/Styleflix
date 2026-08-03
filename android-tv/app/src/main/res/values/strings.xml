@@ -7,5 +7,5 @@
       ngrok: https://unloaded-employed-twisty.ngrok-free.dev
       Si cambia tu IP de PC, actualiza esta URL y vuelve a generar el APK.
     -->
-    <string name="styleflix_url">https://streaming.cloudmusic.cl</string>
+    <string name="styleflix_url">https://streaming.mublackstar.cl</string>
 </resources>

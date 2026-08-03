@@ -84,9 +84,11 @@ export default function LoginForm() {
               type="email"
               required
               autoComplete="email"
+              autoFocus
+              data-tv-autofocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded border border-white/10 bg-black/50 px-3 py-3 text-base outline-none ring-[#E50914] focus:ring-2"
               placeholder="tu@email.com"
             />
           </div>
@@ -101,7 +103,7 @@ export default function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded border border-white/10 bg-black/50 px-3 py-3 text-base outline-none ring-[#E50914] focus:ring-2"
               placeholder="••••••••"
             />
           </div>
@@ -115,7 +117,8 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-[#E50914] py-2.5 font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
+            data-tv-focus
+            className="tv-cta w-full rounded bg-[#E50914] py-3 text-base font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
@@ -126,7 +129,7 @@ export default function LoginForm() {
           al Super Admin.
         </p>
         <p className="mt-4 text-sm text-neutral-500">
-          <a href="/descargar" className="text-neutral-300 underline">
+          <a href="/descargar" data-tv-focus className="text-neutral-300 underline">
             Descargar app Android TV
           </a>
         </p>

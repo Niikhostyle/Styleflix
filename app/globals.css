@@ -60,3 +60,48 @@ a {
   animation: player-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: center center;
 }
+
+/* —— Android TV / control remoto —— */
+html.tv-mode {
+  scroll-behavior: smooth;
+}
+
+html.tv-mode body {
+  cursor: none;
+}
+
+html.tv-mode a:focus-visible,
+html.tv-mode button:focus-visible,
+html.tv-mode [data-tv-focus]:focus-visible,
+html.tv-mode input:focus-visible,
+html.tv-mode select:focus-visible,
+html.tv-mode [tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px rgba(229, 9, 20, 0.45);
+  z-index: 5;
+}
+
+html.tv-mode .tv-card:focus-visible {
+  transform: scale(1.12);
+  outline-offset: 6px;
+}
+
+html.tv-mode .tv-card:focus-visible .tv-card-meta {
+  opacity: 1;
+}
+
+html.tv-mode .tv-cta:focus-visible {
+  transform: scale(1.06);
+  background-color: #fff !important;
+  color: #000 !important;
+}
+
+html.tv-mode .group\/row:focus-within .tv-row-chevron {
+  opacity: 1;
+}
+
+/* En TV, chevrons de fila siempre semi-visibles al estar en la sección */
+html.tv-mode .tv-row-chevron {
+  opacity: 0.35;
+}

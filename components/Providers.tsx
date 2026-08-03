@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { SessionProvider } from "next-auth/react";
+import TvRemoteProvider from "@/components/TvRemoteProvider";
 
 function isNgrokHost() {
   if (typeof window === "undefined") return false;
@@ -31,7 +32,9 @@ function NgrokFetchPatch({ children }: { children: React.ReactNode }) {
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <NgrokFetchPatch>{children}</NgrokFetchPatch>
+      <NgrokFetchPatch>
+        <TvRemoteProvider>{children}</TvRemoteProvider>
+      </NgrokFetchPatch>
     </SessionProvider>
   );
 }

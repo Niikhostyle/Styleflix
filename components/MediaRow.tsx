@@ -52,8 +52,10 @@ export default function MediaRow({
         <button
           type="button"
           aria-label="Anterior"
+          tabIndex={-1}
+          data-tv-ignore
           onClick={() => scroll("left")}
-          className="absolute left-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-black/55 opacity-0 transition group-hover/row:opacity-100 hover:bg-black/75 md:w-12"
+          className="tv-row-chevron absolute left-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-black/55 opacity-0 transition group-hover/row:opacity-100 hover:bg-black/75 md:w-12"
         >
           <ChevronLeft className="h-9 w-9 text-white" />
         </button>
@@ -71,7 +73,15 @@ export default function MediaRow({
               <Link
                 key={`${type}-${item.id}`}
                 href={`/titulo/${type}/${item.id}`}
-                className="group/card relative aspect-[2/3] w-[110px] flex-shrink-0 overflow-hidden rounded-sm bg-zinc-900 transition duration-300 hover:z-10 hover:scale-105 md:w-[140px] lg:w-[160px]"
+                data-tv-focus
+                onFocus={(e) => {
+                  e.currentTarget.scrollIntoView({
+                    inline: "center",
+                    block: "nearest",
+                    behavior: "smooth",
+                  });
+                }}
+                className="tv-card group/card relative aspect-[2/3] w-[110px] flex-shrink-0 overflow-hidden rounded-sm bg-zinc-900 transition duration-300 hover:z-10 hover:scale-105 focus-visible:z-10 md:w-[140px] lg:w-[160px]"
               >
                 {item.poster_path ? (
                   <Image
@@ -88,8 +98,8 @@ export default function MediaRow({
                     {name}
                   </div>
                 )}
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition group-hover/card:opacity-100" />
-                <p className="pointer-events-none absolute bottom-0 left-0 right-0 truncate px-2 pb-2 text-xs font-medium text-white opacity-0 transition group-hover/card:opacity-100">
+                <div className="tv-card-meta pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition group-hover/card:opacity-100" />
+                <p className="tv-card-meta pointer-events-none absolute bottom-0 left-0 right-0 truncate px-2 pb-2 text-xs font-medium text-white opacity-0 transition group-hover/card:opacity-100">
                   {name}
                 </p>
               </Link>
@@ -100,8 +110,10 @@ export default function MediaRow({
         <button
           type="button"
           aria-label="Siguiente"
+          tabIndex={-1}
+          data-tv-ignore
           onClick={() => scroll("right")}
-          className="absolute right-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-black/55 opacity-0 transition group-hover/row:opacity-100 hover:bg-black/75 md:w-12"
+          className="tv-row-chevron absolute right-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-black/55 opacity-0 transition group-hover/row:opacity-100 hover:bg-black/75 md:w-12"
         >
           <ChevronRight className="h-9 w-9 text-white" />
         </button>

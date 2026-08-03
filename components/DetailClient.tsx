@@ -224,6 +224,7 @@ export default function DetailClient({
         <div className="relative z-10 px-4 pb-10 pt-24 md:px-12 md:pb-16 md:pt-28">
           <button
             type="button"
+            data-tv-focus
             onClick={() => router.back()}
             className="mb-8 flex items-center gap-2 text-sm text-neutral-300 transition hover:text-white"
           >
@@ -277,8 +278,10 @@ export default function DetailClient({
               <div className="mb-6 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
+                  data-tv-autofocus
+                  data-tv-focus
                   onClick={openPlayer}
-                  className="flex items-center gap-2 rounded bg-white px-7 py-2.5 text-sm font-bold text-black transition hover:bg-white/85 md:text-base"
+                  className="tv-cta flex items-center gap-2 rounded bg-white px-7 py-2.5 text-sm font-bold text-black transition hover:bg-white/85 md:text-base"
                 >
                   <Play className="h-5 w-5 fill-black" />
                   {hasProgress && mediaType === "tv"
@@ -290,6 +293,7 @@ export default function DetailClient({
 
                 <button
                   type="button"
+                  data-tv-focus
                   aria-label="Agregar a mi lista"
                   className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-400 text-white transition hover:border-white"
                 >
@@ -298,6 +302,7 @@ export default function DetailClient({
 
                 <button
                   type="button"
+                  data-tv-focus
                   aria-label="Me gusta"
                   className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-400 text-white transition hover:border-white"
                 >
@@ -307,6 +312,7 @@ export default function DetailClient({
                 {showTrailer && (
                   <button
                     type="button"
+                    data-tv-focus
                     aria-label={trailerMuted ? "Activar sonido" : "Silenciar"}
                     onClick={() => setTrailerMuted((m) => !m)}
                     className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-400 text-white transition hover:border-white"
@@ -362,6 +368,7 @@ export default function DetailClient({
                 Temporada
                 <select
                   value={season}
+                  data-tv-focus
                   onChange={(e) => {
                     setSeason(Number(e.target.value));
                     setEpisode(1);
@@ -396,6 +403,7 @@ export default function DetailClient({
                   <button
                     key={ep.id}
                     type="button"
+                    data-tv-focus
                     onClick={() =>
                       playEpisode(ep.season_number, ep.episode_number)
                     }

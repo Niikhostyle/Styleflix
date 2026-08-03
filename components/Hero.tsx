@@ -79,7 +79,9 @@ export default function Hero({ item, mediaType = "movie" }: HeroProps) {
         <div className="flex flex-wrap gap-3">
           <Link
             href={`${detailHref}?play=1`}
-            className="flex items-center gap-2 rounded bg-white px-6 py-2.5 text-sm font-bold text-black transition hover:bg-white/85 md:px-8 md:text-base"
+            data-tv-autofocus
+            data-tv-focus
+            className="tv-cta flex items-center gap-2 rounded bg-white px-6 py-2.5 text-sm font-bold text-black transition hover:bg-white/85 md:px-8 md:text-base"
           >
             <Play className="h-5 w-5 fill-black" />
             Reproducir
@@ -87,7 +89,8 @@ export default function Hero({ item, mediaType = "movie" }: HeroProps) {
 
           <Link
             href={detailHref}
-            className="flex items-center gap-2 rounded bg-neutral-500/60 px-6 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-neutral-500/40 md:px-8 md:text-base"
+            data-tv-focus
+            className="tv-cta flex items-center gap-2 rounded bg-neutral-500/60 px-6 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-neutral-500/40 md:px-8 md:text-base"
           >
             <Info className="h-5 w-5" />
             Más información

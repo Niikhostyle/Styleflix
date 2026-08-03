@@ -119,6 +119,7 @@ export default function Navbar() {
         <div className="flex items-center gap-6 md:gap-10">
           <Link
             href="/"
+            data-tv-focus
             className="text-2xl font-black tracking-tighter text-[#E50914] md:text-[1.85rem]"
           >
             STYLEFLIX
@@ -135,7 +136,8 @@ export default function Navbar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={`transition-colors ${
+                    data-tv-focus
+                    className={`rounded px-1 py-0.5 transition-colors ${
                       active
                         ? "font-semibold text-white"
                         : "text-neutral-300 hover:text-neutral-100"
@@ -155,6 +157,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                data-tv-focus
                 className={
                   pathname.startsWith(link.href)
                     ? "text-white"
@@ -185,6 +188,7 @@ export default function Navbar() {
                 <button
                   type="button"
                   aria-label="Cerrar búsqueda"
+                  data-tv-dismiss
                   onClick={closeSearch}
                   className="text-neutral-400 transition hover:text-white"
                 >
@@ -195,8 +199,9 @@ export default function Navbar() {
               <button
                 type="button"
                 aria-label="Buscar"
+                data-tv-focus
                 onClick={openSearch}
-                className="transition hover:text-neutral-300"
+                className="rounded p-1 transition hover:text-neutral-300"
               >
                 <Search className="h-5 w-5" />
               </button>
@@ -224,6 +229,7 @@ export default function Navbar() {
                         key={`${type}-${item.id}`}
                         href={`/titulo/${type}/${item.id}`}
                         onClick={closeSearch}
+                        data-tv-focus
                         className="flex items-center gap-3 border-b border-white/5 px-3 py-2.5 transition hover:bg-white/5 last:border-0"
                       >
                         <div className="h-14 w-10 shrink-0 overflow-hidden rounded-sm bg-zinc-800">
@@ -277,6 +283,7 @@ export default function Navbar() {
             <div className="relative">
               <button
                 type="button"
+                data-tv-focus
                 onClick={() => setMenuOpen((v) => !v)}
                 className="flex items-center gap-2 rounded bg-[#E50914]/90 px-2 py-1.5 transition hover:bg-[#E50914]"
               >
@@ -296,6 +303,7 @@ export default function Navbar() {
                   {session.user.role === "SUPER_ADMIN" && (
                     <Link
                       href="/admin"
+                      data-tv-focus
                       className="block px-3 py-2 text-sm hover:bg-white/5"
                       onClick={() => setMenuOpen(false)}
                     >
@@ -304,6 +312,8 @@ export default function Navbar() {
                   )}
                   <button
                     type="button"
+                    data-tv-focus
+                    data-tv-dismiss
                     onClick={() => signOut({ callbackUrl: "/login" })}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-white/5"
                   >
@@ -316,6 +326,7 @@ export default function Navbar() {
           ) : (
             <Link
               href="/login"
+              data-tv-focus
               className="rounded bg-[#E50914] px-3 py-1.5 text-sm font-semibold transition hover:bg-[#f6121d]"
             >
               Entrar
