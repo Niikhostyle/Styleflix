@@ -158,10 +158,6 @@ export default function ModalPlayer({
         <span className="text-sm font-semibold">Volver</span>
       </button>
 
-      <p className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/55 px-4 py-1.5 text-xs text-neutral-200 backdrop-blur-sm md:text-sm">
-        Atrás / Escape para salir del reproductor
-      </p>
-
       {!embedPath ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-white">
