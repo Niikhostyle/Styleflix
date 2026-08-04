@@ -57,6 +57,10 @@ export default function AdminUsersClient() {
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
+  const [previewMinutes, setPreviewMinutes] = useState(5);
+  const [previewDraft, setPreviewDraft] = useState(5);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState("");
 
   const loadUsers = useCallback(async () => {
     setLoadingList(true);
@@ -72,9 +76,52 @@ export default function AdminUsersClient() {
     }
   }, [filter]);
 
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/settings");
+      const data = await res.json();
+      if (res.ok && data.previewMinutes) {
+        setPreviewMinutes(data.previewMinutes);
+        setPreviewDraft(data.previewMinutes);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     void loadUsers();
   }, [loadUsers]);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
+
+  async function savePreviewMinutes(e: FormEvent) {
+    e.preventDefault();
+    setSettingsBusy(true);
+    setSettingsMsg("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ previewMinutes: previewDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSettingsMsg(data.error || "No se pudo guardar.");
+        setSettingsBusy(false);
+        return;
+      }
+      setPreviewMinutes(data.previewMinutes);
+      setPreviewDraft(data.previewMinutes);
+      setSettingsMsg(`Guardado: ${data.previewMinutes} min de preview.`);
+    } catch {
+      setSettingsMsg("Error de red.");
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -159,6 +206,40 @@ export default function AdminUsersClient() {
             ))}
           </div>
         )}
+
+        <form
+          onSubmit={savePreviewMinutes}
+          className="mb-10 space-y-3 border border-white/10 bg-black/40 p-5"
+        >
+          <h2 className="text-lg font-bold">Configuración · Preview</h2>
+          <p className="text-sm text-neutral-400">
+            Minutos de prueba para cuentas sin membresía activa (ahora:{" "}
+            {previewMinutes} min).
+          </p>
+          <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+            Minutos:
+            <input
+              type="number"
+              min={1}
+              max={180}
+              value={previewDraft}
+              onChange={(e) =>
+                setPreviewDraft(Number(e.target.value) || 1)
+              }
+              className="w-24 rounded border border-white/15 bg-black/60 px-2 py-1"
+            />
+            <button
+              type="submit"
+              disabled={settingsBusy}
+              className="rounded bg-white px-3 py-1.5 text-sm font-bold text-black disabled:opacity-60"
+            >
+              {settingsBusy ? "Guardando…" : "Guardar"}
+            </button>
+          </label>
+          {settingsMsg && (
+            <p className="text-sm text-emerald-300">{settingsMsg}</p>
+          )}
+        </form>
 
         <form
           onSubmit={onSubmit}

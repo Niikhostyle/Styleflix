@@ -73,3 +73,10 @@ model WatchProgress {
   @@unique([userId, mediaType, tmdbId])
   @@index([userId, lastWatchedAt])
 }
+
+/// Config global (ej. minutos de preview sin membresía)
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

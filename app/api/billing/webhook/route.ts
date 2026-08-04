@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getPreapproval,
   membershipAmount,
+  normalizeMpAccessToken,
   verifyWebhookSignature,
 } from "@/lib/mercadopago";
 import { activateMembership, markSubscriptionStatus } from "@/lib/membership";
@@ -103,7 +104,10 @@ export async function POST(request: Request) {
     }
 
     if (topic.includes("payment") || topic === "payment") {
-      if (!dataId || !process.env.MERCADOPAGO_ACCESS_TOKEN) {
+      const mpToken = normalizeMpAccessToken(
+        process.env.MERCADOPAGO_ACCESS_TOKEN
+      );
+      if (!dataId || !mpToken) {
         return NextResponse.json({ ok: true, skipped: "payment no token/id" });
       }
 
@@ -111,7 +115,7 @@ export async function POST(request: Request) {
         `https://api.mercadopago.com/v1/payments/${dataId}`,
         {
           headers: {
-            Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`,
+            Authorization: `Bearer ${mpToken}`,
           },
         }
       );

@@ -153,9 +153,22 @@ export default function MembershipClient({
         </p>
       )}
       {error && (
-        <p className="mt-4 rounded bg-red-500/15 px-3 py-2 text-sm text-red-300">
-          {error}
-        </p>
+        <div className="mt-4 rounded bg-red-500/15 px-3 py-2 text-sm text-red-300">
+          <p>{error}</p>
+          {(error.includes("real or test") ||
+            error.includes("TEST_PAYER") ||
+            error.includes("Modo test")) && (
+            <p className="mt-2 text-red-200/90">
+              En modo prueba el cobrador y el pagador deben ser cuentas TEST. En
+              Coolify: token{" "}
+              <code className="text-xs">APP_USR-…</code> (no APP_USER),{" "}
+              <code className="text-xs">MERCADOPAGO_MODE=test</code> y{" "}
+              <code className="text-xs">MERCADOPAGO_TEST_PAYER_EMAIL</code> del
+              comprador de prueba. En el checkout de MP inicia sesión con ese
+              comprador.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="mt-6 flex flex-col gap-3">

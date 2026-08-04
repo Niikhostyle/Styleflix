@@ -4,8 +4,8 @@ export const APP_NAME_UPPER = "VeoTV";
 export const APP_TAGLINE =
   "Películas, series y animes. Tu plataforma de streaming.";
 
-/** Preview gratis sin membresía (ms). */
-export const PREVIEW_LIMIT_MS = 5 * 60 * 1000;
+/** Fallback si no carga settings de DB. */
+export const DEFAULT_PREVIEW_MINUTES = 5;
 
 export function previewStorageKey(userId: string) {
   return `veotv_preview_ms_${userId}`;

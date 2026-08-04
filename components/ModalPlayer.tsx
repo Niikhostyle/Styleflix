@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 import { isBackKey } from "@/lib/tv";
 import {
   APP_NAME,
-  PREVIEW_LIMIT_MS,
+  DEFAULT_PREVIEW_MINUTES,
   previewStorageKey,
 } from "@/lib/brand";
 import { MEMBERSHIP_PRICE_CLP } from "@/lib/access";
@@ -78,6 +78,9 @@ export default function ModalPlayer({
   const [frameNonce, setFrameNonce] = useState(0);
   const [paywall, setPaywall] = useState(false);
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
+  const [previewLimitMs, setPreviewLimitMs] = useState(
+    DEFAULT_PREVIEW_MINUTES * 60 * 1000
+  );
   const [embedPath, setEmbedPath] = useState("");
   const [sourceLabel, setSourceLabel] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
@@ -86,6 +89,25 @@ export default function ModalPlayer({
   const pushedRef = useRef(false);
   const closingRef = useRef(false);
   const usedMsRef = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/settings/preview")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const mins = Number(data.previewMinutes);
+        if (Number.isFinite(mins) && mins >= 1) {
+          setPreviewLimitMs(Math.floor(mins) * 60 * 1000);
+        }
+      })
+      .catch(() => {
+        /* keep default */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -153,7 +175,7 @@ export default function ModalPlayer({
     }
 
     usedMsRef.current = readPreviewMs(userId);
-    if (usedMsRef.current >= PREVIEW_LIMIT_MS) {
+    if (usedMsRef.current >= previewLimitMs) {
       setPaywall(true);
       setRemainingSec(0);
       return;
@@ -167,24 +189,24 @@ export default function ModalPlayer({
       const elapsed = base + (Date.now() - started);
       usedMsRef.current = elapsed;
       writePreviewMs(userId, elapsed);
-      const left = Math.max(0, PREVIEW_LIMIT_MS - elapsed);
+      const left = Math.max(0, previewLimitMs - elapsed);
       setRemainingSec(Math.ceil(left / 1000));
-      if (elapsed >= PREVIEW_LIMIT_MS) {
+      if (elapsed >= previewLimitMs) {
         setPaywall(true);
         setRemainingSec(0);
         window.clearInterval(tick);
       }
     }, 1000);
 
-    setRemainingSec(Math.ceil((PREVIEW_LIMIT_MS - base) / 1000));
+    setRemainingSec(Math.ceil((previewLimitMs - base) / 1000));
 
     return () => {
       window.clearInterval(tick);
       const finalMs = base + (Date.now() - started);
-      usedMsRef.current = Math.min(finalMs, PREVIEW_LIMIT_MS);
+      usedMsRef.current = Math.min(finalMs, previewLimitMs);
       writePreviewMs(userId, usedMsRef.current);
     };
-  }, [open, unlimited, userId]);
+  }, [open, unlimited, userId, previewLimitMs]);
 
   useEffect(() => {
     if (!open) return;
@@ -296,7 +318,7 @@ export default function ModalPlayer({
             {APP_NAME}
           </p>
           <h2 className="max-w-md text-2xl font-black text-white md:text-3xl">
-            Se acabó tu preview de 5 minutos
+            Se acabó tu preview de prueba
           </h2>
           <p className="max-w-sm text-sm text-neutral-300">
             Activa la membresía mensual por ${price} CLP y mira sin límites

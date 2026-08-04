@@ -3,10 +3,12 @@
  * Docs: https://www.mercadopago.cl/developers/es/docs/subscriptions/overview
  *
  * Coolify / .env:
- *   MERCADOPAGO_ACCESS_TOKEN=APP_USR-...
- *   MERCADOPAGO_WEBHOOK_SECRET=... (opcional, validación x-signature)
+ *   MERCADOPAGO_ACCESS_TOKEN=APP_USR-...   (ojo: APP_USR, no APP_USER)
+ *   NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=APP_USR-...
+ *   MERCADOPAGO_MODE=test|production
+ *   MERCADOPAGO_TEST_PAYER_EMAIL=email del comprador de prueba (obligatorio en test)
+ *   MERCADOPAGO_WEBHOOK_SECRET=... (opcional)
  *   MEMBERSHIP_PRICE_CLP=4990
- *   RESELLER_PRICE_CLP=2990  (cuentas admin; no pasa por este checkout)
  *   AUTH_URL=https://veotv.cloud
  */
 
@@ -31,8 +33,28 @@ export type MpPreapproval = {
   };
 };
 
+/** Corrige typo frecuente APP_USER → APP_USR */
+export function normalizeMpAccessToken(raw?: string | null): string {
+  const t = (raw || "").trim();
+  if (!t) return "";
+  if (t.startsWith("APP_USER-")) {
+    console.warn(
+      "[mercadopago] Token empieza con APP_USER-; se corrige a APP_USR-."
+    );
+    return `APP_USR-${t.slice("APP_USER-".length)}`;
+  }
+  return t;
+}
+
+export function isMercadoPagoTestMode(): boolean {
+  const mode = (process.env.MERCADOPAGO_MODE || "").trim().toLowerCase();
+  if (mode === "production" || mode === "prod") return false;
+  if (mode === "test" || mode === "sandbox") return true;
+  return Boolean(process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim());
+}
+
 function accessToken() {
-  const t = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
+  const t = normalizeMpAccessToken(process.env.MERCADOPAGO_ACCESS_TOKEN);
   if (!t) throw new Error("Falta MERCADOPAGO_ACCESS_TOKEN");
   return t;
 }
@@ -47,6 +69,20 @@ function publicBaseUrl() {
 
 export function membershipAmount(): number {
   return MEMBERSHIP_PRICE_CLP;
+}
+
+/** Email que debe ir a MP: en test, el comprador de prueba. */
+export function resolvePayerEmail(accountEmail: string): string {
+  if (isMercadoPagoTestMode()) {
+    const testEmail = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
+    if (!testEmail) {
+      throw new Error(
+        "Modo test: configura MERCADOPAGO_TEST_PAYER_EMAIL con el email del comprador de prueba (Cuentas de prueba → Comprador)."
+      );
+    }
+    return testEmail.toLowerCase();
+  }
+  return accountEmail.toLowerCase().trim();
 }
 
 async function mpFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -86,13 +122,14 @@ export async function createMembershipPreapproval(opts: {
 }): Promise<MpPreapproval> {
   const amount = membershipAmount();
   const backUrl = `${publicBaseUrl()}/membresia?status=ok`;
+  const payerEmail = resolvePayerEmail(opts.payerEmail);
 
   return mpFetch<MpPreapproval>("/preapproval", {
     method: "POST",
     body: JSON.stringify({
       reason: "VeoTV Mensual",
       external_reference: opts.userId,
-      payer_email: opts.payerEmail,
+      payer_email: payerEmail,
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",
@@ -117,11 +154,8 @@ export async function cancelPreapproval(id: string): Promise<MpPreapproval> {
 }
 
 export function checkoutUrl(preapproval: MpPreapproval): string {
-  const isProd = Boolean(
-    process.env.MERCADOPAGO_ACCESS_TOKEN?.startsWith("APP_USR-")
-  );
-  if (!isProd && preapproval.sandbox_init_point) {
-    return preapproval.sandbox_init_point;
+  if (isMercadoPagoTestMode()) {
+    return preapproval.sandbox_init_point || preapproval.init_point || "";
   }
   return preapproval.init_point || preapproval.sandbox_init_point || "";
 }
