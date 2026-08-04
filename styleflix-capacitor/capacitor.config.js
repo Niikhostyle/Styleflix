@@ -1,6 +1,6 @@
 /**
  * VeoTV (Next.js) corre en el servidor; la APK abre esa URL en WebView.
- * Define CAPACITOR_SERVER_URL con la URL de tu Coolify antes de sync/build.
+ * Override: CAPACITOR_SERVER_URL=https://tu-dominio
  * @type {import('@capacitor/cli').CapacitorConfig}
  */
 const config = {
@@ -8,7 +8,9 @@ const config = {
   appName: "VeoTV",
   webDir: "www",
   server: {
-    url: process.env.CAPACITOR_SERVER_URL || "https://streaming.mublackstar.cl",
+    url:
+      process.env.CAPACITOR_SERVER_URL ||
+      "http://xm1dcyaivniukhm46fh5ic2r.207.248.200.210.sslip.io",
     cleartext: true,
     androidScheme: "https",
   },

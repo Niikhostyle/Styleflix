@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "StyleFlixTV"
+rootProject.name = "VeoTV"
 include(":app")

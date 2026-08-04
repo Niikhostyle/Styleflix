@@ -2,26 +2,26 @@
 
 | Archivo en `/public/downloads/` | Dispositivo | Proyecto |
 |---|---|---|
-| `styleflix-celular.apk` | Celular / tablet | `styleflix-capacitor` (appName: VeoTV) |
-| `styleflix-tv.apk` | Android TV / Google TV | `android-tv` |
+| `veotv-celular.apk` | Celular / tablet | `styleflix-capacitor` |
+| `veotv-tv.apk` | Android TV / Google TV | `android-tv` |
 
-Ambos abren la URL de tu Coolify (`CAPACITOR_SERVER_URL` / `styleflix_url`).
+URL por defecto (Coolify): `http://xm1dcyaivniukhm46fh5ic2r.207.248.200.210.sslip.io`
 
 ## Celular
 
-```bash
+```powershell
 cd styleflix-capacitor
-# set CAPACITOR_SERVER_URL=https://TU-COOLIFY
 npx cap sync android
-cd android && .\gradlew.bat assembleRelease
-Copy-Item -Force app\build\outputs\apk\release\app-release.apk ..\..\public\downloads\styleflix-celular.apk
+cd android
+.\gradlew.bat assembleRelease
+New-Item -ItemType Directory -Force -Path ..\..\public\downloads | Out-Null
+Copy-Item -Force app\build\outputs\apk\release\app-release.apk ..\..\public\downloads\veotv-celular.apk
 ```
 
 ## TV
 
-```bash
+```powershell
 cd android-tv
-# edita res/values/strings.xml → styleflix_url
 .\gradlew.bat assembleRelease
-Copy-Item -Force app\build\outputs\apk\release\app-release.apk ..\public\downloads\styleflix-tv.apk
+Copy-Item -Force app\build\outputs\apk\release\app-release.apk ..\public\downloads\veotv-tv.apk
 ```

@@ -2,9 +2,7 @@
 <resources>
     <string name="app_name">VeoTV</string>
     <!--
-      URL que abre la TV (tu Coolify local).
-      Ejemplo LAN: http://192.168.1.55:8000
-      Cambia esta URL y vuelve a generar el APK.
+      URL Coolify. Si cambia el dominio/IP, actualiza y regenera el APK.
     -->
-    <string name="styleflix_url">https://streaming.mublackstar.cl</string>
+    <string name="styleflix_url">http://xm1dcyaivniukhm46fh5ic2r.207.248.200.210.sslip.io</string>
 </resources>

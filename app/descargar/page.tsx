@@ -19,24 +19,24 @@ export default function DescargarPage() {
 
         <div className="mt-10 space-y-4">
           <a
-            href="/downloads/styleflix-celular.apk"
+            href="/downloads/veotv-celular.apk"
             download
             className="flex w-full flex-col gap-1 rounded bg-[#E50914] px-6 py-4 text-left transition hover:bg-[#f6121d]"
           >
             <span className="text-lg font-bold">Celular / tablet Android</span>
             <span className="text-sm font-medium text-white/85">
-              VeoTV (celular) · táctil
+              veotv-celular.apk · táctil
             </span>
           </a>
 
           <a
-            href="/downloads/styleflix-tv.apk"
+            href="/downloads/veotv-tv.apk"
             download
             className="flex w-full flex-col gap-1 rounded border border-white/25 bg-white/10 px-6 py-4 text-left transition hover:bg-white/15"
           >
             <span className="text-lg font-bold">Android TV / Google TV</span>
             <span className="text-sm font-medium text-neutral-300">
-              VeoTV (TV) · control remoto
+              veotv-tv.apk · control remoto
             </span>
           </a>
         </div>
@@ -56,8 +56,8 @@ export default function DescargarPage() {
 
         <div className="mt-8 rounded-lg border border-white/10 bg-black/40 p-4 text-sm text-neutral-400">
           <p className="font-semibold text-neutral-200">Tip ADB (avanzado)</p>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-neutral-300">{`adb install -r styleflix-celular.apk
-adb install -r styleflix-tv.apk`}</pre>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-neutral-300">{`adb install -r veotv-celular.apk
+adb install -r veotv-tv.apk`}</pre>
         </div>
 
         <p className="mt-8 text-sm text-neutral-500">

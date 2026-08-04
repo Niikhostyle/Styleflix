@@ -9,7 +9,7 @@ import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
 /**
- * StyleFlix móvil (Capacitor) + bloqueo de ads en WebView.
+ * VeoTV móvil (Capacitor) + bloqueo de ads en WebView.
  */
 public class MainActivity extends BridgeActivity {
   @Override

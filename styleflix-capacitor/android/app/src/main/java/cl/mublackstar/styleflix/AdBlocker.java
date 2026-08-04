@@ -11,7 +11,7 @@ import java.util.Set;
 
 /**
  * Bloqueo de redes de ads/trackers a nivel WebView (equivalente práctico a Brave).
- * No toca vimeus.com / TMDB / el propio StyleFlix.
+ * No toca vimeus.com / TMDB / el propio VeoTV.
  */
 public final class AdBlocker {
   private AdBlocker() {}
