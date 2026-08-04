@@ -25,4 +25,5 @@ npm run dev
 
 - **Directo** $4.990/mes vía Mercado Pago.
 - **Revendedor** $2.990: el admin crea cuentas `PREPAID`; los días corren al **primer login** del cliente.
-- Sin membresía activa solo login y `/membresia` (`SUPER_ADMIN` bypasea).
+- Registro público en `/login` → Crear cuenta. Sin membresía: catálogo + **5 min** de preview, luego invitación a pagar.
+- `SUPER_ADMIN` bypasea el paywall.
