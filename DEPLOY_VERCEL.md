@@ -1,4 +1,4 @@
-# Deploy Naseros en Vercel
+# Deploy VeoTV en Vercel
 
 ## 1. Base de datos (obligatoria)
 

@@ -20,16 +20,16 @@ function isMediaType(value: string): value is MediaType {
 
 export async function generateMetadata({ params }: PageProps) {
   const { type, id } = await params;
-  if (!isMediaType(type)) return { title: "Naseros" };
+  if (!isMediaType(type)) return { title: "VeoTV" };
 
   try {
     const details = await getMediaDetails(type, Number(id));
     return {
-      title: `${getDisplayTitle(details)} | Naseros`,
-      description: details.overview?.slice(0, 160) || "Ver en Naseros",
+      title: `${getDisplayTitle(details)} | VeoTV`,
+      description: details.overview?.slice(0, 160) || "Ver en VeoTV",
     };
   } catch {
-    return { title: "Naseros" };
+    return { title: "VeoTV" };
   }
 }
 

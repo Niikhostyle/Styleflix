@@ -6,7 +6,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl">
         <p className="mb-6 text-sm">
           Preguntas? Contáctanos en{" "}
-          <span className="underline">ayuda@naseros.com</span>
+          <span className="underline">ayuda@veotv.com</span>
         </p>
 
         <div className="mb-8 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
@@ -25,7 +25,7 @@ export default function Footer() {
         </div>
 
         <p className="text-xs text-neutral-600">
-          © {new Date().getFullYear()} Naseros. Datos de catálogo proporcionados
+          © {new Date().getFullYear()} VeoTV. Datos de catálogo proporcionados
           por TMDB.
         </p>
       </div>

@@ -34,9 +34,7 @@ ENV NODE_ENV=production \
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
-  && groupadd --system --gid 1001 nodejs \
-  && useradd --system --uid 1001 nextjs
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/package.json /app/package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
@@ -46,6 +44,5 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
-USER nextjs
 EXPOSE 3000
 CMD ["npm", "run", "start"]

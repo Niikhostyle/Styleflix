@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Naseros</string>
+    <string name="app_name">VeoTV</string>
     <!--
       URL que abre la TV (tu Coolify local).
       Ejemplo LAN: http://192.168.1.55:8000

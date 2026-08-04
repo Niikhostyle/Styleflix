@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
             databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            userAgentString = "$userAgentString NaserosTV/1.0"
+            userAgentString = "$userAgentString VeoTV/1.0"
             cacheMode = WebSettings.LOAD_DEFAULT
             loadWithOverviewMode = true
             useWideViewPort = true

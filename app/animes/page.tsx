@@ -4,8 +4,8 @@ import { enrichWithTmdb, getVimeusAnimes } from "@/lib/vimeus";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Animes | Naseros",
-  description: "Animes disponibles para reproducir en Naseros",
+  title: "Animes | VeoTV",
+  description: "Animes disponibles para reproducir en VeoTV",
 };
 
 export default async function AnimesPage() {

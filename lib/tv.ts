@@ -3,7 +3,7 @@
 export function isTvEnvironment(): boolean {
   if (typeof window === "undefined") return false;
   const ua = navigator.userAgent || "";
-  if (/NaserosTV|StyleFlixTV/i.test(ua)) return true;
+  if (/VeoTV|NaserosTV|StyleFlixTV/i.test(ua)) return true;
   if (/Android.*TV|SMART-TV|AppleTV|GoogleTV|AFT[A-Z]|BRAVIA|MIBOX|MiBOX/i.test(ua)) {
     return true;
   }

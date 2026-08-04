@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Naseros</string>
-    <string name="title_activity_main">Naseros</string>
+    <string name="app_name">VeoTV</string>
+    <string name="title_activity_main">VeoTV</string>
     <string name="package_name">cl.mublackstar.styleflix</string>
     <string name="custom_url_scheme">cl.mublackstar.styleflix</string>
 </resources>

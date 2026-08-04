@@ -98,7 +98,7 @@ export default function MembershipClient({
     return (
       <div className="mx-auto max-w-lg px-4 py-24 text-white">
         <p className="text-2xl font-black tracking-tight text-[#E50914]">
-          Naseros
+          VeoTV
         </p>
         <h1 className="mt-3 text-3xl font-black">Membresía</h1>
         <p className="mt-3 text-neutral-300">
@@ -117,7 +117,7 @@ export default function MembershipClient({
   return (
     <div className="mx-auto max-w-lg px-4 py-24 text-white">
       <p className="text-2xl font-black tracking-tight text-[#E50914]">
-        Naseros
+        VeoTV
       </p>
       <h1 className="mt-3 text-3xl font-black">Membresía mensual</h1>
       <p className="mt-3 text-neutral-300">
@@ -129,7 +129,7 @@ export default function MembershipClient({
         <p className="text-sm uppercase tracking-wider text-neutral-400">
           Plan
         </p>
-        <p className="mt-1 text-2xl font-black">Naseros Mensual</p>
+        <p className="mt-1 text-2xl font-black">VeoTV Mensual</p>
         <p className="mt-2 text-3xl font-black text-white">
           ${price}
           <span className="text-base font-medium text-neutral-400"> / mes</span>
@@ -198,7 +198,7 @@ export default function MembershipClient({
             href="/"
             className="mt-2 text-center text-sm font-semibold text-white underline"
           >
-            Ir a Naseros
+            Ir a VeoTV
           </Link>
         )}
       </div>

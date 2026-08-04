@@ -1,8 +1,8 @@
-# Naseros — APKs
+# VeoTV — APKs
 
 | Archivo en `/public/downloads/` | Dispositivo | Proyecto |
 |---|---|---|
-| `styleflix-celular.apk` | Celular / tablet | `styleflix-capacitor` (appName: Naseros) |
+| `styleflix-celular.apk` | Celular / tablet | `styleflix-capacitor` (appName: VeoTV) |
 | `styleflix-tv.apk` | Android TV / Google TV | `android-tv` |
 
 Ambos abren la URL de tu Coolify (`CAPACITOR_SERVER_URL` / `styleflix_url`).

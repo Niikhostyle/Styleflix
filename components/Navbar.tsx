@@ -122,7 +122,7 @@ export default function Navbar() {
             data-tv-focus
             className="text-2xl font-black tracking-tighter text-[#E50914] md:text-[1.85rem]"
           >
-            NASEROS
+            VeoTV
           </Link>
 
           <ul className="hidden items-center gap-5 text-[0.9rem] md:flex">
