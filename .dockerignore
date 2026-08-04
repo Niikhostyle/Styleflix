@@ -1,0 +1,22 @@
+# Acelera builds Coolify/Nixpacks (el repo no tenía .dockerignore)
+.git
+.github
+.next
+node_modules
+**/node_modules
+**/.gradle
+**/build
+**/.idea
+**/*.apk
+**/*.aab
+**/*.jks
+**/*.keystore
+styleflix-capacitor
+android-tv
+.agents
+.claude
+.windsurf
+*.md
+!README.md
+.env*
+!.env.example
