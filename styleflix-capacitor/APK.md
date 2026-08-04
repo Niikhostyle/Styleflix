@@ -5,7 +5,7 @@
 | `veotv-celular.apk` | Celular / tablet | `styleflix-capacitor` |
 | `veotv-tv.apk` | Android TV / Google TV | `android-tv` |
 
-URL por defecto (Coolify): `http://xm1dcyaivniukhm46fh5ic2r.207.248.200.210.sslip.io`
+URL por defecto: `https://veotv.cloud`
 
 ## Celular
 

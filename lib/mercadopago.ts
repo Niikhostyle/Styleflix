@@ -7,7 +7,7 @@
  *   MERCADOPAGO_WEBHOOK_SECRET=... (opcional, validación x-signature)
  *   MEMBERSHIP_PRICE_CLP=4990
  *   RESELLER_PRICE_CLP=2990  (cuentas admin; no pasa por este checkout)
- *   AUTH_URL=https://streaming.mublackstar.cl
+ *   AUTH_URL=https://veotv.cloud
  */
 
 import { createHmac } from "crypto";

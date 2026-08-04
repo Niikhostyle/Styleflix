@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VeoTV</string>
-    <!--
-      URL Coolify. Si cambia el dominio/IP, actualiza y regenera el APK.
-    -->
-    <string name="styleflix_url">http://xm1dcyaivniukhm46fh5ic2r.207.248.200.210.sslip.io</string>
+    <!-- URL pública de VeoTV -->
+    <string name="styleflix_url">https://veotv.cloud</string>
 </resources>

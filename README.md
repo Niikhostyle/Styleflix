@@ -22,11 +22,10 @@ Nixpacks genera `RUN --mount=type=cache` y el build se cuelga / falla en `npm ci
 
 1. Application → **Build Pack = Dockerfile** (o “Dockerfile” detectado)
 2. Branch: `main`
-3. Variables: `NEXT_PUBLIC_TMDB_API_KEY`, Vimeus, `AUTH_SECRET`, `AUTH_URL`, `DATABASE_URL`
-4. Membresía Mercado Pago: `MERCADOPAGO_ACCESS_TOKEN`, `MEMBERSHIP_PRICE_CLP=4990`, `RESELLER_PRICE_CLP=2990`, opcional `MERCADOPAGO_WEBHOOK_SECRET`
-5. Webhook MP → `{AUTH_URL}/api/billing/webhook`
-6. Tras deploy: migraciones las aplica `npm start` vía `scripts/db-setup.cjs` (o `npx prisma migrate deploy` en Terminal)
-7. Probar primero con credenciales **TEST** de MP Chile
+3. Variables: `NEXT_PUBLIC_TMDB_API_KEY`, Vimeus, `AUTH_SECRET`, `AUTH_URL=https://veotv.cloud`, `DATABASE_URL`
+4. En Coolify → Domains: `veotv.cloud` (HTTPS) apuntando a esta app
+5. Membresía Mercado Pago: `MERCADOPAGO_ACCESS_TOKEN`, `MEMBERSHIP_PRICE_CLP=4990`, `RESELLER_PRICE_CLP=2990`
+6. Webhook MP → `https://veotv.cloud/api/billing/webhook`
 
 - **Directo** $4.990/mes vía Mercado Pago.
 - **Revendedor** $2.990: el admin crea cuentas `PREPAID`; los días corren al **primer login** del cliente.
