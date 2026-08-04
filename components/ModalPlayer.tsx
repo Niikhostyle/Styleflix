@@ -78,16 +78,15 @@ export default function ModalPlayer({
   useEffect(() => {
     if (!open) return;
 
-    const focusBack = () => backBtnRef.current?.focus({ preventScroll: true });
-    const t = window.setTimeout(focusBack, 80);
-
-    // Reclamar foco periódicamente (el iframe lo roba)
-    const interval = window.setInterval(() => {
-      const active = document.activeElement;
-      if (active?.tagName === "IFRAME") {
-        focusBack();
-      }
-    }, 1200);
+    // Solo en TV: foco inicial en Volver para D-pad. No reclamar el foco
+    // después: si lo robamos al iframe, Vimeus pide otro clic en Play.
+    const isTv = document.documentElement.classList.contains("tv-mode");
+    let t: number | undefined;
+    if (isTv) {
+      t = window.setTimeout(() => {
+        backBtnRef.current?.focus({ preventScroll: true });
+      }, 80);
+    }
 
     const onKey = (e: KeyboardEvent) => {
       if (!isBackKey(e)) return;
@@ -104,8 +103,7 @@ export default function ModalPlayer({
 
     window.addEventListener("keydown", onKey, true);
     return () => {
-      window.clearTimeout(t);
-      window.clearInterval(interval);
+      if (t != null) window.clearTimeout(t);
       window.removeEventListener("keydown", onKey, true);
     };
   }, [open, onClose]);

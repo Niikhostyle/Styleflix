@@ -31,6 +31,7 @@ const PLAYER_PARAMS: Record<string, string> = {
   playUI: "v3",
   epanel: "v2",
   splash: "v2",
+  autoplay: "1",
 };
 
 /**
