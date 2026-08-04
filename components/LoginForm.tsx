@@ -130,7 +130,7 @@ export default function LoginForm() {
         </p>
         <p className="mt-4 text-sm text-neutral-500">
           <a href="/descargar" data-tv-focus className="text-neutral-300 underline">
-            Descargar app Android TV
+            Descargar apps Android (celular o TV)
           </a>
         </p>
       </div>

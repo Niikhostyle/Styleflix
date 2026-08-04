@@ -1,33 +1,35 @@
-# StyleFlix — APK (Capacitor + Android / Android TV)
+# StyleFlix — APKs
 
-Copia del proyecto Next.js preparada para generar una APK.
-La app nativa abre tu StyleFlix en WebView: `https://streaming.mublackstar.cl`
+Hay **dos** APKs:
 
-## Requisitos
+| Archivo | Destino | Proyecto |
+|---------|---------|----------|
+| `styleflix-celular.apk` | Celular / tablet | `styleflix-capacitor` |
+| `styleflix-tv.apk` | Android TV / Google TV | `android-tv` |
 
-1. [Android Studio](https://developer.android.com/studio) (incluye SDK + JDK)
-2. Node 20+
-3. StyleFlix en línea (Coolify) o una URL local/ngrok
+Ambos abren: `https://streaming.mublackstar.cl`
 
-## Generar el APK release
+Descarga pública: `https://streaming.mublackstar.cl/descargar`
+
+## Build celular (Capacitor)
 
 ```powershell
 cd "c:\Users\NICOLAS FIGUEROA\Documents\styleflix\netflix-clone\styleflix-capacitor"
 npm install
 npx cap sync android
 cd android
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.12.8-hotspot"
 .\gradlew.bat assembleRelease
+Copy-Item -Force app\build\outputs\apk\release\app-release.apk ..\..\public\downloads\styleflix-celular.apk
 ```
 
-Salida: `android\app\build\outputs\apk\release\app-release.apk`
+## Build TV (android-tv)
 
-Copia a la web:
+Requiere `android-tv\keystore.properties` + `styleflix-release.jks` (copiar desde Capacitor; no van a git).
 
-`public\downloads\styleflix.apk` → `https://streaming.mublackstar.cl/descargar`
-
-## Cambiar la URL del servidor
-
-Edita `capacitor.config.js` → `server.url`, luego `npx cap sync android`.
-
-- Producción: `https://streaming.mublackstar.cl`
-- Local (misma WiFi): `http://192.168.x.x:3000`
+```powershell
+cd "c:\Users\NICOLAS FIGUEROA\Documents\styleflix\netflix-clone\android-tv"
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.12.8-hotspot"
+.\gradlew.bat assembleRelease
+Copy-Item -Force app\build\outputs\apk\release\app-release.apk ..\public\downloads\styleflix-tv.apk
+```

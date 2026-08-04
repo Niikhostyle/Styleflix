@@ -4,13 +4,12 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
-import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
 /**
- * StyleFlix Capacitor + bloqueo de ads + foco D-pad para Android TV.
+ * StyleFlix móvil (Capacitor) + bloqueo de ads en WebView.
  */
 public class MainActivity extends BridgeActivity {
   @Override
@@ -22,13 +21,6 @@ public class MainActivity extends BridgeActivity {
     WebView webView = this.bridge.getWebView();
     webView.setFocusable(true);
     webView.setFocusableInTouchMode(true);
-    webView.requestFocus();
-
-    WebSettings settings = webView.getSettings();
-    String ua = settings.getUserAgentString();
-    if (ua != null && !ua.contains("StyleFlixTV")) {
-      settings.setUserAgentString(ua + " StyleFlixTV/1.0");
-    }
 
     BridgeWebViewClient client =
         new BridgeWebViewClient(this.bridge) {
@@ -59,9 +51,6 @@ public class MainActivity extends BridgeActivity {
   public boolean dispatchKeyEvent(KeyEvent event) {
     if (this.bridge != null && this.bridge.getWebView() != null) {
       WebView webView = this.bridge.getWebView();
-      if (!webView.hasFocus()) {
-        webView.requestFocus();
-      }
       if (webView.dispatchKeyEvent(event)) {
         return true;
       }
