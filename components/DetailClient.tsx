@@ -537,6 +537,7 @@ export default function DetailClient({
         mediaId={details.id}
         mediaType={mediaType}
         title={title}
+        year={year ? Number(year) : null}
         posterPath={details.poster_path}
         backdropPath={details.backdrop_path}
         season={mediaType === "tv" ? season : null}

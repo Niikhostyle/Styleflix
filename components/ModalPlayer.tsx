@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { getVimeusEmbedUrl } from "@/lib/vimeus";
 import { isBackKey } from "@/lib/tv";
 import {
   APP_NAME,
@@ -25,6 +24,7 @@ interface ModalPlayerProps {
   mediaId: number;
   mediaType: MediaType;
   title: string;
+  year?: number | null;
   posterPath?: string | null;
   backdropPath?: string | null;
   season?: number | null;
@@ -55,7 +55,7 @@ function writePreviewMs(userId: string, ms: number) {
 }
 
 /**
- * Iframe Vimeus a pantalla completa.
+ * Player fullscreen: Vimeus primero, Pluto TV de respaldo.
  * Sin membresía: máx. 5 min acumulados, luego invitación a pagar.
  */
 export default function ModalPlayer({
@@ -63,6 +63,7 @@ export default function ModalPlayer({
   mediaId,
   mediaType,
   title,
+  year = null,
   season = null,
   episode = null,
   onClose,
@@ -77,15 +78,71 @@ export default function ModalPlayer({
   const [frameNonce, setFrameNonce] = useState(0);
   const [paywall, setPaywall] = useState(false);
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
+  const [embedPath, setEmbedPath] = useState("");
+  const [sourceLabel, setSourceLabel] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const pushedRef = useRef(false);
   const closingRef = useRef(false);
   const usedMsRef = useRef(0);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setEmbedPath("");
+      setSourceLabel(null);
+      setResolveError("");
+      setResolving(false);
+      return;
+    }
+
     setFrameNonce((n) => n + 1);
-  }, [open, mediaId, mediaType, season, episode, isAnime]);
+    setResolving(true);
+    setResolveError("");
+    setEmbedPath("");
+    setSourceLabel(null);
+
+    const params = new URLSearchParams({
+      tmdb: String(mediaId),
+      type: mediaType,
+      title,
+    });
+    if (year) params.set("year", String(year));
+    if (mediaType === "tv") {
+      params.set("se", String(season ?? 1));
+      params.set("ep", String(episode ?? 1));
+      if (isAnime) params.set("anime", "1");
+    }
+
+    let cancelled = false;
+    void fetch(`/api/play/resolve?${params}`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok || !data.embedUrl) {
+          setResolveError(
+            data.error || "No disponible en Vimeus ni Pluto TV"
+          );
+          setEmbedPath("");
+          setSourceLabel(null);
+          return;
+        }
+        setEmbedPath(`${data.embedUrl}${data.embedUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`);
+        setSourceLabel(data.label || data.source || null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolveError("No se pudo resolver la reproducción.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setResolving(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mediaId, mediaType, title, year, season, episode, isAnime]);
 
   // Preview timer
   useEffect(() => {
@@ -182,21 +239,6 @@ export default function ModalPlayer({
     };
   }, [open, onClose]);
 
-  const embedPath = useMemo(() => {
-    if (!open || paywall) return "";
-    try {
-      return (
-        getVimeusEmbedUrl(mediaType, mediaId, {
-          season: mediaType === "tv" ? season ?? 1 : undefined,
-          episode: mediaType === "tv" ? episode ?? 1 : undefined,
-          anime: isAnime,
-        }) + `&_r=${frameNonce}`
-      );
-    } catch {
-      return "";
-    }
-  }, [open, paywall, mediaType, mediaId, season, episode, isAnime, frameNonce]);
-
   if (!open) return null;
 
   function handleCloseClick() {
@@ -212,6 +254,7 @@ export default function ModalPlayer({
   const price = MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL");
   const mins = remainingSec != null ? Math.floor(remainingSec / 60) : 0;
   const secs = remainingSec != null ? remainingSec % 60 : 0;
+  const showPlayer = Boolean(embedPath) && !paywall && !resolving && !resolveError;
 
   return (
     <div
@@ -234,11 +277,18 @@ export default function ModalPlayer({
         <span className="text-sm font-semibold">Volver</span>
       </button>
 
-      {!unlimited && remainingSec != null && !paywall && (
-        <div className="absolute right-3 top-3 z-20 rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-sm md:right-6 md:top-6">
-          Prueba {mins}:{String(secs).padStart(2, "0")}
-        </div>
-      )}
+      <div className="absolute right-3 top-3 z-20 flex flex-col items-end gap-2 md:right-6 md:top-6">
+        {sourceLabel && showPlayer && (
+          <span className="rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-neutral-200 backdrop-blur-sm">
+            {sourceLabel}
+          </span>
+        )}
+        {!unlimited && remainingSec != null && !paywall && (
+          <div className="rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-sm">
+            Prueba {mins}:{String(secs).padStart(2, "0")}
+          </div>
+        )}
+      </div>
 
       {paywall ? (
         <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
@@ -269,10 +319,14 @@ export default function ModalPlayer({
             Volver al catálogo
           </button>
         </div>
-      ) : !embedPath ? (
+      ) : resolving ? (
+        <div className="flex h-full items-center justify-center text-neutral-300">
+          Buscando fuente…
+        </div>
+      ) : resolveError || !embedPath ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-white">
-            No se pudo reproducir
+            {resolveError || "No disponible en Vimeus ni Pluto TV"}
           </p>
           <button
             type="button"
@@ -285,7 +339,7 @@ export default function ModalPlayer({
         </div>
       ) : (
         <iframe
-          key={`player-${mediaId}-${season}-${episode}-${frameNonce}`}
+          key={`player-${mediaId}-${season}-${episode}-${frameNonce}-${sourceLabel}`}
           src={embedPath}
           title={title}
           tabIndex={-1}
@@ -295,7 +349,9 @@ export default function ModalPlayer({
           frameBorder={0}
           allowFullScreen
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          referrerPolicy="origin"
+          referrerPolicy={
+            sourceLabel === "Pluto TV" ? "no-referrer-when-downgrade" : "origin"
+          }
         />
       )}
     </div>

@@ -23,7 +23,7 @@ type VimeusListItem = {
 
 /** Personalización del player — params del dashboard Vimeus. */
 const PLAYER_PARAMS: Record<string, string> = {
-  title: "Stylefli",
+  title: "VeoTV",
   theme: "minimal",
   loader: "v3",
   font: "v2",
@@ -141,6 +141,67 @@ export async function vimeusList(
   }
 
   return res.json();
+}
+
+/** True si Vimeus declara el tmdb_id en listing (movies/series/animes). */
+export async function vimeusHasTmdbId(
+  mediaType: MediaType,
+  tmdbId: number,
+  opts?: { anime?: boolean }
+): Promise<boolean> {
+  if (!process.env.VIMEUS_API_KEY) return false;
+
+  const kinds: VimeusKind[] = opts?.anime
+    ? ["animes"]
+    : mediaType === "tv"
+      ? ["series", "animes"]
+      : ["movies"];
+
+  for (const kind of kinds) {
+    try {
+      const payload = await vimeusList(kind, 1, { tmdb_id: tmdbId });
+      const items = extractItems(payload, kind);
+      if (items.some((i) => Number(i.tmdb_id) === tmdbId)) return true;
+    } catch (err) {
+      console.warn(`[vimeus] hasTmdb ${kind}`, err);
+    }
+  }
+  return false;
+}
+
+/**
+ * Fallback: lee el HTML del embed y comprueba si trae embeds[].
+ * Útil si el listing no filtra bien por tmdb_id.
+ */
+export async function vimeusEmbedHasSources(
+  mediaType: MediaType,
+  tmdbId: number,
+  opts?: { season?: number; episode?: number; anime?: boolean }
+): Promise<boolean> {
+  const viewKey = process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY;
+  if (!viewKey) return false;
+
+  try {
+    const embedUrl = getVimeusEmbedUrl(mediaType, tmdbId, opts);
+    const res = await fetch(embedUrl, {
+      headers: {
+        Accept: "text/html",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return false;
+    const html = await res.text();
+    const match = html.match(
+      /<script[^>]*id="data"[^>]*>([\s\S]*?)<\/script>/i
+    );
+    if (!match?.[1]) return false;
+    const data = JSON.parse(match[1].trim()) as { embeds?: unknown[] };
+    return Array.isArray(data.embeds) && data.embeds.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function listAsMedia(
