@@ -14,8 +14,8 @@ android {
         applicationId = "com.styleflix.tv"
         minSdk = 21
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0-tv"
+        versionCode = 3
+        versionName = "1.1.1-tv"
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
