@@ -1,11 +1,25 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { getSession, signIn, useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
+function safeCallback(callbackUrl: string) {
+  return callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
+    ? callbackUrl
+    : "/";
+}
+
+function postLoginDestination(
+  membershipActive: boolean | undefined,
+  callbackUrl: string
+) {
+  if (!membershipActive) return "/membresia";
+  return safeCallback(callbackUrl);
+}
+
 export default function LoginForm() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
@@ -17,16 +31,15 @@ export default function LoginForm() {
   // Si ya hay sesión, salir del login (aunque el middleware falle)
   useEffect(() => {
     if (status !== "authenticated") return;
-    const safe =
-      callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
-        ? callbackUrl
-        : "/";
-    // Pequeño delay para asegurar cookie + evitar pelea con middleware viejo
+    const dest = postLoginDestination(
+      session?.user?.membershipActive,
+      callbackUrl
+    );
     const t = window.setTimeout(() => {
-      window.location.replace(safe);
+      window.location.replace(dest);
     }, 50);
     return () => window.clearTimeout(t);
-  }, [status, callbackUrl]);
+  }, [status, callbackUrl, session?.user?.membershipActive]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -47,11 +60,12 @@ export default function LoginForm() {
         return;
       }
 
-      const safe =
-        callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
-          ? callbackUrl
-          : "/";
-      window.location.assign(safe);
+      const fresh = await getSession();
+      const dest = postLoginDestination(
+        fresh?.user?.membershipActive,
+        callbackUrl
+      );
+      window.location.assign(dest);
     } catch {
       setError("No se pudo iniciar sesión. Intenta de nuevo.");
       setLoading(false);
@@ -74,7 +88,7 @@ export default function LoginForm() {
         </p>
         <h1 className="mb-2 text-3xl font-black">Iniciar sesión</h1>
         <p className="mb-8 text-sm text-neutral-400">
-          Accede a tu cuenta para reproducir contenido.
+          Necesitas una membresía activa ($4.990/mes) para ver el catálogo.
         </p>
 
         <form onSubmit={onSubmit} className="space-y-4">

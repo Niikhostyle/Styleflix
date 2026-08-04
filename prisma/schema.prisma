@@ -14,9 +14,40 @@ model User {
   passwordHash String
   /// USER | SUPER_ADMIN
   role         String          @default("USER")
+
+  /// NONE | PREPAID | PENDING | ACTIVE | PAST_DUE | CANCELLED | EXPIRED
+  /// PREPAID = cuenta revendedor lista; los días empiezan al primer login
+  subscriptionStatus String    @default("NONE")
+  currentPeriodEnd   DateTime?
+  mpPreapprovalId    String?
+  membershipStartedAt DateTime?
+  cancelledAt        DateTime?
+  /// DIRECT (MP $4990) | RESELLER ($2990, activación diferida)
+  planSource         String    @default("DIRECT")
+  /// Días a activar al primer uso (solo PREPAID / revendedor)
+  prepaidDays        Int?
+
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   watchHistory WatchProgress[]
+  payments     Payment[]
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   String   @default("MERCADOPAGO")
+  externalId String?
+  amount     Decimal  @db.Decimal(10, 2)
+  currency   String   @default("CLP")
+  status     String
+  rawPayload Json?
+  paidAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([externalId])
 }
 
 /// Progreso / historial de visionado (solo usuarios registrados)

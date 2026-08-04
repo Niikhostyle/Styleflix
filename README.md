@@ -15,11 +15,14 @@ npm run db:setup
 npm run dev
 ```
 
-## Vercel
+## Deploy (Coolify)
 
-Sigue **[DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md)**:
+1. Variables: `NEXT_PUBLIC_TMDB_API_KEY`, Vimeus, `AUTH_SECRET`, `AUTH_URL`, `DATABASE_URL`
+2. Membresía Mercado Pago: `MERCADOPAGO_ACCESS_TOKEN`, `MEMBERSHIP_PRICE_CLP=4990`, `RESELLER_PRICE_CLP=2990`, opcional `MERCADOPAGO_WEBHOOK_SECRET`
+3. Webhook MP → `{AUTH_URL}/api/billing/webhook`
+4. Tras deploy: `npx prisma migrate deploy`
+5. Probar primero con credenciales **TEST** de MP Chile
 
-1. Variables: `NEXT_PUBLIC_TMDB_API_KEY`, Vimeus, `AUTH_SECRET`, `AUTH_URL`, `DATABASE_URL` (Neon Postgres)
-2. Redeploy
-
-Sin `DATABASE_URL` Postgres el catálogo puede desplegarse; login/historial requieren Neon.
+- **Directo** $4.990/mes vía Mercado Pago.
+- **Revendedor** $2.990: el admin crea cuentas `PREPAID`; los días corren al **primer login** del cliente.
+- Sin membresía activa solo login y `/membresia` (`SUPER_ADMIN` bypasea).

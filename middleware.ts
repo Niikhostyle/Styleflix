@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { hasActiveMembership } from "@/lib/access";
 
 function isPublicPath(pathname: string) {
   if (pathname === "/login") return true;
   if (pathname === "/descargar") return true;
   if (pathname.startsWith("/downloads/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
+  if (pathname === "/api/billing/webhook") return true;
+  return false;
+}
+
+/** Autenticado pero sin membresía: puede pagar / ver estado. */
+function isMembershipPath(pathname: string) {
+  if (pathname === "/membresia" || pathname.startsWith("/membresia/")) {
+    return true;
+  }
+  if (pathname.startsWith("/api/billing/")) return true;
   return false;
 }
 
@@ -15,7 +26,6 @@ function authSecret() {
   return raw.trim().replace(/^["']|["']$/g, "") || undefined;
 }
 
-/** Detecta cookie de sesión aunque getToken falle tras el proxy HTTPS. */
 function hasSessionCookie(request: NextRequest) {
   for (const c of request.cookies.getAll()) {
     const n = c.name.toLowerCase();
@@ -33,7 +43,6 @@ async function readToken(request: NextRequest) {
   const secret = authSecret();
   if (!secret) return null;
 
-  // Probar ambas variantes: Coolify puede mentir con el esquema http/https
   const secure = await getToken({
     req: request,
     secret,
@@ -55,6 +64,16 @@ function isLoggedIn(
   return Boolean(token) || hasSessionCookie(request);
 }
 
+function tokenHasMembership(token: Awaited<ReturnType<typeof readToken>>) {
+  if (!token) return false;
+  if (token.membershipActive === true) return true;
+  return hasActiveMembership({
+    role: token.role as string | undefined,
+    subscriptionStatus: token.subscriptionStatus as string | undefined,
+    currentPeriodEnd: token.currentPeriodEnd as string | null | undefined,
+  });
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -67,10 +86,16 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath(pathname)) {
     if (pathname === "/login" && loggedIn) {
-      const dest = request.nextUrl.searchParams.get("callbackUrl") || "/";
-      // Evitar open redirect
-      const safe = dest.startsWith("/") && !dest.startsWith("//") ? dest : "/";
-      return NextResponse.redirect(new URL(safe, request.url));
+      const dest = tokenHasMembership(token) ? "/" : "/membresia";
+      const callback = request.nextUrl.searchParams.get("callbackUrl");
+      if (callback && tokenHasMembership(token)) {
+        const safe =
+          callback.startsWith("/") && !callback.startsWith("//")
+            ? callback
+            : dest;
+        return NextResponse.redirect(new URL(safe, request.url));
+      }
+      return NextResponse.redirect(new URL(dest, request.url));
     }
     return NextResponse.next();
   }
@@ -81,13 +106,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  // Rol: si tenemos JWT lo validamos; si solo hay cookie, la página /admin usa auth()
   if (
     pathname.startsWith("/admin") &&
     token &&
     token.role !== "SUPER_ADMIN"
   ) {
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // Paywall: sin membresía solo /membresia y billing APIs
+  if (!tokenHasMembership(token) && !isMembershipPath(pathname)) {
+    if (token?.role === "SUPER_ADMIN") {
+      return NextResponse.next();
+    }
+    // Si solo hay cookie sin JWT legible, dejar pasar a membresía por seguridad
+    if (!token && hasSessionCookie(request) && !isMembershipPath(pathname)) {
+      return NextResponse.redirect(new URL("/membresia", request.url));
+    }
+    if (token) {
+      return NextResponse.redirect(new URL("/membresia", request.url));
+    }
   }
 
   return NextResponse.next();

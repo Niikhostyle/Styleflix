@@ -299,7 +299,30 @@ export default function Navbar() {
                     {session.user.role === "SUPER_ADMIN"
                       ? "Super Admin"
                       : session.user.email}
+                    {session.user.role !== "SUPER_ADMIN" && (
+                      <p className="mt-1 text-[11px] text-neutral-500">
+                        {session.user.membershipActive
+                          ? `Activa${
+                              session.user.currentPeriodEnd
+                                ? ` · Vence el ${new Date(
+                                    session.user.currentPeriodEnd
+                                  ).toLocaleDateString("es-CL")}`
+                                : ""
+                            }`
+                          : "Sin membresía activa"}
+                      </p>
+                    )}
                   </div>
+                  {session.user.role === "USER" && (
+                    <Link
+                      href="/membresia"
+                      data-tv-focus
+                      className="block px-3 py-2 text-sm hover:bg-white/5"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Membresía
+                    </Link>
+                  )}
                   {session.user.role === "SUPER_ADMIN" && (
                     <Link
                       href="/admin"
