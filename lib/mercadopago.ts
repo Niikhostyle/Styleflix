@@ -90,7 +90,7 @@ export async function createMembershipPreapproval(opts: {
   return mpFetch<MpPreapproval>("/preapproval", {
     method: "POST",
     body: JSON.stringify({
-      reason: "StyleFlix Mensual",
+      reason: "Naseros Mensual",
       external_reference: opts.userId,
       payer_email: opts.payerEmail,
       auto_recurring: {

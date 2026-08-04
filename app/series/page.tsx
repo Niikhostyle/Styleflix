@@ -4,8 +4,8 @@ import { enrichWithTmdb, getVimeusSeries } from "@/lib/vimeus";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Series | StyleFlix",
-  description: "Series disponibles para reproducir en StyleFlix",
+  title: "Series | Naseros",
+  description: "Series disponibles para reproducir en Naseros",
 };
 
 export default async function SeriesPage() {

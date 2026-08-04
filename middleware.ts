@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { hasActiveMembership } from "@/lib/access";
 
 function isPublicPath(pathname: string) {
   if (pathname === "/login") return true;
+  if (pathname === "/registro") return true;
   if (pathname === "/descargar") return true;
   if (pathname.startsWith("/downloads/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
   if (pathname === "/api/billing/webhook") return true;
-  return false;
-}
-
-/** Autenticado pero sin membresía: puede pagar / ver estado. */
-function isMembershipPath(pathname: string) {
-  if (pathname === "/membresia" || pathname.startsWith("/membresia/")) {
-    return true;
-  }
-  if (pathname.startsWith("/api/billing/")) return true;
   return false;
 }
 
@@ -64,38 +55,27 @@ function isLoggedIn(
   return Boolean(token) || hasSessionCookie(request);
 }
 
-function tokenHasMembership(token: Awaited<ReturnType<typeof readToken>>) {
-  if (!token) return false;
-  if (token.membershipActive === true) return true;
-  return hasActiveMembership({
-    role: token.role as string | undefined,
-    subscriptionStatus: token.subscriptionStatus as string | undefined,
-    currentPeriodEnd: token.currentPeriodEnd as string | null | undefined,
-  });
-}
-
+/**
+ * Soft paywall: login obligatorio para catálogo.
+ * Sin membresía se puede navegar y ver 5 min (límite en el player).
+ */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/registro")) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
 
   const token = await readToken(request);
   const loggedIn = isLoggedIn(token, request);
 
   if (isPublicPath(pathname)) {
-    if (pathname === "/login" && loggedIn) {
-      const dest = tokenHasMembership(token) ? "/" : "/membresia";
+    if (
+      (pathname === "/login" || pathname === "/registro") &&
+      loggedIn
+    ) {
       const callback = request.nextUrl.searchParams.get("callbackUrl");
-      if (callback && tokenHasMembership(token)) {
-        const safe =
-          callback.startsWith("/") && !callback.startsWith("//")
-            ? callback
-            : dest;
-        return NextResponse.redirect(new URL(safe, request.url));
-      }
-      return NextResponse.redirect(new URL(dest, request.url));
+      const safe =
+        callback && callback.startsWith("/") && !callback.startsWith("//")
+          ? callback
+          : "/";
+      return NextResponse.redirect(new URL(safe, request.url));
     }
     return NextResponse.next();
   }
@@ -112,20 +92,6 @@ export async function middleware(request: NextRequest) {
     token.role !== "SUPER_ADMIN"
   ) {
     return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  // Paywall: sin membresía solo /membresia y billing APIs
-  if (!tokenHasMembership(token) && !isMembershipPath(pathname)) {
-    if (token?.role === "SUPER_ADMIN") {
-      return NextResponse.next();
-    }
-    // Si solo hay cookie sin JWT legible, dejar pasar a membresía por seguridad
-    if (!token && hasSessionCookie(request) && !isMembershipPath(pathname)) {
-      return NextResponse.redirect(new URL("/membresia", request.url));
-    }
-    if (token) {
-      return NextResponse.redirect(new URL("/membresia", request.url));
-    }
   }
 
   return NextResponse.next();

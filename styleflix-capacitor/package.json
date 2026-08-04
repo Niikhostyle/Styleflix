@@ -2,7 +2,7 @@
   "name": "styleflix-capacitor",
   "version": "1.0.0",
   "private": true,
-  "description": "StyleFlix APK (Capacitor WebView + Android / Android TV)",
+  "description": "Naseros APK (Capacitor WebView + Android / Android TV)",
   "scripts": {
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",

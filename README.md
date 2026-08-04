@@ -1,4 +1,4 @@
-# StyleFlix
+# Naseros
 
 Streaming (películas, series, animes) con Next.js, TMDB, Vimeus y auth.
 

@@ -4,8 +4,8 @@ import MembershipClient from "@/components/MembershipClient";
 import { hasActiveMembership } from "@/lib/access";
 
 export const metadata = {
-  title: "Membresía | StyleFlix",
-  description: "Activa tu membresía mensual StyleFlix con Mercado Pago",
+  title: "Membresía | Naseros",
+  description: "Activa tu membresía mensual Naseros con Mercado Pago",
 };
 
 export default async function MembresiaPage({

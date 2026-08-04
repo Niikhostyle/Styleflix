@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import AdminUsersClient from "@/components/AdminUsersClient";
 
 export const metadata = {
-  title: "Admin · Usuarios | StyleFlix",
+  title: "Admin · Usuarios | Naseros",
 };
 
 export default async function AdminPage() {

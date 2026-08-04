@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Descargar app | StyleFlix",
-  description: "Instala StyleFlix en celular Android o Android TV",
+  title: "Descargar app | Naseros",
+  description: "Instala Naseros en celular Android o Android TV",
 };
 
 export default function DescargarPage() {
@@ -10,7 +10,7 @@ export default function DescargarPage() {
     <div className="min-h-screen bg-[#141414] px-4 py-16 text-white md:px-10">
       <div className="mx-auto max-w-2xl">
         <p className="text-2xl font-black tracking-tight text-[#E50914]">
-          STYLEFLIX
+          NASEROS
         </p>
         <h1 className="mt-3 text-3xl font-black md:text-4xl">Descargar apps</h1>
         <p className="mt-3 text-neutral-300">
@@ -25,7 +25,7 @@ export default function DescargarPage() {
           >
             <span className="text-lg font-bold">Celular / tablet Android</span>
             <span className="text-sm font-medium text-white/85">
-              styleflix-celular.apk · táctil
+              Naseros (celular) · táctil
             </span>
           </a>
 
@@ -36,7 +36,7 @@ export default function DescargarPage() {
           >
             <span className="text-lg font-bold">Android TV / Google TV</span>
             <span className="text-sm font-medium text-neutral-300">
-              styleflix-tv.apk · control remoto
+              Naseros (TV) · control remoto
             </span>
           </a>
         </div>
@@ -49,7 +49,8 @@ export default function DescargarPage() {
           </li>
           <li>Abre el archivo e instala.</li>
           <li>
-            Inicia sesión con la cuenta que te creó el administrador.
+            Crea tu cuenta en la app o inicia sesión. Sin membresía tienes 5
+            minutos de prueba.
           </li>
         </ol>
 

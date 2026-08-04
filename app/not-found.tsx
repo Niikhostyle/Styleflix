@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#141414] px-4 text-center text-white">
       <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#E50914]">
-        StyleFlix
+        Naseros
       </p>
       <h1 className="mb-3 text-4xl font-black md:text-5xl">
         Título no encontrado

@@ -1,4 +1,4 @@
-# Deploy StyleFlix en Vercel
+# Deploy Naseros en Vercel
 
 ## 1. Base de datos (obligatoria)
 

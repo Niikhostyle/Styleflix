@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { getVimeusEmbedUrl } from "@/lib/vimeus";
 import { isBackKey } from "@/lib/tv";
+import {
+  APP_NAME,
+  PREVIEW_LIMIT_MS,
+  previewStorageKey,
+} from "@/lib/brand";
+import { MEMBERSHIP_PRICE_CLP } from "@/lib/access";
 import type { MediaType } from "@/lib/tmdb";
 
 export type SeasonMeta = {
@@ -28,9 +36,27 @@ interface ModalPlayerProps {
   isAnime?: boolean;
 }
 
+function readPreviewMs(userId: string) {
+  try {
+    const raw = localStorage.getItem(previewStorageKey(userId));
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writePreviewMs(userId: string, ms: number) {
+  try {
+    localStorage.setItem(previewStorageKey(userId), String(Math.floor(ms)));
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Iframe Vimeus a pantalla completa.
- * Back del mando / Escape / historial WebView cierran el player.
+ * Sin membresía: máx. 5 min acumulados, luego invitación a pagar.
  */
 export default function ModalPlayer({
   open,
@@ -42,17 +68,67 @@ export default function ModalPlayer({
   onClose,
   isAnime = false,
 }: ModalPlayerProps) {
+  const { data: session } = useSession();
+  const membershipActive = Boolean(session?.user?.membershipActive);
+  const userId = session?.user?.id || "anon";
+  const isAdmin = session?.user?.role === "SUPER_ADMIN";
+  const unlimited = membershipActive || isAdmin;
+
   const [frameNonce, setFrameNonce] = useState(0);
+  const [paywall, setPaywall] = useState(false);
+  const [remainingSec, setRemainingSec] = useState<number | null>(null);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const pushedRef = useRef(false);
   const closingRef = useRef(false);
+  const usedMsRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
     setFrameNonce((n) => n + 1);
   }, [open, mediaId, mediaType, season, episode, isAnime]);
 
-  // Historial: Back nativo del WebView cierra el modal
+  // Preview timer
+  useEffect(() => {
+    if (!open || unlimited) {
+      setPaywall(false);
+      setRemainingSec(null);
+      return;
+    }
+
+    usedMsRef.current = readPreviewMs(userId);
+    if (usedMsRef.current >= PREVIEW_LIMIT_MS) {
+      setPaywall(true);
+      setRemainingSec(0);
+      return;
+    }
+
+    setPaywall(false);
+    const started = Date.now();
+    const base = usedMsRef.current;
+
+    const tick = window.setInterval(() => {
+      const elapsed = base + (Date.now() - started);
+      usedMsRef.current = elapsed;
+      writePreviewMs(userId, elapsed);
+      const left = Math.max(0, PREVIEW_LIMIT_MS - elapsed);
+      setRemainingSec(Math.ceil(left / 1000));
+      if (elapsed >= PREVIEW_LIMIT_MS) {
+        setPaywall(true);
+        setRemainingSec(0);
+        window.clearInterval(tick);
+      }
+    }, 1000);
+
+    setRemainingSec(Math.ceil((PREVIEW_LIMIT_MS - base) / 1000));
+
+    return () => {
+      window.clearInterval(tick);
+      const finalMs = base + (Date.now() - started);
+      usedMsRef.current = Math.min(finalMs, PREVIEW_LIMIT_MS);
+      writePreviewMs(userId, usedMsRef.current);
+    };
+  }, [open, unlimited, userId]);
+
   useEffect(() => {
     if (!open) return;
     pushedRef.current = true;
@@ -78,8 +154,6 @@ export default function ModalPlayer({
   useEffect(() => {
     if (!open) return;
 
-    // Solo en TV: foco inicial en Volver para D-pad. No reclamar el foco
-    // después: si lo robamos al iframe, Vimeus pide otro clic en Play.
     const isTv = document.documentElement.classList.contains("tv-mode");
     let t: number | undefined;
     if (isTv) {
@@ -109,7 +183,7 @@ export default function ModalPlayer({
   }, [open, onClose]);
 
   const embedPath = useMemo(() => {
-    if (!open) return "";
+    if (!open || paywall) return "";
     try {
       return (
         getVimeusEmbedUrl(mediaType, mediaId, {
@@ -121,7 +195,7 @@ export default function ModalPlayer({
     } catch {
       return "";
     }
-  }, [open, mediaType, mediaId, season, episode, isAnime, frameNonce]);
+  }, [open, paywall, mediaType, mediaId, season, episode, isAnime, frameNonce]);
 
   if (!open) return null;
 
@@ -134,6 +208,10 @@ export default function ModalPlayer({
       onClose();
     }
   }
+
+  const price = MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL");
+  const mins = remainingSec != null ? Math.floor(remainingSec / 60) : 0;
+  const secs = remainingSec != null ? remainingSec % 60 : 0;
 
   return (
     <div
@@ -156,7 +234,42 @@ export default function ModalPlayer({
         <span className="text-sm font-semibold">Volver</span>
       </button>
 
-      {!embedPath ? (
+      {!unlimited && remainingSec != null && !paywall && (
+        <div className="absolute right-3 top-3 z-20 rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-sm md:right-6 md:top-6">
+          Prueba {mins}:{String(secs).padStart(2, "0")}
+        </div>
+      )}
+
+      {paywall ? (
+        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+          <p className="text-sm font-semibold uppercase tracking-widest text-[#E50914]">
+            {APP_NAME}
+          </p>
+          <h2 className="max-w-md text-2xl font-black text-white md:text-3xl">
+            Se acabó tu preview de 5 minutos
+          </h2>
+          <p className="max-w-sm text-sm text-neutral-300">
+            Activa la membresía mensual por ${price} CLP y mira sin límites
+            películas, series y animes.
+          </p>
+          <Link
+            href="/membresia"
+            data-tv-focus
+            data-tv-autofocus
+            className="tv-cta rounded bg-[#E50914] px-6 py-3 text-base font-bold transition hover:bg-[#f6121d]"
+          >
+            Activar membresía
+          </Link>
+          <button
+            type="button"
+            onClick={handleCloseClick}
+            data-tv-focus
+            className="text-sm text-neutral-400 underline hover:text-white"
+          >
+            Volver al catálogo
+          </button>
+        </div>
+      ) : !embedPath ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-white">
             No se pudo reproducir

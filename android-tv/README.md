@@ -1,6 +1,6 @@
-# StyleFlix — APK para Android TV
+# Naseros — APK para Android TV
 
-App WebView a pantalla completa que abre tu Styleflix (Next.js) en la TV.
+App WebView a pantalla completa que abre tu Naseros (Next.js) en la TV.
 
 ## Requisitos en la TV / red
 
@@ -10,10 +10,10 @@ App WebView a pantalla completa que abre tu Styleflix (Next.js) en la TV.
 
 ```xml
 <!-- Misma WiFi (mejor): -->
-<string name="styleflix_url">http://192.168.1.55:8000</string>
+<string name="Naseros_url">http://192.168.1.55:8000</string>
 
 <!-- O ngrok: -->
-<string name="styleflix_url">https://unloaded-employed-twisty.ngrok-free.dev</string>
+<string name="Naseros_url">https://unloaded-employed-twisty.ngrok-free.dev</string>
 ```
 
 Tu IP local la ves al arrancar Next (`Network: http://192.168.x.x:8000`).
@@ -42,6 +42,6 @@ O usa un instalador de APKs desde la tienda (si tu TV lo permite) y abre el arch
 
 ## Notas
 
-- El control remoto (D-pad) puede ser limitado: Styleflix es web; un mando con puntero / mouse ayuda.
+- El control remoto (D-pad) puede ser limitado: Naseros es web; un mando con puntero / mouse ayuda.
 - Si cambias la URL de ngrok, vuelve a editar `strings.xml` y regenera el APK.
 - Con `leanback` requerido, la app está pensada para **Android TV** (aparece en el launcher de TV).

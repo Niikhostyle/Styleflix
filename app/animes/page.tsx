@@ -4,8 +4,8 @@ import { enrichWithTmdb, getVimeusAnimes } from "@/lib/vimeus";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Animes | StyleFlix",
-  description: "Animes disponibles para reproducir en StyleFlix",
+  title: "Animes | Naseros",
+  description: "Animes disponibles para reproducir en Naseros",
 };
 
 export default async function AnimesPage() {

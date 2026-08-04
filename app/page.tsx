@@ -43,7 +43,7 @@ export default function Home() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-[#141414] text-neutral-400">
-          Cargando StyleFlix…
+          Cargando Naseros…
         </div>
       }
     >
