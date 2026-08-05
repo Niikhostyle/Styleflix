@@ -305,7 +305,7 @@ export default function DetailClient({
                   <Plus className="h-5 w-5" />
                 </button>
 
-                {canRequest ? (
+                {status === "authenticated" && canRequest ? (
                   <button
                     type="button"
                     data-tv-focus
@@ -315,6 +315,12 @@ export default function DetailClient({
                         setRequestBusy(true);
                         setRequestMsg("");
                         try {
+                          const yearNum =
+                            typeof year === "number"
+                              ? year
+                              : year
+                                ? Number(year)
+                                : null;
                           const res = await fetch("/api/requests", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -322,7 +328,10 @@ export default function DetailClient({
                               mediaType,
                               tmdbId: details.id,
                               title,
-                              year: year || null,
+                              year:
+                                yearNum && Number.isFinite(yearNum)
+                                  ? yearNum
+                                  : null,
                             }),
                           });
                           const data = await res.json().catch(() => ({}));
@@ -343,16 +352,23 @@ export default function DetailClient({
                         }
                       })();
                     }}
-                    className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2.5 text-sm font-semibold text-fuchsia-200 transition hover:bg-fuchsia-500/20 disabled:opacity-60"
+                    className="rounded-xl border border-teal-300/40 bg-teal-300/10 px-4 py-2.5 text-sm font-semibold text-teal-100 transition hover:bg-teal-300/20 disabled:opacity-60"
                   >
                     {requestBusy ? "Enviando…" : "Solicitar título"}
                   </button>
-                ) : (
+                ) : status === "authenticated" ? (
                   <Link
                     href="/onboarding/planes"
                     className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/55 hover:text-white"
                   >
                     Solicitar (upgrade)
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/55 hover:text-white"
+                  >
+                    Inicia sesión para solicitar
                   </Link>
                 )}
 

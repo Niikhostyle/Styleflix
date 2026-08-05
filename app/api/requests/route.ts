@@ -6,9 +6,12 @@ import { sendTitleRequestNotice } from "@/lib/mail";
 
 const bodySchema = z.object({
   mediaType: z.enum(["movie", "tv"]),
-  tmdbId: z.number().int().positive(),
+  tmdbId: z.coerce.number().int().positive(),
   title: z.string().min(1).max(200),
-  year: z.number().int().min(1900).max(2100).nullable().optional(),
+  year: z
+    .union([z.coerce.number().int().min(1900).max(2100), z.null(), z.literal("")])
+    .optional()
+    .transform((v) => (v === "" || v == null || Number.isNaN(v as number) ? null : Number(v))),
   note: z.string().max(500).nullable().optional(),
 });
 
@@ -18,12 +21,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
+  // Entitlement desde DB (el JWT puede estar desfasado tras cambiar de plan)
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, planFeatures: true },
+  });
+  const features =
+    dbUser?.planFeatures &&
+    typeof dbUser.planFeatures === "object" &&
+    !Array.isArray(dbUser.planFeatures)
+      ? (dbUser.planFeatures as { canRequest?: boolean })
+      : null;
   const canRequest =
+    dbUser?.role === "SUPER_ADMIN" ||
     session.user.role === "SUPER_ADMIN" ||
+    Boolean(features?.canRequest) ||
     Boolean(session.user.planCanRequest);
   if (!canRequest) {
     return NextResponse.json(
-      { error: "Tu plan no permite solicitar títulos." },
+      { error: "Tu plan no permite solicitar títulos. Actualiza a Premium o Plus." },
       { status: 403 }
     );
   }
@@ -31,7 +47,13 @@ export async function POST(request: Request) {
   const raw = await request.json().catch(() => null);
   const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "Datos inválidos.",
+        details: parsed.error.flatten(),
+      },
+      { status: 400 }
+    );
   }
 
   const data = parsed.data;
@@ -93,11 +115,25 @@ export async function POST(request: Request) {
       ok: true,
       item: row,
       message:
-        "Solicitud enviada. El equipo la verá en el panel admin" +
+        "Solicitud enviada. El equipo la verá en Solicitudes del panel admin" +
         (process.env.SMTP_HOST ? " y por correo." : "."),
     });
   } catch (err) {
     console.error("[api/requests]", err);
+    const msg = String(err);
+    if (
+      msg.includes("TitleRequest") ||
+      msg.includes("does not exist") ||
+      msg.includes("P2021")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "La tabla de solicitudes aún no está creada. Redeploy / prisma db push en el servidor.",
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: "No se pudo registrar la solicitud." },
       { status: 500 }

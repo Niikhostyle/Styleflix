@@ -236,9 +236,11 @@ export function getDisplayTitle(item: Pick<MediaItem, "title" | "name">) {
   return item.title || item.name || "Sin título";
 }
 
-export function getReleaseYear(item: MediaItem) {
+export function getReleaseYear(item: MediaItem): number | null {
   const date = item.release_date || item.first_air_date;
-  return date ? date.slice(0, 4) : null;
+  if (!date) return null;
+  const y = Number(date.slice(0, 4));
+  return Number.isFinite(y) && y >= 1900 ? y : null;
 }
 
 export function formatRuntime(minutes?: number) {
