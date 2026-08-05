@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { useRefreshPricing } from "@/components/PricingProvider";
-import { formatClp } from "@/lib/pricing";
+import { formatClp, MP_MIN_AMOUNT_CLP } from "@/lib/pricing";
 
 export default function AdminSettingsClient() {
   const refreshPricing = useRefreshPricing();
@@ -14,6 +14,7 @@ export default function AdminSettingsClient() {
   const [membershipDraft, setMembershipDraft] = useState(4990);
   const [resellerPrice, setResellerPrice] = useState(2990);
   const [resellerDraft, setResellerDraft] = useState(2990);
+  const [minPriceClp, setMinPriceClp] = useState(MP_MIN_AMOUNT_CLP);
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState("");
@@ -40,6 +41,9 @@ export default function AdminSettingsClient() {
       if (typeof data.resellerPriceClp === "number") {
         setResellerPrice(data.resellerPriceClp);
         setResellerDraft(data.resellerPriceClp);
+      }
+      if (typeof data.minPriceClp === "number") {
+        setMinPriceClp(data.minPriceClp);
       }
     } catch {
       setError("No se pudieron cargar los ajustes.");
@@ -125,17 +129,17 @@ export default function AdminSettingsClient() {
             Estos valores se usan en la página de membresía, el cobro de Mercado
             Pago y las cuentas revendedor. Vigentes ahora: membresía $
             {formatClp(membershipPrice)} · revendedor ${formatClp(resellerPrice)}
-            .
+            . Mínimo Mercado Pago Chile (Visa): ${formatClp(minPriceClp)} CLP.
           </p>
           <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
             Membresía directa (CLP / mes)
             <input
               type="number"
-              min={1}
+              min={minPriceClp}
               max={1000000}
               value={membershipDraft}
               onChange={(e) =>
-                setMembershipDraft(Number(e.target.value) || 1)
+                setMembershipDraft(Number(e.target.value) || minPriceClp)
               }
               className="w-32 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
             />
@@ -144,10 +148,12 @@ export default function AdminSettingsClient() {
             Precio revendedor (CLP)
             <input
               type="number"
-              min={1}
+              min={minPriceClp}
               max={1000000}
               value={resellerDraft}
-              onChange={(e) => setResellerDraft(Number(e.target.value) || 1)}
+              onChange={(e) =>
+                setResellerDraft(Number(e.target.value) || minPriceClp)
+              }
               className="w-32 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
             />
           </label>

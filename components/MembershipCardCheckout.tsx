@@ -7,12 +7,37 @@ import {
   useMembershipPrice,
   usePricingReady,
 } from "@/components/PricingProvider";
+import { MP_MIN_AMOUNT_CLP } from "@/lib/pricing";
 
 type Props = {
   onPaid: (result: { activated: boolean; message?: string }) => void;
   onError: (message: string) => void;
   onBusy?: (busy: boolean) => void;
 };
+
+function brickErrorMessage(err: unknown): string {
+  if (!err || typeof err !== "object") {
+    return "Error en el formulario de Mercado Pago.";
+  }
+  const e = err as {
+    message?: string;
+    cause?: string;
+    type?: string;
+  };
+  const cause = (e.cause || "").toLowerCase();
+  const msg = (e.message || "").toLowerCase();
+
+  if (
+    cause.includes("bin") ||
+    cause.includes("payment_methods") ||
+    msg.includes("información de pago") ||
+    msg.includes("informacion de pago")
+  ) {
+    return `Mercado Pago no pudo leer la tarjeta. En Chile Visa Débito/Crédito exige mínimo $${MP_MIN_AMOUNT_CLP} CLP; revisa el precio en Ajustes o prueba otra tarjeta.`;
+  }
+  if (e.message?.trim()) return e.message.trim();
+  return "Error en el formulario de Mercado Pago.";
+}
 
 export default function MembershipCardCheckout({
   onPaid,
@@ -28,6 +53,7 @@ export default function MembershipCardCheckout({
 
   useEffect(() => {
     if (!publicKey) return;
+    // locale es-CL = sitio Chile (MLC); sin locale el Brick puede fallar al resolver medios.
     initMercadoPago(publicKey, { locale: "es-CL" });
     setSdkReady(true);
   }, [publicKey]);
@@ -52,6 +78,17 @@ export default function MembershipCardCheckout({
     );
   }
 
+  if (priceClp < MP_MIN_AMOUNT_CLP) {
+    return (
+      <p className="rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-100">
+        El precio actual es ${priceLabel} CLP, pero Mercado Pago Chile exige al
+        menos ${MP_MIN_AMOUNT_CLP} CLP para Visa Débito/Crédito. Sube el precio
+        en <strong>Admin → Ajustes</strong> (ej. {MP_MIN_AMOUNT_CLP}) y vuelve a
+        intentar.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-black shadow-xl">
       <div>
@@ -71,7 +108,7 @@ export default function MembershipCardCheckout({
       <Payment
         key={priceClp}
         initialization={{
-          amount: priceClp,
+          amount: Math.round(priceClp),
           payer: {
             email: session?.user?.email || undefined,
           },
@@ -81,8 +118,11 @@ export default function MembershipCardCheckout({
             style: { theme: "default" },
           },
           paymentMethods: {
+            // prepaidCard es obligatorio desde 2025; sin esto MP muestra
+            // "No pudimos obtener la información de pago".
             creditCard: "all",
             debitCard: "all",
+            prepaidCard: "all",
             maxInstallments: 1,
           },
         }}
@@ -99,8 +139,7 @@ export default function MembershipCardCheckout({
               throw new Error("missing_token");
             }
 
-            // Suscripción autorizada (preapproval) — funciona con estas credenciales.
-            // /v1/payments responde "Unauthorized use of live credentials" en este setup.
+            // Suscripción autorizada (preapproval) con card_token_id.
             const res = await fetch("/api/billing/subscribe", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -131,7 +170,7 @@ export default function MembershipCardCheckout({
         }}
         onError={(err) => {
           console.error("[PaymentBrick]", err);
-          onError("Error en el formulario de Mercado Pago.");
+          onError(brickErrorMessage(err));
         }}
         onReady={() => {
           /* listo */

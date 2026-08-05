@@ -10,6 +10,13 @@
 export const DEFAULT_MEMBERSHIP_PRICE_CLP = 4990;
 export const DEFAULT_RESELLER_PRICE_CLP = 2990;
 
+/**
+ * Mínimo real de Mercado Pago Chile para Visa Débito/Crédito (MLC).
+ * Con amount menor el Payment Brick falla al leer el BIN:
+ * "No pudimos obtener la información de pago".
+ */
+export const MP_MIN_AMOUNT_CLP = 10;
+
 export type Pricing = {
   membershipPriceClp: number;
   resellerPriceClp: number;

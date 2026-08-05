@@ -4,6 +4,7 @@ import {
   DEFAULT_RESELLER_PRICE_CLP,
   envMembershipPriceClp,
   envResellerPriceClp,
+  MP_MIN_AMOUNT_CLP,
   parsePriceClp,
   type Pricing,
 } from "@/lib/pricing";
@@ -14,7 +15,8 @@ export const RESELLER_PRICE_KEY = "resellerPriceClp";
 
 export const DEFAULT_PREVIEW_MINUTES = 5;
 
-const MIN_PRICE_CLP = 1;
+/** Alineado al mínimo de Visa Débito/Crédito en MP Chile. */
+const MIN_PRICE_CLP = MP_MIN_AMOUNT_CLP;
 const MAX_PRICE_CLP = 1_000_000;
 
 export async function getPreviewMinutes(): Promise<number> {

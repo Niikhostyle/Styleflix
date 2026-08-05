@@ -7,6 +7,7 @@ import {
   setPreviewMinutes,
   setPricing,
 } from "@/lib/settings";
+import { MP_MIN_AMOUNT_CLP } from "@/lib/pricing";
 
 async function requireAdmin() {
   const session = await auth();
@@ -26,14 +27,25 @@ export async function GET() {
     previewMinutes,
     membershipPriceClp: pricing.membershipPriceClp,
     resellerPriceClp: pricing.resellerPriceClp,
+    minPriceClp: MP_MIN_AMOUNT_CLP,
   });
 }
 
 const patchSchema = z
   .object({
     previewMinutes: z.number().int().min(1).max(180).optional(),
-    membershipPriceClp: z.number().int().min(1).max(1_000_000).optional(),
-    resellerPriceClp: z.number().int().min(1).max(1_000_000).optional(),
+    membershipPriceClp: z
+      .number()
+      .int()
+      .min(MP_MIN_AMOUNT_CLP)
+      .max(1_000_000)
+      .optional(),
+    resellerPriceClp: z
+      .number()
+      .int()
+      .min(MP_MIN_AMOUNT_CLP)
+      .max(1_000_000)
+      .optional(),
   })
   .refine(
     (d) =>
@@ -52,7 +64,9 @@ export async function PATCH(request: Request) {
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Datos inválidos. Revisa precios (1–1.000.000) o minutos (1–180)." },
+      {
+        error: `Datos inválidos. Precios mínimos $${MP_MIN_AMOUNT_CLP} CLP (exigencia Visa Débito Mercado Pago Chile); minutos 1–180.`,
+      },
       { status: 400 }
     );
   }
