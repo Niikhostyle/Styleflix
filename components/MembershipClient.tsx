@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -17,6 +17,8 @@ type Props = {
   membershipActive: boolean;
   isAdmin: boolean;
   flash?: string | null;
+  /** payment_id que MP agrega al volver del checkout */
+  returnPaymentId?: string | null;
 };
 
 export default function MembershipClient({
@@ -25,20 +27,32 @@ export default function MembershipClient({
   membershipActive,
   isAdmin,
   flash,
+  returnPaymentId = null,
 }: Props) {
   const router = useRouter();
   const { update } = useSession();
   const refreshPricing = useRefreshPricing();
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(flash || "");
+  const autoSynced = useRef(false);
 
   const { label: price } = useMembershipPrice();
 
   useEffect(() => {
     void refreshPricing();
   }, [refreshPricing]);
+
+  useEffect(() => {
+    if (isAdmin || membershipActive || autoSynced.current) return;
+    // Al volver de MP (o con payment_id), verificamos el pago en la API.
+    if (!returnPaymentId && !flash?.includes("Verificando")) return;
+    autoSynced.current = true;
+    void syncPayment(returnPaymentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnPaymentId, membershipActive, isAdmin]);
 
   const ends = currentPeriodEnd
     ? new Date(currentPeriodEnd).toLocaleDateString("es-CL", {
@@ -47,6 +61,35 @@ export default function MembershipClient({
         year: "numeric",
       })
     : null;
+
+  async function syncPayment(paymentId?: string | null) {
+    setSyncing(true);
+    setError("");
+    try {
+      const res = await fetch("/api/billing/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          paymentId ? { paymentId } : {}
+        ),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          data.error ||
+            "Aún no confirmamos un pago aprobado. Si acabas de pagar, espera e intenta de nuevo."
+        );
+        return;
+      }
+      setMessage(data.message || "¡Membresía activada!");
+      await update();
+      router.refresh();
+    } catch {
+      setError("No se pudo verificar el pago. Intenta «Actualizar estado».");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function startRedirectCheckout() {
     setError("");
@@ -105,9 +148,7 @@ export default function MembershipClient({
   }
 
   async function refreshStatus() {
-    await update();
-    router.refresh();
-    setMessage("Estado actualizado.");
+    await syncPayment(returnPaymentId);
   }
 
   if (isAdmin) {
@@ -173,8 +214,8 @@ export default function MembershipClient({
           <div className="mt-7 flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4">
             <ShieldCheck className="h-5 w-5 text-teal-300" />
             <p className="text-xs leading-5 text-slate-400">
-              El pago se completa en Mercado Pago. Tus datos de tarjeta no se
-              ingresan en VeoTV.
+              La membresía solo se activa cuando Mercado Pago confirma el pago
+              aprobado. Tus datos de tarjeta no se ingresan en VeoTV.
             </p>
           </div>
         </section>
@@ -216,7 +257,7 @@ export default function MembershipClient({
               <button
                 type="button"
                 onClick={() => void startRedirectCheckout()}
-                disabled={loading}
+                disabled={loading || syncing}
                 className="brand-button rounded-xl py-3.5 text-base font-extrabold transition disabled:opacity-60"
               >
                 {loading
@@ -239,9 +280,12 @@ export default function MembershipClient({
             <button
               type="button"
               onClick={() => void refreshStatus()}
-              className="text-sm text-neutral-400 underline hover:text-neutral-200"
+              disabled={syncing}
+              className="text-sm text-neutral-400 underline hover:text-neutral-200 disabled:opacity-60"
             >
-              Actualizar estado
+              {syncing
+                ? "Verificando pago con Mercado Pago…"
+                : "Actualizar estado"}
             </button>
 
             {membershipActive && (

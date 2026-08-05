@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
+  getPayment,
   getPreapproval,
   membershipAmount,
-  normalizeMpAccessToken,
   verifyWebhookSignature,
 } from "@/lib/mercadopago";
-import { activateMembership, markSubscriptionStatus } from "@/lib/membership";
+import {
+  activateFromMercadoPagoPayment,
+  activateMembership,
+  markSubscriptionStatus,
+} from "@/lib/membership";
 
 type MpTopicBody = {
   type?: string;
@@ -74,6 +78,7 @@ export async function POST(request: Request) {
       }
 
       const status = (preapproval.status || "").toLowerCase();
+      // Solo activar con suscripción realmente autorizada/activa (no pending).
       if (status === "authorized" || status === "active") {
         await activateMembership({
           userId,
@@ -104,65 +109,55 @@ export async function POST(request: Request) {
     }
 
     if (topic.includes("payment") || topic === "payment") {
-      const mpToken = normalizeMpAccessToken(
-        process.env.MERCADOPAGO_ACCESS_TOKEN
-      );
-      if (!dataId || !mpToken) {
-        return NextResponse.json({ ok: true, skipped: "payment no token/id" });
+      if (!dataId) {
+        return NextResponse.json({ ok: true, skipped: "payment no id" });
       }
 
-      const payRes = await fetch(
-        `https://api.mercadopago.com/v1/payments/${dataId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${mpToken}`,
-          },
-        }
-      );
-      if (!payRes.ok) {
+      let payment;
+      try {
+        payment = await getPayment(dataId);
+      } catch {
         return NextResponse.json({ ok: true, skipped: "payment fetch fail" });
       }
-      const payment = (await payRes.json()) as {
-        id: number;
-        status?: string;
-        transaction_amount?: number;
-        external_reference?: string;
-        metadata?: { preapproval_id?: string };
-      };
+
+      const metaPreapproval =
+        payment.metadata &&
+        typeof payment.metadata === "object" &&
+        "preapproval_id" in payment.metadata
+          ? String(
+              (payment.metadata as { preapproval_id?: unknown }).preapproval_id ||
+                ""
+            )
+          : undefined;
 
       const userId = await resolveUserId(
         payment.external_reference,
-        payment.metadata?.preapproval_id
+        metaPreapproval || undefined
       );
       if (!userId) {
         return NextResponse.json({ ok: true, skipped: "payment no user" });
       }
 
-      if (payment.status === "approved") {
-        await activateMembership({
-          userId,
-          months: 1,
-          payment: {
-            externalId: String(payment.id),
-            status: "approved",
-            amount: payment.transaction_amount ?? (await membershipAmount()),
-            rawPayload: payment as object,
-          },
-        });
-      } else if (
-        payment.status === "rejected" ||
-        payment.status === "cancelled"
-      ) {
-        await prisma.payment.create({
-          data: {
-            userId,
-            externalId: String(payment.id),
-            amount: payment.transaction_amount ?? (await membershipAmount()),
-            currency: "CLP",
-            status: payment.status,
-            rawPayload: payment as object,
-          },
-        });
+      const status = (payment.status || "").toLowerCase();
+
+      if (status === "approved") {
+        // Solo activa si MP confirma approved + monto + external_reference.
+        await activateFromMercadoPagoPayment({ userId, payment });
+      } else if (status === "rejected" || status === "cancelled") {
+        const externalId = String(payment.id);
+        const dup = await prisma.payment.findFirst({ where: { externalId } });
+        if (!dup) {
+          await prisma.payment.create({
+            data: {
+              userId,
+              externalId,
+              amount: payment.transaction_amount ?? (await membershipAmount()),
+              currency: "CLP",
+              status,
+              rawPayload: payment as object,
+            },
+          });
+        }
       }
 
       return NextResponse.json({ ok: true });

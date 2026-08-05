@@ -1,6 +1,12 @@
 import { addDays, addMonths } from "@/lib/access";
 import { getResellerPriceClp } from "@/lib/settings";
-import { membershipAmount } from "@/lib/mercadopago";
+import {
+  assertApprovedMembershipPayment,
+  findLatestApprovedPaymentForUser,
+  getPayment,
+  membershipAmount,
+  type MpPaymentDetail,
+} from "@/lib/mercadopago";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
@@ -20,6 +26,40 @@ export async function activateMembership(opts: {
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { id: opts.userId } });
   if (!user) return null;
+
+  // Idempotencia: si este pago MP ya activó, no duplicar ni extender de nuevo.
+  if (opts.payment?.externalId) {
+    const existing = await prisma.payment.findFirst({
+      where: {
+        externalId: opts.payment.externalId,
+        status: { in: ["approved", "subscription_authorized"] },
+      },
+    });
+    if (existing) {
+      if (
+        user.subscriptionStatus === "ACTIVE" &&
+        user.currentPeriodEnd &&
+        user.currentPeriodEnd > now
+      ) {
+        return user;
+      }
+      // Pago ya registrado pero membresía caída: reactivar sin nuevo payment row.
+      return prisma.user.update({
+        where: { id: opts.userId },
+        data: {
+          subscriptionStatus: "ACTIVE",
+          currentPeriodEnd: addMonths(now, months),
+          membershipStartedAt: user.membershipStartedAt ?? now,
+          cancelledAt: null,
+          planSource: user.planSource || "DIRECT",
+          prepaidDays: null,
+          ...(opts.mpPreapprovalId
+            ? { mpPreapprovalId: opts.mpPreapprovalId }
+            : {}),
+        },
+      });
+    }
+  }
 
   const base =
     user.currentPeriodEnd && user.currentPeriodEnd > now
@@ -57,6 +97,101 @@ export async function activateMembership(opts: {
   }
 
   return updated;
+}
+
+/**
+ * Activa membresía solo si Mercado Pago confirma el pago como approved
+ * y pertenece a este usuario.
+ */
+export async function activateFromMercadoPagoPayment(opts: {
+  userId: string;
+  payment: MpPaymentDetail;
+}): Promise<
+  | { activated: true; paymentId: string; alreadyActive?: boolean }
+  | { activated: false; reason: string; status?: string }
+> {
+  const check = await assertApprovedMembershipPayment({
+    payment: opts.payment,
+    userId: opts.userId,
+  });
+  if (!check.ok) {
+    return {
+      activated: false,
+      reason: check.reason,
+      status: opts.payment.status,
+    };
+  }
+
+  const externalId = String(opts.payment.id);
+  const existing = await prisma.payment.findFirst({
+    where: { externalId, status: "approved" },
+  });
+
+  await activateMembership({
+    userId: opts.userId,
+    months: 1,
+    payment: {
+      externalId,
+      status: "approved",
+      amount: check.amount,
+      rawPayload: opts.payment as object,
+      paidAt: opts.payment.date_approved
+        ? new Date(opts.payment.date_approved)
+        : new Date(),
+    },
+  });
+
+  return {
+    activated: true,
+    paymentId: externalId,
+    alreadyActive: Boolean(existing),
+  };
+}
+
+/** Sincroniza membresía consultando la API de Mercado Pago (nunca confía solo en la URL). */
+export async function syncMembershipFromMercadoPago(opts: {
+  userId: string;
+  paymentId?: string | null;
+}): Promise<
+  | { activated: true; paymentId: string; alreadyActive?: boolean }
+  | { activated: false; reason: string; status?: string }
+> {
+  let payment: MpPaymentDetail | null = null;
+
+  if (opts.paymentId?.trim()) {
+    try {
+      payment = await getPayment(opts.paymentId.trim());
+    } catch (err) {
+      console.warn("[sync] getPayment", err);
+      return {
+        activated: false,
+        reason: "No se pudo consultar el pago en Mercado Pago.",
+      };
+    }
+  } else {
+    try {
+      payment = await findLatestApprovedPaymentForUser(opts.userId);
+    } catch (err) {
+      console.warn("[sync] search payments", err);
+      return {
+        activated: false,
+        reason: "No se pudo buscar pagos en Mercado Pago.",
+      };
+    }
+  }
+
+  if (!payment) {
+    return {
+      activated: false,
+      reason:
+        "Aún no hay un pago aprobado en Mercado Pago para tu cuenta. Si acabas de pagar, espera unos segundos e intenta de nuevo.",
+    };
+  }
+
+  return activateFromMercadoPagoPayment({
+    userId: opts.userId,
+    payment,
+  });
 }
 
 /**

@@ -271,8 +271,8 @@ export async function createMembershipPreference(opts: {
       external_reference: opts.userId,
       back_urls: {
         success: `${base}/membresia?status=ok`,
-        failure: `${base}/membresia`,
-        pending: `${base}/membresia?status=ok`,
+        failure: `${base}/membresia?status=failure`,
+        pending: `${base}/membresia?status=pending`,
       },
       auto_return: "approved",
       notification_url: `${base}/api/billing/webhook`,
@@ -293,6 +293,84 @@ export function preferenceCheckoutUrl(pref: {
     return pref.sandbox_init_point || pref.init_point || "";
   }
   return pref.init_point || pref.sandbox_init_point || "";
+}
+
+export type MpPaymentDetail = {
+  id: number;
+  status?: string;
+  status_detail?: string;
+  transaction_amount?: number;
+  currency_id?: string;
+  external_reference?: string;
+  date_approved?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export async function getPayment(paymentId: string | number): Promise<MpPaymentDetail> {
+  return mpFetch<MpPaymentDetail>(`/v1/payments/${paymentId}`);
+}
+
+/**
+ * Busca el último pago aprobado de este usuario (external_reference = userId).
+ * Usado al volver de Checkout Pro o al pulsar «Actualizar estado».
+ */
+export async function findLatestApprovedPaymentForUser(
+  userId: string
+): Promise<MpPaymentDetail | null> {
+  const qs = new URLSearchParams({
+    sort: "date_created",
+    criteria: "desc",
+    external_reference: userId,
+    range: "date_created",
+    begin_date: "NOW-30DAYS",
+    end_date: "NOW",
+  });
+
+  const data = await mpFetch<{ results?: MpPaymentDetail[] }>(
+    `/v1/payments/search?${qs.toString()}`
+  );
+
+  const approved = (data.results || []).find(
+    (p) => (p.status || "").toLowerCase() === "approved"
+  );
+  return approved || null;
+}
+
+/**
+ * Valida que un pago de MP corresponde a este usuario y está aprobado.
+ * No activa membresía; solo verifica.
+ */
+export async function assertApprovedMembershipPayment(opts: {
+  payment: MpPaymentDetail;
+  userId: string;
+}): Promise<{ ok: true; amount: number } | { ok: false; reason: string }> {
+  const status = (opts.payment.status || "").toLowerCase();
+  if (status !== "approved") {
+    return {
+      ok: false,
+      reason: `El pago aún no está aprobado (estado: ${opts.payment.status || "desconocido"}).`,
+    };
+  }
+
+  const ref = (opts.payment.external_reference || "").trim();
+  if (ref && ref !== opts.userId) {
+    return { ok: false, reason: "El pago no corresponde a esta cuenta." };
+  }
+
+  const expected = await membershipAmount();
+  const amount = Number(opts.payment.transaction_amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, reason: "Monto de pago inválido." };
+  }
+  // Tolerancia mínima: no activar si cobraron menos del mínimo de membresía.
+  if (amount + 0.01 < expected) {
+    return {
+      ok: false,
+      reason: `El monto pagado ($${amount}) es menor al precio de membresía ($${expected}).`,
+    };
+  }
+
+  return { ok: true, amount };
 }
 
 export function checkoutUrl(preapproval: MpPreapproval): string {
