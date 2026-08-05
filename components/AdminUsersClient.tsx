@@ -3,12 +3,11 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AdminShell from "@/components/AdminShell";
+import { planSourceLabel, subscriptionLabel } from "@/lib/access";
 import {
-  MEMBERSHIP_PRICE_CLP,
-  RESELLER_PRICE_CLP,
-  planSourceLabel,
-  subscriptionLabel,
-} from "@/lib/access";
+  useMembershipPrice,
+  useResellerPrice,
+} from "@/components/PricingProvider";
 
 type AdminUser = {
   id: string;
@@ -43,6 +42,8 @@ const filters = [
 ] as const;
 
 export default function AdminUsersClient() {
+  const { label: membershipPrice } = useMembershipPrice();
+  const { label: resellerPrice } = useResellerPrice();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<string>("all");
@@ -106,7 +107,7 @@ export default function AdminUsersClient() {
 
     setOk(
       resellerPrepaid
-        ? `Cuenta revendedor creada ($${RESELLER_PRICE_CLP.toLocaleString("es-CL")}): se activa al primer login (${prepaidDays} días).`
+        ? `Cuenta revendedor creada ($${resellerPrice}): se activa al primer login (${prepaidDays} días).`
         : `Cuenta creada: ${data.user?.email}`
     );
     setName("");
@@ -127,7 +128,7 @@ export default function AdminUsersClient() {
   return (
     <AdminShell
       title="Usuarios y membresías"
-      subtitle={`Directo $${MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL")}/mes · Revendedor $${RESELLER_PRICE_CLP.toLocaleString("es-CL")} (activación al primer uso)`}
+      subtitle={`Directo $${membershipPrice}/mes · Revendedor $${resellerPrice} (activación al primer uso)`}
     >
       {stats && (
         <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -160,7 +161,7 @@ export default function AdminUsersClient() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nombre"
-            className="rounded-lg border border-white/15 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-[#E50914]"
+            className="rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
           />
           <input
             required
@@ -168,7 +169,7 @@ export default function AdminUsersClient() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="rounded-lg border border-white/15 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-[#E50914]"
+            className="rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
           />
           <input
             required
@@ -177,7 +178,7 @@ export default function AdminUsersClient() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Contraseña"
-            className="rounded-lg border border-white/15 bg-black/60 px-3 py-2 outline-none focus:ring-2 focus:ring-[#E50914]"
+            className="rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
           />
           <select
             value={role}
@@ -199,10 +200,9 @@ export default function AdminUsersClient() {
               setResellerPrepaid(e.target.checked);
               if (e.target.checked) setGrantDays(0);
             }}
-            className="accent-[#E50914]"
+            className="accent-teal-300"
           />
-          Cuenta revendedor (${RESELLER_PRICE_CLP.toLocaleString("es-CL")}) —
-          activar al primer login
+          Cuenta revendedor (${resellerPrice}) — activar al primer login
           {resellerPrepaid && (
             <>
               <span className="text-neutral-500">Días:</span>
@@ -240,7 +240,7 @@ export default function AdminUsersClient() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-[#E50914] px-4 py-2 text-sm font-bold disabled:opacity-60"
+          className="brand-button rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60"
         >
           {loading ? "Creando…" : "Crear cuenta"}
         </button>
@@ -293,7 +293,7 @@ export default function AdminUsersClient() {
                     <span
                       className={`rounded px-1.5 py-0.5 text-xs ${
                         u.role === "SUPER_ADMIN"
-                          ? "bg-[#E50914]/30 text-red-200"
+                          ? "bg-teal-300/15 text-teal-200"
                           : "bg-white/10 text-neutral-300"
                       }`}
                     >
@@ -320,7 +320,7 @@ export default function AdminUsersClient() {
                   <td className="px-3 py-3 text-right">
                     <Link
                       href={`/admin/usuarios/${u.id}`}
-                      className="text-[#E50914] underline hover:text-red-300"
+                      className="text-teal-300 underline hover:text-teal-200"
                     >
                       Detalle
                     </Link>

@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#141414] px-4 text-center text-white">
-      <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#E50914]">
+    <div className="app-page flex min-h-screen flex-col items-center justify-center px-4 text-center">
+      <p className="eyebrow mb-2">
         VeoTV
       </p>
       <h1 className="mb-3 text-4xl font-black md:text-5xl">

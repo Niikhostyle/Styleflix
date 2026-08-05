@@ -29,13 +29,13 @@ export default function AdminShell({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-[#0c0c0c] text-white">
+    <div className="app-page">
       <Navbar />
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 pb-20 pt-24 md:flex-row md:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-20 pt-32 md:flex-row md:px-8">
         <aside className="w-full shrink-0 md:w-56">
-          <div className="sticky top-24 space-y-1 rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-3">
+          <div className="glass-panel sticky top-28 space-y-1 rounded-2xl p-3">
             <div className="mb-3 flex items-center gap-2 px-2 py-1">
-              <LayoutDashboard className="h-4 w-4 text-[#E50914]" />
+              <LayoutDashboard className="h-4 w-4 text-teal-300" />
               <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
                 Panel admin
               </p>
@@ -54,8 +54,8 @@ export default function AdminShell({
                   href={item.href}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                     active
-                      ? "bg-[#E50914] text-white shadow-lg shadow-red-900/30"
-                      : "text-neutral-300 hover:bg-white/5 hover:text-white"
+                      ? "bg-teal-300 text-[#07111d] shadow-lg shadow-teal-950/30"
+                      : "text-slate-300 hover:bg-white/5 hover:text-white"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -75,10 +75,12 @@ export default function AdminShell({
 
         <main className="min-w-0 flex-1">
           <header className="mb-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">
+            <p className="eyebrow">
               Super Admin
             </p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight">{title}</h1>
+            <h1 className="mt-2 text-4xl font-black tracking-[-0.045em]">
+              {title}
+            </h1>
             {subtitle && (
               <p className="mt-2 max-w-2xl text-sm text-neutral-400">
                 {subtitle}

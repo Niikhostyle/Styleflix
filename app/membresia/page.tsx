@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import MembershipClient from "@/components/MembershipClient";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { hasActiveMembership } from "@/lib/access";
 
 export const metadata = {
@@ -31,7 +33,8 @@ export default async function MembresiaPage({
   });
 
   return (
-    <div className="min-h-screen bg-[#141414]">
+    <div className="app-page">
+      <Navbar />
       <MembershipClient
         status={session.user.subscriptionStatus || "NONE"}
         currentPeriodEnd={session.user.currentPeriodEnd}
@@ -39,6 +42,7 @@ export default async function MembresiaPage({
         isAdmin={session.user.role === "SUPER_ADMIN"}
         flash={flash}
       />
+      <Footer />
     </div>
   );
 }

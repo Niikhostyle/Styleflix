@@ -3,10 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRef } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 import {
   IMAGE_POSTER_URL,
   getDisplayTitle,
+  getReleaseYear,
   type MediaItem,
   type MediaType,
 } from "@/lib/tmdb";
@@ -43,10 +44,14 @@ export default function MediaRow({
   if (!items.length) return null;
 
   return (
-    <section className="group/row relative mb-9 px-4 md:mb-11 md:px-12">
-      <h2 className="mb-3 text-lg font-semibold tracking-wide text-neutral-100 md:text-xl">
-        {title}
-      </h2>
+    <section className="group/row relative mb-10 px-4 md:mb-14 md:px-8 lg:px-12">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="h-1.5 w-1.5 rounded-full bg-teal-300 shadow-[0_0_14px_rgba(94,234,212,0.9)]" />
+        <h2 className="text-lg font-bold tracking-[-0.02em] text-slate-100 md:text-xl">
+          {title}
+        </h2>
+        <span className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+      </div>
 
       <div className="relative">
         <button
@@ -55,19 +60,23 @@ export default function MediaRow({
           tabIndex={-1}
           data-tv-ignore
           onClick={() => scroll("left")}
-          className="tv-row-chevron absolute left-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-black/55 opacity-0 transition group-hover/row:opacity-100 hover:bg-black/75 md:w-12"
+          className="tv-row-chevron glass-panel absolute -left-2 top-1/2 z-20 flex h-14 w-10 -translate-y-1/2 items-center justify-center rounded-xl opacity-0 transition group-hover/row:opacity-100 hover:border-teal-300/25 hover:text-teal-200 md:w-11"
         >
           <ChevronLeft className="h-9 w-9 text-white" />
         </button>
 
         <div
           ref={rowRef}
-          className="scrollbar-hide flex gap-2 overflow-x-auto scroll-smooth pb-1 md:gap-2.5"
+          className="scrollbar-hide flex gap-3 overflow-x-auto scroll-smooth pb-3 pt-1 md:gap-4"
         >
           {items.map((item, index) => {
             const type = resolveType(item, mediaType);
             const name = getDisplayTitle(item);
             const priority = index < priorityCount;
+            const year = getReleaseYear(item);
+            const score = item.vote_average
+              ? item.vote_average.toFixed(1)
+              : null;
 
             return (
               <Link
@@ -81,15 +90,15 @@ export default function MediaRow({
                     behavior: "smooth",
                   });
                 }}
-                className="tv-card group/card relative aspect-[2/3] w-[110px] flex-shrink-0 overflow-hidden rounded-sm bg-zinc-900 transition duration-300 hover:z-10 hover:scale-105 focus-visible:z-10 md:w-[140px] lg:w-[160px]"
+                className="tv-card group/card relative aspect-[2/3] w-[128px] flex-shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101827] shadow-[0_12px_35px_rgba(0,0,0,0.18)] transition duration-300 hover:z-10 hover:-translate-y-1.5 hover:border-teal-200/25 hover:shadow-[0_20px_45px_rgba(0,0,0,0.38)] focus-visible:z-10 md:w-[158px] lg:w-[174px]"
               >
                 {item.poster_path ? (
                   <Image
                     src={`${IMAGE_POSTER_URL}${item.poster_path}`}
                     alt={name}
                     fill
-                    sizes="(max-width: 768px) 110px, (max-width: 1024px) 140px, 160px"
-                    className="object-cover"
+                    sizes="(max-width: 768px) 128px, (max-width: 1024px) 158px, 174px"
+                    className="object-cover transition duration-500 group-hover/card:scale-[1.04]"
                     priority={priority}
                     loading={priority ? "eager" : "lazy"}
                   />
@@ -98,10 +107,21 @@ export default function MediaRow({
                     {name}
                   </div>
                 )}
-                <div className="tv-card-meta pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition group-hover/card:opacity-100" />
-                <p className="tv-card-meta pointer-events-none absolute bottom-0 left-0 right-0 truncate px-2 pb-2 text-xs font-medium text-white opacity-0 transition group-hover/card:opacity-100">
-                  {name}
-                </p>
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#07101d]/95 via-transparent to-transparent opacity-80 transition group-hover/card:opacity-100" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">
+                  <p className="line-clamp-2 text-xs font-bold leading-4 text-white md:text-[13px]">
+                    {name}
+                  </p>
+                  <div className="mt-1.5 flex items-center gap-2 text-[10px] font-medium text-slate-300">
+                    {year && <span>{year}</span>}
+                    {score && (
+                      <span className="inline-flex items-center gap-1 text-amber-300">
+                        <Star className="h-2.5 w-2.5 fill-current" />
+                        {score}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </Link>
             );
           })}
@@ -113,7 +133,7 @@ export default function MediaRow({
           tabIndex={-1}
           data-tv-ignore
           onClick={() => scroll("right")}
-          className="tv-row-chevron absolute right-0 top-0 z-20 flex h-full w-10 items-center justify-center bg-black/55 opacity-0 transition group-hover/row:opacity-100 hover:bg-black/75 md:w-12"
+          className="tv-row-chevron glass-panel absolute -right-2 top-1/2 z-20 flex h-14 w-10 -translate-y-1/2 items-center justify-center rounded-xl opacity-0 transition group-hover/row:opacity-100 hover:border-teal-300/25 hover:text-teal-200 md:w-11"
         >
           <ChevronRight className="h-9 w-9 text-white" />
         </button>

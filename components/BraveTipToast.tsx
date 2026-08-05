@@ -73,7 +73,7 @@ export default function BraveTipToast() {
             href="https://brave.com/download/"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-[#E50914] underline hover:text-red-300"
+            className="font-semibold text-teal-300 underline hover:text-teal-200"
           >
             Brave
           </a>{" "}

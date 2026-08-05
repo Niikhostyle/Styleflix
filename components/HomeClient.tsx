@@ -31,12 +31,12 @@ export default function HomeClient({
   animeMovies,
 }: HomeClientProps) {
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="app-page">
       <Navbar />
 
       <Hero item={featured} mediaType={featured.media_type ?? "movie"} />
 
-      <main className="relative z-10 -mt-14 space-y-1 pb-8 md:-mt-20">
+      <main className="relative z-10 -mt-16 space-y-1 pb-10 md:-mt-24">
         <PersonalizedRows />
         <MediaRow
           title="Películas en Vimeus"

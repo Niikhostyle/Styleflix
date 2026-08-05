@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { APP_NAME_UPPER } from "@/lib/brand-ui";
+import BrandMark from "@/components/BrandMark";
 
 type Tab = "password" | "email";
 
@@ -63,19 +63,18 @@ export default function RecoverClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0c0c] text-white">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-16">
-        <p className="mb-2 text-2xl font-black tracking-tight text-[#E50914]">
-          {APP_NAME_UPPER}
-        </p>
-        <h1 className="text-3xl font-black tracking-tight">
+    <div className="app-page">
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16">
+        <BrandMark className="mb-8" />
+        <p className="eyebrow mb-2">Seguridad de cuenta</p>
+        <h1 className="text-4xl font-black tracking-[-0.045em]">
           Recuperar acceso
         </h1>
         <p className="mt-2 text-sm text-neutral-400">
           Restablece tu contraseña o solicita ayuda si olvidaste el correo.
         </p>
 
-        <div className="mt-6 flex gap-2 rounded-xl bg-white/5 p-1">
+        <div className="mt-7 flex gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-1.5">
           <button
             type="button"
             onClick={() => {
@@ -85,7 +84,7 @@ export default function RecoverClient() {
             }}
             className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
               tab === "password"
-                ? "bg-white text-black"
+                ? "bg-teal-300 text-[#07111d]"
                 : "text-neutral-300 hover:text-white"
             }`}
           >
@@ -100,7 +99,7 @@ export default function RecoverClient() {
             }}
             className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
               tab === "email"
-                ? "bg-white text-black"
+                ? "bg-teal-300 text-[#07111d]"
                 : "text-neutral-300 hover:text-white"
             }`}
           >
@@ -108,7 +107,7 @@ export default function RecoverClient() {
           </button>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-6">
+        <div className="glass-panel mt-4 rounded-3xl p-6">
           {tab === "password" ? (
             <form onSubmit={onForgotPassword} className="space-y-4">
               <p className="text-sm text-neutral-400">
@@ -123,14 +122,14 @@ export default function RecoverClient() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 outline-none ring-[#E50914] focus:ring-2"
+                  className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                   placeholder="tu@email.com"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg bg-[#E50914] py-3 text-sm font-bold hover:bg-[#f6121d] disabled:opacity-60"
+                className="brand-button w-full rounded-xl py-3 text-sm font-bold disabled:opacity-60"
               >
                 {loading ? "Enviando…" : "Enviar enlace"}
               </button>
@@ -157,7 +156,7 @@ export default function RecoverClient() {
                 <input
                   value={nameHint}
                   onChange={(e) => setNameHint(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 outline-none ring-[#E50914] focus:ring-2"
+                  className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                   placeholder="Nombre en la cuenta"
                 />
               </div>

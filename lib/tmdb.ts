@@ -1,12 +1,12 @@
 const BASE_URL = "https://api.themoviedb.org/3";
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
-/** Poster de filas (~110–160px): w342 basta y pesa mucho menos que w500. */
-export const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w342";
+/** Posters nítidos en pantallas Retina y tarjetas ampliadas. */
+export const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 /** Alias explícito para posters. */
-export const IMAGE_POSTER_URL = "https://image.tmdb.org/t/p/w342";
-/** Backdrop hero / detalle: w1280 en vez de original (varios MB). */
-export const IMAGE_BACKDROP_URL = "https://image.tmdb.org/t/p/w1280";
+export const IMAGE_POSTER_URL = "https://image.tmdb.org/t/p/w500";
+/** Backdrop hero / detalle en alta resolución. */
+export const IMAGE_BACKDROP_URL = "https://image.tmdb.org/t/p/original";
 /** Solo cuando hace falta máxima calidad (p.ej. player cover). */
 export const IMAGE_ORIGINAL_URL = "https://image.tmdb.org/t/p/original";
 

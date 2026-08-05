@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="app-page">
       <div className="h-16 bg-black/40" />
       <div className="relative h-[70vh] animate-pulse bg-zinc-900">
         <div className="absolute bottom-24 left-4 space-y-3 md:left-12">

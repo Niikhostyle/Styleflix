@@ -4,7 +4,9 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { getSession, signIn, useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { APP_NAME_UPPER, MEMBERSHIP_HINT } from "@/lib/brand-ui";
+import { membershipHint } from "@/lib/brand-ui";
+import { useMembershipPrice } from "@/components/PricingProvider";
+import BrandMark from "@/components/BrandMark";
 
 function safeCallback(callbackUrl: string) {
   return callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
@@ -14,6 +16,7 @@ function safeCallback(callbackUrl: string) {
 
 export default function LoginForm() {
   const { status } = useSession();
+  const { clp: membershipPriceClp } = useMembershipPrice();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const modeParam = searchParams.get("mode");
@@ -166,28 +169,29 @@ export default function LoginForm() {
 
   if (status === "authenticated" || status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0c0c0c] text-neutral-300">
+      <div className="app-page flex min-h-screen items-center justify-center text-slate-300">
         {status === "loading" ? "Cargando…" : "Entrando…"}
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0c0c0c] text-white">
+    <div className="app-page relative min-h-screen overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(229,9,20,0.18),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(255,255,255,0.04),_transparent_50%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(45,212,191,0.16),transparent_30rem),radial-gradient(circle_at_82%_75%,rgba(139,92,246,0.14),transparent_32rem)]"
       />
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-24">
-        <p className="mb-2 text-2xl font-black tracking-tight text-[#E50914]">
-          {APP_NAME_UPPER}
-        </p>
-        <h1 className="mb-2 text-3xl font-black tracking-tight">
+      <div className="relative mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-20">
+        <BrandMark className="mb-8" />
+        <p className="eyebrow mb-2">Tu próxima historia comienza aquí</p>
+        <h1 className="mb-3 text-4xl font-black tracking-[-0.045em]">
           {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
         </h1>
-        <p className="mb-6 text-sm text-neutral-400">{MEMBERSHIP_HINT}</p>
+        <p className="mb-7 text-sm leading-6 text-slate-400">
+          {membershipHint(membershipPriceClp)}
+        </p>
 
-        <div className="mb-6 flex gap-1 rounded-xl bg-white/5 p-1">
+        <div className="mb-4 flex gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-1.5">
           <button
             type="button"
             data-tv-focus
@@ -197,8 +201,8 @@ export default function LoginForm() {
             }}
             className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition ${
               mode === "login"
-                ? "bg-white text-black shadow"
-                : "text-neutral-300 hover:text-white"
+                ? "bg-teal-300 text-[#07111d] shadow"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             Entrar
@@ -213,8 +217,8 @@ export default function LoginForm() {
             }}
             className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition ${
               mode === "register"
-                ? "bg-white text-black shadow"
-                : "text-neutral-300 hover:text-white"
+                ? "bg-teal-300 text-[#07111d] shadow"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             Crear cuenta
@@ -223,7 +227,7 @@ export default function LoginForm() {
 
         <form
           onSubmit={mode === "login" ? onLogin : onRegister}
-          className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur"
+          className="glass-panel space-y-4 rounded-3xl p-6 md:p-7"
         >
           {mode === "register" && (
             <div>
@@ -238,7 +242,7 @@ export default function LoginForm() {
                 data-tv-autofocus={mode === "register" ? true : undefined}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 text-base outline-none ring-[#E50914] focus:ring-2"
+                className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 text-base outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                 placeholder="Tu nombre"
               />
             </div>
@@ -253,7 +257,7 @@ export default function LoginForm() {
               data-tv-autofocus={mode === "login" ? true : undefined}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 text-base outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 text-base outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
               placeholder="tu@email.com"
             />
           </div>
@@ -280,7 +284,7 @@ export default function LoginForm() {
               }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 text-base outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 text-base outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
               placeholder="••••••••"
             />
           </div>
@@ -310,7 +314,7 @@ export default function LoginForm() {
             type="submit"
             disabled={loading}
             data-tv-focus
-            className="tv-cta w-full rounded-lg bg-[#E50914] py-3 text-base font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
+            className="brand-button tv-cta focus-ring w-full rounded-xl py-3.5 text-base font-extrabold transition disabled:opacity-60"
           >
             {loading
               ? mode === "login"
@@ -322,11 +326,11 @@ export default function LoginForm() {
           </button>
         </form>
 
-        <p className="mt-6 text-sm text-neutral-500">
+        <p className="mt-6 text-sm text-slate-500">
           <a
             href="/descargar"
             data-tv-focus
-            className="text-neutral-300 underline"
+            className="text-teal-200 underline"
           >
             Descargar apps Android (celular o TV)
           </a>

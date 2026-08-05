@@ -107,14 +107,14 @@ export default function AccountClient() {
   const isAdmin = role === "SUPER_ADMIN" || session?.user?.role === "SUPER_ADMIN";
 
   return (
-    <div className="min-h-screen bg-[#0c0c0c] text-white">
+    <div className="app-page">
       <Navbar />
-      <main className="mx-auto max-w-3xl px-4 pb-20 pt-24 md:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">
+      <main className="mx-auto max-w-4xl px-4 pb-20 pt-32 md:px-8">
+        <p className="eyebrow">
           Cuenta
         </p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight">Mi perfil</h1>
-        <p className="mt-2 text-sm text-neutral-400">
+        <h1 className="mt-2 text-4xl font-black tracking-[-0.045em]">Mi perfil</h1>
+        <p className="mt-2 text-sm text-slate-400">
           Administra tu nombre y contraseña de forma segura.
         </p>
 
@@ -122,9 +122,9 @@ export default function AccountClient() {
           <p className="mt-10 text-neutral-400">Cargando…</p>
         ) : (
           <div className="mt-10 space-y-6">
-            <section className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-transparent p-6">
+            <section className="surface-panel rounded-3xl p-6 md:p-7">
               <div className="mb-5 flex items-center gap-2">
-                <UserRound className="h-5 w-5 text-[#E50914]" />
+                <UserRound className="h-5 w-5 text-teal-300" />
                 <h2 className="text-lg font-bold">Datos personales</h2>
               </div>
               <form onSubmit={saveProfile} className="space-y-4">
@@ -137,7 +137,7 @@ export default function AccountClient() {
                     onChange={(e) => setName(e.target.value)}
                     required
                     minLength={2}
-                    className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+                    className="w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3.5 py-2.5 outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                   />
                 </div>
                 <div>
@@ -171,7 +171,7 @@ export default function AccountClient() {
                     )}
                     <Link
                       href="/membresia"
-                      className="mt-2 inline-block text-sm text-[#E50914] underline"
+                      className="mt-2 inline-block text-sm text-teal-300 underline"
                     >
                       Gestionar membresía
                     </Link>
@@ -186,16 +186,16 @@ export default function AccountClient() {
                 <button
                   type="submit"
                   disabled={busyProfile}
-                  className="rounded-lg bg-white px-4 py-2.5 text-sm font-bold text-black transition hover:bg-neutral-200 disabled:opacity-60"
+                  className="brand-button rounded-xl px-4 py-2.5 text-sm font-bold transition disabled:opacity-60"
                 >
                   {busyProfile ? "Guardando…" : "Guardar perfil"}
                 </button>
               </form>
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-transparent p-6">
+            <section className="surface-panel rounded-3xl p-6 md:p-7">
               <div className="mb-5 flex items-center gap-2">
-                <KeyRound className="h-5 w-5 text-[#E50914]" />
+                <KeyRound className="h-5 w-5 text-violet-300" />
                 <h2 className="text-lg font-bold">Cambiar contraseña</h2>
               </div>
               <form onSubmit={changePassword} className="space-y-4">
@@ -209,7 +209,7 @@ export default function AccountClient() {
                     autoComplete="current-password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+                    className="w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3.5 py-2.5 outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -224,7 +224,7 @@ export default function AccountClient() {
                       autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+                      className="w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3.5 py-2.5 outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                     />
                   </div>
                   <div>
@@ -238,7 +238,7 @@ export default function AccountClient() {
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+                      className="w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3.5 py-2.5 outline-none transition focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
                     />
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export default function AccountClient() {
                 <button
                   type="submit"
                   disabled={busyPass}
-                  className="rounded-lg bg-[#E50914] px-4 py-2.5 text-sm font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
+                  className="brand-button rounded-xl px-4 py-2.5 text-sm font-bold transition disabled:opacity-60"
                 >
                   {busyPass ? "Actualizando…" : "Actualizar contraseña"}
                 </button>
@@ -259,9 +259,9 @@ export default function AccountClient() {
             {isAdmin && (
               <section className="rounded-2xl border border-white/10 bg-black/30 p-5">
                 <div className="flex items-center gap-2 text-sm text-neutral-300">
-                  <Shield className="h-4 w-4 text-[#E50914]" />
+                  <Shield className="h-4 w-4 text-teal-300" />
                   Acceso de super administrador.
-                  <Link href="/admin" className="text-[#E50914] underline">
+                  <Link href="/admin" className="text-teal-300 underline">
                     Ir al panel
                   </Link>
                 </div>

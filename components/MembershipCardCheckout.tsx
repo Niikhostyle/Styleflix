@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
 import { useSession } from "next-auth/react";
-import { MEMBERSHIP_PRICE_CLP } from "@/lib/access";
+import { useMembershipPrice } from "@/components/PricingProvider";
 
 type Props = {
   onPaid: (result: { activated: boolean; message?: string }) => void;
@@ -17,6 +17,7 @@ export default function MembershipCardCheckout({
   onBusy,
 }: Props) {
   const { data: session } = useSession();
+  const { clp: priceClp, label: priceLabel } = useMembershipPrice();
   const [ready, setReady] = useState(false);
   const publicKey =
     process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim() || "";
@@ -44,24 +45,25 @@ export default function MembershipCardCheckout({
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border border-white/10 bg-white p-4 text-black shadow-xl">
+    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-black shadow-xl">
       <div>
-        <p className="text-sm font-bold text-neutral-900">
+        <p className="text-sm font-bold text-slate-900">
           Pago seguro · Mercado Pago
         </p>
-        <p className="text-xs text-neutral-600">
-          ${MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL")} / mes · Payment Brick
+        <p className="text-xs text-slate-600">
+          ${priceLabel} / mes · Payment Brick
         </p>
       </div>
 
-      <p className="rounded-md bg-neutral-100 px-3 py-2 text-xs text-neutral-700">
-        Pago real con Mercado Pago. Usa tu tarjeta; el cobro es de $
-        {MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL")} CLP al mes.
+      <p className="rounded-xl bg-teal-50 px-3 py-2 text-xs text-teal-900">
+        Pago real con Mercado Pago. Usa tu tarjeta; el cobro es de ${priceLabel}{" "}
+        CLP al mes.
       </p>
 
       <Payment
+        key={priceClp}
         initialization={{
-          amount: MEMBERSHIP_PRICE_CLP,
+          amount: priceClp,
           payer: {
             email: session?.user?.email || undefined,
           },

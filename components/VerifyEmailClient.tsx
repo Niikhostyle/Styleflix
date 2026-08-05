@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { APP_NAME_UPPER } from "@/lib/brand-ui";
+import BrandMark from "@/components/BrandMark";
 
 function VerifyInner() {
   const searchParams = useSearchParams();
@@ -40,12 +40,13 @@ function VerifyInner() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-[#0c0c0c] text-white">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-16">
-        <p className="mb-2 text-2xl font-black text-[#E50914]">
-          {APP_NAME_UPPER}
-        </p>
-        <h1 className="text-3xl font-black">Verificar correo</h1>
+    <div className="app-page">
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16">
+        <BrandMark className="mb-8" />
+        <p className="eyebrow mb-2">Seguridad de cuenta</p>
+        <h1 className="text-4xl font-black tracking-[-0.045em]">
+          Verificar correo
+        </h1>
         <div
           className={`mt-8 rounded-2xl border p-6 ${
             status === "ok"
@@ -63,7 +64,7 @@ function VerifyInner() {
           {status !== "loading" && (
             <Link
               href="/login"
-              className="mt-4 inline-block rounded-lg bg-[#E50914] px-4 py-2.5 text-sm font-bold text-white"
+              className="brand-button mt-4 inline-block rounded-xl px-4 py-2.5 text-sm font-bold"
             >
               Ir a iniciar sesión
             </Link>
@@ -78,7 +79,7 @@ export default function VerifyEmailClient() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0c0c0c] text-neutral-400">
+        <div className="app-page flex min-h-screen items-center justify-center text-slate-400">
           Cargando…
         </div>
       }

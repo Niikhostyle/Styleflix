@@ -1,9 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #141414;
-  --foreground: #ffffff;
-  --brand: #e50914;
+  --background: #070b14;
+  --foreground: #f4f7fb;
+  --brand: #5eead4;
+  --brand-strong: #2dd4bf;
+  --accent: #8b5cf6;
+  --surface: #0d1424;
+  --surface-strong: #111b2e;
+  --muted: #91a0b8;
+  --line: rgba(148, 163, 184, 0.14);
 }
 
 @theme inline {
@@ -25,11 +31,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background-image:
+    radial-gradient(circle at 8% -10%, rgba(45, 212, 191, 0.12), transparent 32rem),
+    radial-gradient(circle at 92% 8%, rgba(139, 92, 246, 0.1), transparent 30rem);
+  background-attachment: fixed;
 }
 
 ::selection {
   background: color-mix(in srgb, var(--brand) 55%, transparent);
-  color: white;
+  color: #07111d;
 }
 
 .scrollbar-hide {
@@ -43,6 +53,55 @@ body {
 
 a {
   text-underline-offset: 3px;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-page {
+  min-height: 100vh;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.glass-panel {
+  border: 1px solid var(--line);
+  background: rgba(13, 20, 36, 0.72);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(20px);
+}
+
+.surface-panel {
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(17, 27, 46, 0.92), rgba(9, 15, 27, 0.92));
+}
+
+.eyebrow {
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.brand-button {
+  color: #06111a;
+  background: linear-gradient(135deg, #99f6e4, #5eead4 52%, #67e8f9);
+  box-shadow: 0 12px 34px rgba(45, 212, 191, 0.2);
+}
+
+.brand-button:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
 }
 
 @keyframes player-enter {
@@ -108,7 +167,7 @@ html.tv-mode select:focus-visible,
 html.tv-mode [tabindex]:not([tabindex="-1"]):focus-visible {
   outline: 3px solid #ffffff;
   outline-offset: 4px;
-  box-shadow: 0 0 0 6px rgba(229, 9, 20, 0.45);
+  box-shadow: 0 0 0 6px rgba(45, 212, 191, 0.35);
   z-index: 5;
 }
 

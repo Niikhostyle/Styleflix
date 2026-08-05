@@ -10,7 +10,7 @@ import {
   DEFAULT_PREVIEW_MINUTES,
   previewStorageKey,
 } from "@/lib/brand";
-import { MEMBERSHIP_PRICE_CLP } from "@/lib/access";
+import { useMembershipPrice } from "@/components/PricingProvider";
 import type { MediaType } from "@/lib/tmdb";
 
 export type SeasonMeta = {
@@ -70,6 +70,7 @@ export default function ModalPlayer({
   isAnime = false,
 }: ModalPlayerProps) {
   const { data: session } = useSession();
+  const { label: price } = useMembershipPrice();
   const membershipActive = Boolean(session?.user?.membershipActive);
   const userId = session?.user?.id || "anon";
   const isAdmin = session?.user?.role === "SUPER_ADMIN";
@@ -273,7 +274,6 @@ export default function ModalPlayer({
     }
   }
 
-  const price = MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL");
   const mins = remainingSec != null ? Math.floor(remainingSec / 60) : 0;
   const secs = remainingSec != null ? remainingSec % 60 : 0;
   const showPlayer = Boolean(embedPath) && !paywall && !resolving && !resolveError;
@@ -314,7 +314,7 @@ export default function ModalPlayer({
 
       {paywall ? (
         <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-[#E50914]">
+          <p className="text-sm font-semibold uppercase tracking-widest text-teal-300">
             {APP_NAME}
           </p>
           <h2 className="max-w-md text-2xl font-black text-white md:text-3xl">
@@ -328,7 +328,7 @@ export default function ModalPlayer({
             href="/membresia"
             data-tv-focus
             data-tv-autofocus
-            className="tv-cta rounded bg-[#E50914] px-6 py-3 text-base font-bold transition hover:bg-[#f6121d]"
+            className="brand-button tv-cta rounded-xl px-6 py-3 text-base font-bold transition"
           >
             Activar membresía
           </Link>

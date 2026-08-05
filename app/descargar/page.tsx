@@ -1,4 +1,6 @@
 import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
+import { Smartphone, Tv } from "lucide-react";
 
 export const metadata = {
   title: "Descargar app | VeoTV",
@@ -7,22 +9,24 @@ export const metadata = {
 
 export default function DescargarPage() {
   return (
-    <div className="min-h-screen bg-[#141414] px-4 py-16 text-white md:px-10">
-      <div className="mx-auto max-w-2xl">
-        <p className="text-2xl font-black tracking-tight text-[#E50914]">
-          VeoTV
-        </p>
-        <h1 className="mt-3 text-3xl font-black md:text-4xl">Descargar apps</h1>
+    <div className="app-page px-4 py-16 md:px-10">
+      <div className="mx-auto max-w-3xl">
+        <BrandMark className="mb-10" />
+        <p className="eyebrow">VeoTV en todos tus dispositivos</p>
+        <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] md:text-6xl">
+          Descargar aplicaciones
+        </h1>
         <p className="mt-3 text-neutral-300">
           Elige la versión según tu dispositivo. Sin Google Play.
         </p>
 
-        <div className="mt-10 space-y-4">
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
           <a
             href="/downloads/veotv-celular.apk"
             download
-            className="flex w-full flex-col gap-1 rounded bg-[#E50914] px-6 py-4 text-left transition hover:bg-[#f6121d]"
+            className="brand-button flex w-full flex-col gap-1 rounded-2xl px-6 py-5 text-left transition"
           >
+            <Smartphone className="mb-3 h-7 w-7" />
             <span className="text-lg font-bold">Celular / tablet Android</span>
             <span className="text-sm font-medium text-white/85">
               veotv-celular.apk · táctil
@@ -32,8 +36,9 @@ export default function DescargarPage() {
           <a
             href="/downloads/veotv-tv.apk"
             download
-            className="flex w-full flex-col gap-1 rounded border border-white/25 bg-white/10 px-6 py-4 text-left transition hover:bg-white/15"
+            className="surface-panel flex w-full flex-col gap-1 rounded-2xl px-6 py-5 text-left transition hover:border-violet-300/30"
           >
+            <Tv className="mb-3 h-7 w-7 text-violet-300" />
             <span className="text-lg font-bold">Android TV / Google TV</span>
             <span className="text-sm font-medium text-neutral-300">
               veotv-tv.apk · control remoto
@@ -41,7 +46,7 @@ export default function DescargarPage() {
           </a>
         </div>
 
-        <ol className="mt-10 list-decimal space-y-3 pl-5 text-sm text-neutral-200 md:text-base">
+        <ol className="surface-panel mt-10 list-decimal space-y-3 rounded-3xl p-6 pl-10 text-sm text-slate-200 md:text-base">
           <li>Descarga el APK correcto (celular o TV).</li>
           <li>
             Permite <strong>instalar apps desconocidas</strong> para el navegador

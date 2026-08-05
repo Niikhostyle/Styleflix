@@ -11,16 +11,6 @@ export type SubscriptionStatus =
 
 export type PlanSource = "DIRECT" | "RESELLER";
 
-/** Plan directo (Mercado Pago) */
-export const MEMBERSHIP_PRICE_CLP = Number(
-  process.env.MEMBERSHIP_PRICE_CLP || "4990"
-);
-
-/** Precio por cuenta / mes para revendedores (activación al primer uso) */
-export const RESELLER_PRICE_CLP = Number(
-  process.env.RESELLER_PRICE_CLP || "2990"
-);
-
 export type MembershipFields = {
   role?: string | null;
   subscriptionStatus?: string | null;

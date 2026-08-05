@@ -21,11 +21,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const items = query.length >= 2 ? await searchMulti(query) : [];
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="app-page">
       <Navbar />
 
-      <main className="px-4 pb-16 pt-24 md:px-12">
-        <h1 className="mb-2 text-2xl font-bold md:text-3xl">
+      <main className="mx-auto max-w-[1520px] px-4 pb-16 pt-32 md:px-8 lg:px-12">
+        <p className="eyebrow mb-2">Descubrir</p>
+        <h1 className="mb-2 text-3xl font-black tracking-[-0.04em] md:text-4xl">
           {query ? (
             <>
               Resultados para{" "}
@@ -44,7 +45,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         </p>
 
         {items.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
             {items.map((item) => {
               const type = (item.media_type ?? "movie") as MediaType;
               const name = getDisplayTitle(item);
@@ -54,7 +55,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 <Link
                   key={`${type}-${item.id}`}
                   href={`/titulo/${type}/${item.id}`}
-                  className="group overflow-hidden rounded-sm bg-zinc-900 transition hover:scale-[1.03]"
+                  className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101827] shadow-lg transition hover:-translate-y-1 hover:border-teal-300/25"
                 >
                   <div className="aspect-[2/3] bg-zinc-800">
                     {item.poster_path ? (
@@ -71,8 +72,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                       </div>
                     )}
                   </div>
-                  <div className="p-2">
-                    <p className="truncate text-sm font-medium group-hover:text-white">
+                  <div className="p-3">
+                    <p className="truncate text-sm font-bold group-hover:text-teal-100">
                       {name}
                     </p>
                     <p className="text-xs text-neutral-500">

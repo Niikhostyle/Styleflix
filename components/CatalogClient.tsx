@@ -30,18 +30,23 @@ export default function CatalogClient({
   const hero = featured[0] ?? null;
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="app-page">
       <Navbar />
 
       {hero && (
         <Hero item={hero} mediaType={hero.media_type ?? defaultMediaType} />
       )}
 
-      <main className="relative z-10 -mt-10 space-y-2 px-0 pb-10 md:-mt-16">
-        <div className="px-4 pt-4 md:px-12">
-          <h1 className="text-2xl font-bold md:text-3xl">{pageTitle}</h1>
+      <main className="relative z-10 -mt-14 space-y-2 px-0 pb-10 md:-mt-20">
+        <div className="mx-4 mb-7 rounded-2xl border border-white/[0.08] bg-[#0b1424]/70 px-5 py-5 backdrop-blur-xl md:mx-8 md:px-6 lg:mx-12">
+          <p className="eyebrow mb-2">Explora el catálogo</p>
+          <h1 className="text-3xl font-black tracking-[-0.04em] md:text-4xl">
+            {pageTitle}
+          </h1>
           {subtitle && (
-            <p className="mt-1 text-sm text-neutral-400">{subtitle}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+              {subtitle}
+            </p>
           )}
         </div>
 

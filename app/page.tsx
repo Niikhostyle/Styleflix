@@ -11,7 +11,7 @@ async function HomeShell() {
 
   if (!featuredRaw) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#141414] px-6 text-center text-white">
+      <div className="app-page flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-lg font-semibold">No hay títulos de Vimeus</p>
         <p className="max-w-md text-sm text-neutral-400">
           Revisa <code className="text-neutral-200">VIMEUS_API_KEY</code> en
@@ -42,7 +42,7 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#141414] text-neutral-400">
+        <div className="app-page flex min-h-screen items-center justify-center text-slate-400">
           Cargando VeoTV…
         </div>
       }

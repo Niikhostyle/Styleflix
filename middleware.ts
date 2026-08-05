@@ -12,6 +12,8 @@ function isPublicPath(pathname: string) {
   if (pathname.startsWith("/downloads/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
   if (pathname === "/api/billing/webhook") return true;
+  // El precio se muestra en login/registro, antes de tener sesión
+  if (pathname === "/api/pricing") return true;
   return false;
 }
 

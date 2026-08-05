@@ -3,11 +3,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminShell from "@/components/AdminShell";
-import {
-  RESELLER_PRICE_CLP,
-  planSourceLabel,
-  subscriptionLabel,
-} from "@/lib/access";
+import { planSourceLabel, subscriptionLabel } from "@/lib/access";
+import { useResellerPrice } from "@/components/PricingProvider";
 
 type PaymentRow = {
   id: string;
@@ -39,6 +36,7 @@ type UserDetail = {
 
 export default function AdminUserDetailClient({ userId }: { userId: string }) {
   const router = useRouter();
+  const { label: resellerPrice } = useResellerPrice();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
@@ -123,9 +121,7 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
             <p>
               <span className="text-neutral-400">Origen:</span>{" "}
               {planSourceLabel(user.planSource)}
-              {user.planSource === "RESELLER"
-                ? ` ($${RESELLER_PRICE_CLP.toLocaleString("es-CL")})`
-                : ""}
+              {user.planSource === "RESELLER" ? ` ($${resellerPrice})` : ""}
             </p>
             <p>
               <span className="text-neutral-400">Membresía:</span>{" "}
@@ -202,7 +198,7 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
               type="button"
               disabled={busy}
               onClick={() => void runAction("activate_manual", { days: 30 })}
-              className="rounded-lg bg-[#E50914] px-3 py-2 text-sm font-bold disabled:opacity-60"
+              className="brand-button rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-60"
             >
               Activar 30 días ya
             </button>

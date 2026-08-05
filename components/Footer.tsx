@@ -1,33 +1,62 @@
 import Link from "next/link";
+import BrandMark from "@/components/BrandMark";
 
 export default function Footer() {
   return (
-    <footer className="mt-8 border-t border-white/5 px-4 py-12 text-neutral-500 md:px-12">
-      <div className="mx-auto max-w-6xl">
-        <p className="mb-6 text-sm">
-          Preguntas? Contáctanos en{" "}
-          <span className="underline">ayuda@veotv.com</span>
-        </p>
+    <footer className="px-4 pb-8 pt-12 text-slate-500 md:px-8 lg:px-12">
+      <div className="surface-panel mx-auto max-w-[1440px] rounded-3xl px-6 py-8 md:px-8">
+        <div className="grid gap-8 md:grid-cols-[1.5fr_1fr_1fr]">
+          <div>
+            <BrandMark />
+            <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">
+              Tu espacio para descubrir películas, series y anime en una
+              experiencia hecha para disfrutar.
+            </p>
+            <p className="mt-4 text-sm">
+              Soporte:{" "}
+              <span className="text-slate-300">ayuda@veotv.com</span>
+            </p>
+          </div>
 
-        <div className="mb-8 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <Link href="/peliculas" className="hover:underline">
-            Películas
-          </Link>
-          <Link href="/series" className="hover:underline">
-            Series
-          </Link>
-          <Link href="/animes" className="hover:underline">
-            Animes
-          </Link>
-          <Link href="/" className="hover:underline">
-            Inicio
-          </Link>
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-300">
+              Explorar
+            </p>
+            <div className="grid gap-2.5 text-sm">
+              <Link href="/peliculas" className="hover:text-teal-200">
+                Películas
+              </Link>
+              <Link href="/series" className="hover:text-teal-200">
+                Series
+              </Link>
+              <Link href="/animes" className="hover:text-teal-200">
+                Animes
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-300">
+              Tu cuenta
+            </p>
+            <div className="grid gap-2.5 text-sm">
+              <Link href="/cuenta" className="hover:text-teal-200">
+                Perfil
+              </Link>
+              <Link href="/membresia" className="hover:text-teal-200">
+                Membresía
+              </Link>
+              <Link href="/descargar" className="hover:text-teal-200">
+                Descargar app
+              </Link>
+            </div>
+          </div>
         </div>
 
-        <p className="text-xs text-neutral-600">
-          © {new Date().getFullYear()} VeoTV. Datos de catálogo proporcionados
-          por TMDB.
-        </p>
+        <div className="mt-8 flex flex-col gap-2 border-t border-white/[0.07] pt-5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} VeoTV.</p>
+          <p>Información de catálogo proporcionada por TMDB.</p>
+        </div>
       </div>
     </footer>
   );

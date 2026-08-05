@@ -55,7 +55,7 @@ export default async function TituloPage({ params }: PageProps) {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#141414] text-white">
+        <div className="app-page flex min-h-screen items-center justify-center">
           Cargando...
         </div>
       }

@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { SessionProvider } from "next-auth/react";
 import TvRemoteProvider from "@/components/TvRemoteProvider";
 import BraveTipToast from "@/components/BraveTipToast";
+import PricingProvider from "@/components/PricingProvider";
+import type { Pricing } from "@/lib/pricing";
 
 function isNgrokHost() {
   if (typeof window === "undefined") return false;
@@ -30,15 +32,23 @@ function NgrokFetchPatch({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({
+  children,
+  pricing,
+}: {
+  children: React.ReactNode;
+  pricing?: Pricing;
+}) {
   return (
     <SessionProvider>
-      <NgrokFetchPatch>
-        <TvRemoteProvider>
-          {children}
-          <BraveTipToast />
-        </TvRemoteProvider>
-      </NgrokFetchPatch>
+      <PricingProvider value={pricing}>
+        <NgrokFetchPatch>
+          <TvRemoteProvider>
+            {children}
+            <BraveTipToast />
+          </TvRemoteProvider>
+        </NgrokFetchPatch>
+      </PricingProvider>
     </SessionProvider>
   );
 }

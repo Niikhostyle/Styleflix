@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { APP_NAME_UPPER } from "@/lib/brand-ui";
+import BrandMark from "@/components/BrandMark";
 
 function ResetForm() {
   const searchParams = useSearchParams();
@@ -46,12 +46,13 @@ function ResetForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0c0c] text-white">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-16">
-        <p className="mb-2 text-2xl font-black text-[#E50914]">
-          {APP_NAME_UPPER}
-        </p>
-        <h1 className="text-3xl font-black">Nueva contraseña</h1>
+    <div className="app-page">
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16">
+        <BrandMark className="mb-8" />
+        <p className="eyebrow mb-2">Seguridad de cuenta</p>
+        <h1 className="text-4xl font-black tracking-[-0.045em]">
+          Nueva contraseña
+        </h1>
 
         {done ? (
           <div className="mt-8 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6">
@@ -60,7 +61,7 @@ function ResetForm() {
             </p>
             <Link
               href="/login"
-              className="mt-4 inline-block rounded-lg bg-[#E50914] px-4 py-2.5 text-sm font-bold"
+              className="brand-button mt-4 inline-block rounded-xl px-4 py-2.5 text-sm font-bold"
             >
               Ir a entrar
             </Link>
@@ -68,7 +69,7 @@ function ResetForm() {
         ) : (
           <form
             onSubmit={onSubmit}
-            className="mt-8 space-y-4 rounded-2xl border border-white/10 bg-white/[0.04] p-6"
+            className="glass-panel mt-8 space-y-4 rounded-3xl p-6"
           >
             {!token && (
               <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
@@ -89,7 +90,7 @@ function ResetForm() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 outline-none ring-[#E50914] focus:ring-2"
+                className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
               />
             </div>
             <div>
@@ -102,7 +103,7 @@ function ResetForm() {
                 minLength={6}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-3 outline-none ring-[#E50914] focus:ring-2"
+                className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
               />
             </div>
             {error && (
@@ -113,7 +114,7 @@ function ResetForm() {
             <button
               type="submit"
               disabled={loading || !token}
-              className="w-full rounded-lg bg-[#E50914] py-3 font-bold disabled:opacity-60"
+              className="brand-button w-full rounded-xl py-3 font-bold disabled:opacity-60"
             >
               {loading ? "Guardando…" : "Guardar contraseña"}
             </button>
@@ -128,7 +129,7 @@ export default function ResetPasswordClient() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0c0c0c] text-neutral-400">
+        <div className="app-page flex min-h-screen items-center justify-center text-slate-400">
           Cargando…
         </div>
       }

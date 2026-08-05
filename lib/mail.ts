@@ -51,7 +51,7 @@ function wrapHtml(title: string, body: string) {
     <tr><td align="center">
       <table role="presentation" width="100%" style="max-width:520px;background:#161616;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;">
         <tr><td style="padding:24px 28px;border-bottom:1px solid #2a2a2a;">
-          <p style="margin:0;font-size:22px;font-weight:800;color:#E50914;letter-spacing:-0.02em;">${brand}</p>
+          <p style="margin:0;font-size:22px;font-weight:800;color:#5EEAD4;letter-spacing:-0.02em;">${brand}</p>
         </td></tr>
         <tr><td style="padding:28px;">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#fff;">${title}</h1>
@@ -104,7 +104,7 @@ export async function sendEmailVerification(opts: {
   const html = wrapHtml(
     "Confirma tu correo",
     `<p style="margin:0 0 16px;color:#cfcfcf;line-height:1.55;">Hola <strong style="color:#fff;">${escapeHtml(opts.name)}</strong>, gracias por registrarte en ${APP_NAME}. Confirma tu email para activar la cuenta.</p>
-     <p style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#E50914;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px;">Confirmar correo</a></p>
+     <p style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#5EEAD4;color:#07111D;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">Confirmar correo</a></p>
      <p style="margin:0;font-size:13px;color:#888;word-break:break-all;">O copia este enlace:<br/>${url}</p>`
   );
   return sendMail({ to: opts.to, subject, html, text });
@@ -121,7 +121,7 @@ export async function sendPasswordReset(opts: {
   const html = wrapHtml(
     "Restablecer contraseña",
     `<p style="margin:0 0 16px;color:#cfcfcf;line-height:1.55;">Hola <strong style="color:#fff;">${escapeHtml(opts.name)}</strong>, recibimos una solicitud para cambiar tu contraseña.</p>
-     <p style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#E50914;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:6px;">Elegir nueva contraseña</a></p>
+     <p style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#5EEAD4;color:#07111D;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">Elegir nueva contraseña</a></p>
      <p style="margin:0;font-size:13px;color:#888;word-break:break-all;">O copia este enlace:<br/>${url}</p>`
   );
   return sendMail({ to: opts.to, subject, html, text });
@@ -135,7 +135,7 @@ export async function sendPasswordChangedNotice(opts: {
   const text = `Hola ${opts.name},\n\nTu contraseña en ${APP_NAME} se actualizó correctamente. Si no fuiste tú, contacta a ${contactEmail()}.\n`;
   const html = wrapHtml(
     "Contraseña actualizada",
-    `<p style="margin:0;color:#cfcfcf;line-height:1.55;">Hola <strong style="color:#fff;">${escapeHtml(opts.name)}</strong>, tu contraseña se cambió correctamente. Si no reconoces este cambio, escribe a <a href="mailto:${contactEmail()}" style="color:#E50914;">${contactEmail()}</a>.</p>`
+    `<p style="margin:0;color:#cfcfcf;line-height:1.55;">Hola <strong style="color:#fff;">${escapeHtml(opts.name)}</strong>, tu contraseña se cambió correctamente. Si no reconoces este cambio, escribe a <a href="mailto:${contactEmail()}" style="color:#5EEAD4;">${contactEmail()}</a>.</p>`
   );
   return sendMail({ to: opts.to, subject, html, text });
 }

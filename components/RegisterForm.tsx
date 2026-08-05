@@ -50,16 +50,19 @@ export default function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="app-page">
       <Navbar />
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-24">
-        <h1 className="mb-2 text-3xl font-black">Crear cuenta</h1>
+      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-28">
+        <p className="eyebrow mb-2">Únete a VeoTV</p>
+        <h1 className="mb-2 text-4xl font-black tracking-[-0.045em]">
+          Crear cuenta
+        </h1>
         <p className="mb-8 text-sm text-neutral-400">
           Regístrate gratis para guardar progreso, capítulos y recomendaciones.
           Puedes ver todo sin cuenta.
         </p>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="glass-panel space-y-4 rounded-3xl p-6">
           <div>
             <label className="mb-1 block text-sm text-neutral-300">Nombre</label>
             <input
@@ -68,7 +71,7 @@ export default function RegisterForm() {
               minLength={2}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
             />
           </div>
           <div>
@@ -78,7 +81,7 @@ export default function RegisterForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
             />
           </div>
           <div>
@@ -91,7 +94,7 @@ export default function RegisterForm() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/50 px-3 py-2.5 outline-none ring-[#E50914] focus:ring-2"
+              className="w-full rounded-xl border border-white/10 bg-[#08101d]/75 px-3.5 py-3 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
             />
           </div>
 
@@ -104,7 +107,7 @@ export default function RegisterForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-[#E50914] py-2.5 font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
+            className="brand-button w-full rounded-xl py-3 font-bold transition disabled:opacity-60"
           >
             {loading ? "Creando cuenta..." : "Registrarme"}
           </button>

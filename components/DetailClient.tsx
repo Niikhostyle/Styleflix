@@ -174,10 +174,10 @@ export default function DetailClient({
   }, [details.id, mediaType]);
 
   return (
-    <div className="min-h-screen bg-[#141414] text-white">
+    <div className="app-page">
       <Navbar />
 
-      <section className="relative min-h-[70vh] w-full overflow-hidden md:min-h-[78vh]">
+      <section className="relative min-h-[78vh] w-full overflow-hidden md:min-h-[84vh]">
         {backdrop && (
           <div
             className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${
@@ -210,23 +210,23 @@ export default function DetailClient({
         <div
           className={`pointer-events-none absolute inset-y-0 left-0 w-full bg-gradient-to-r to-transparent md:w-[70%] ${
             showTrailer && trailerReady
-              ? "from-[#141414]/95 via-[#141414]/35"
-              : "from-[#141414] via-[#141414]/75"
+              ? "from-[#070b14]/95 via-[#070b14]/35"
+              : "from-[#070b14] via-[#070b14]/75"
           }`}
         />
         <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-[#141414] to-transparent ${
-            showTrailer && trailerReady ? "via-[#141414]/25" : "via-[#141414]/50"
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-[#070b14] to-transparent ${
+            showTrailer && trailerReady ? "via-[#070b14]/25" : "via-[#070b14]/50"
           }`}
         />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
 
-        <div className="relative z-10 px-4 pb-10 pt-24 md:px-12 md:pb-16 md:pt-28">
+        <div className="relative z-10 mx-auto max-w-[1520px] px-4 pb-12 pt-32 md:px-8 md:pb-16 lg:px-12">
           <button
             type="button"
             data-tv-focus
             onClick={() => router.back()}
-            className="mb-8 flex items-center gap-2 text-sm text-neutral-300 transition hover:text-white"
+            className="focus-ring mb-8 flex items-center gap-2 rounded-xl border border-white/10 bg-[#0b1424]/55 px-3 py-2 text-sm text-slate-300 backdrop-blur-xl transition hover:border-teal-300/25 hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
             Volver
@@ -238,16 +238,16 @@ export default function DetailClient({
               <img
                 src={`${IMAGE_BASE_URL}${details.poster_path}`}
                 alt={title}
-                className="hidden w-44 rounded shadow-2xl shadow-black/60 md:block lg:w-52"
+                className="hidden w-44 rounded-2xl border border-white/10 shadow-2xl shadow-black/50 md:block lg:w-52"
               />
             )}
 
             <div className="max-w-3xl flex-1">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#E50914]">
+              <p className="eyebrow mb-3">
                 {mediaType === "movie" ? "Película" : "Serie"}
               </p>
 
-              <h1 className="mb-4 text-4xl font-black leading-none md:text-6xl">
+              <h1 className="mb-4 text-5xl font-black leading-[0.94] tracking-[-0.055em] md:text-7xl">
                 {title}
               </h1>
 
@@ -259,14 +259,14 @@ export default function DetailClient({
 
               <div className="mb-5 flex flex-wrap items-center gap-3 text-sm">
                 {match !== null && (
-                  <span className="font-semibold text-emerald-400">
-                    {match}% de coincidencia
+                  <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 font-semibold text-emerald-300">
+                    {match}% afinidad
                   </span>
                 )}
                 {year && <span className="text-neutral-300">{year}</span>}
                 {runtime && <span className="text-neutral-300">{runtime}</span>}
-                <span className="rounded border border-neutral-500 px-1.5 py-0.5 text-[10px] uppercase text-neutral-300">
-                  HD
+                <span className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] uppercase text-slate-300">
+                  Alta calidad
                 </span>
                 {details.vote_average !== undefined && (
                   <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-neutral-200">
@@ -281,9 +281,9 @@ export default function DetailClient({
                   data-tv-autofocus
                   data-tv-focus
                   onClick={openPlayer}
-                  className="tv-cta flex items-center gap-2 rounded bg-white px-7 py-2.5 text-sm font-bold text-black transition hover:bg-white/85 md:text-base"
+                  className="brand-button tv-cta focus-ring flex items-center gap-2 rounded-xl px-7 py-3 text-sm font-extrabold transition md:text-base"
                 >
-                  <Play className="h-5 w-5 fill-black" />
+                  <Play className="h-5 w-5 fill-current" />
                   {hasProgress && mediaType === "tv"
                     ? `Continuar T${season} E${episode}`
                     : hasProgress
@@ -295,7 +295,7 @@ export default function DetailClient({
                   type="button"
                   data-tv-focus
                   aria-label="Agregar a mi lista"
-                  className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-400 text-white transition hover:border-white"
+                  className="focus-ring flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] text-white backdrop-blur-xl transition hover:border-teal-300/30 hover:text-teal-200"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -304,7 +304,7 @@ export default function DetailClient({
                   type="button"
                   data-tv-focus
                   aria-label="Me gusta"
-                  className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-400 text-white transition hover:border-white"
+                  className="focus-ring flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] text-white backdrop-blur-xl transition hover:border-teal-300/30 hover:text-teal-200"
                 >
                   <ThumbsUp className="h-5 w-5" />
                 </button>
@@ -315,7 +315,7 @@ export default function DetailClient({
                     data-tv-focus
                     aria-label={trailerMuted ? "Activar sonido" : "Silenciar"}
                     onClick={() => setTrailerMuted((m) => !m)}
-                    className="ml-auto flex h-11 w-11 items-center justify-center rounded-full border-2 border-neutral-400 text-white transition hover:border-white"
+                    className="focus-ring ml-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] text-white backdrop-blur-xl transition hover:border-teal-300/30 hover:text-teal-200"
                   >
                     {trailerMuted ? (
                       <VolumeX className="h-5 w-5" />
@@ -359,9 +359,9 @@ export default function DetailClient({
         </div>
       </section>
 
-      <main className="relative z-10 space-y-10 px-4 pb-8 md:px-12">
+      <main className="relative z-10 mx-auto max-w-[1520px] space-y-12 px-4 pb-8 md:px-8 lg:px-12">
         {mediaType === "tv" && (
-          <section>
+          <section className="surface-panel rounded-3xl p-5 md:p-7">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <h2 className="text-lg font-semibold md:text-xl">Episodios</h2>
               <label className="flex items-center gap-2 text-sm text-neutral-300">
@@ -373,7 +373,7 @@ export default function DetailClient({
                     setSeason(Number(e.target.value));
                     setEpisode(1);
                   }}
-                  className="rounded border border-white/20 bg-black/60 px-3 py-2 text-white outline-none focus:border-white/50"
+                  className="rounded-xl border border-white/10 bg-[#0a1220] px-3 py-2 text-white outline-none focus:border-teal-300/50"
                 >
                   {seasonsMeta.map((s) => (
                     <option key={s.seasonNumber} value={s.seasonNumber}>
@@ -407,10 +407,10 @@ export default function DetailClient({
                     onClick={() =>
                       playEpisode(ep.season_number, ep.episode_number)
                     }
-                    className={`flex w-full gap-3 rounded-md p-2 text-left transition md:gap-4 md:p-3 ${
+                    className={`flex w-full gap-3 rounded-2xl border p-2 text-left transition md:gap-4 md:p-3 ${
                       active
-                        ? "bg-white/12 ring-1 ring-white/25"
-                        : "bg-white/[0.03] hover:bg-white/[0.08]"
+                        ? "border-teal-300/30 bg-teal-300/[0.08]"
+                        : "border-white/[0.06] bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.055]"
                     }`}
                   >
                     <div className="relative h-[72px] w-[128px] shrink-0 overflow-hidden rounded bg-zinc-800 md:h-[90px] md:w-[160px]">
@@ -487,7 +487,7 @@ export default function DetailClient({
           </section>
         )}
 
-        <section className="grid gap-6 rounded-lg bg-white/[0.03] p-5 md:grid-cols-3 md:p-6">
+        <section className="surface-panel grid gap-6 rounded-3xl p-5 md:grid-cols-3 md:p-7">
           <div>
             <h3 className="mb-1 text-xs uppercase tracking-wide text-neutral-500">
               Estado

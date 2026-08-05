@@ -14,7 +14,7 @@
  */
 
 import { createHmac } from "crypto";
-import { MEMBERSHIP_PRICE_CLP } from "@/lib/access";
+import { getMembershipPriceClp } from "@/lib/pricing";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -93,7 +93,7 @@ function publicBaseUrl() {
 }
 
 export function membershipAmount(): number {
-  return MEMBERSHIP_PRICE_CLP;
+  return getMembershipPriceClp();
 }
 
 /** Email que debe ir a MP: en test, el comprador de prueba (no el vendedor). */
