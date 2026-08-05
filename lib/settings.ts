@@ -15,7 +15,7 @@ export const RESELLER_PRICE_KEY = "resellerPriceClp";
 
 export const DEFAULT_PREVIEW_MINUTES = 5;
 
-/** Alineado al mínimo de Visa Débito/Crédito en MP Chile. */
+/** Alineado al mínimo de suscripciones Mercado Pago Chile ($950). */
 const MIN_PRICE_CLP = MP_MIN_AMOUNT_CLP;
 const MAX_PRICE_CLP = 1_000_000;
 

@@ -65,7 +65,7 @@ export async function PATCH(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       {
-        error: `Datos inválidos. Precios mínimos $${MP_MIN_AMOUNT_CLP} CLP (exigencia Visa Débito Mercado Pago Chile); minutos 1–180.`,
+        error: `Datos inválidos. Precios mínimos $${MP_MIN_AMOUNT_CLP} CLP (mínimo suscripciones Mercado Pago Chile); minutos 1–180.`,
       },
       { status: 400 }
     );

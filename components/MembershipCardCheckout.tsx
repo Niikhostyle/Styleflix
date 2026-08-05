@@ -33,7 +33,10 @@ function brickErrorMessage(err: unknown): string {
     msg.includes("información de pago") ||
     msg.includes("informacion de pago")
   ) {
-    return `Mercado Pago no pudo leer la tarjeta. En Chile Visa Débito/Crédito exige mínimo $${MP_MIN_AMOUNT_CLP} CLP; revisa el precio en Ajustes o prueba otra tarjeta.`;
+    return `Mercado Pago no pudo leer la tarjeta. Revisa el precio (mín. $${MP_MIN_AMOUNT_CLP} CLP en suscripciones Chile) o prueba otra tarjeta.`;
+  }
+  if (msg.includes("lower than") || msg.includes("950")) {
+    return `Mercado Pago exige mínimo $${MP_MIN_AMOUNT_CLP} CLP en suscripciones. Sube el precio en Admin → Ajustes.`;
   }
   if (e.message?.trim()) return e.message.trim();
   return "Error en el formulario de Mercado Pago.";
@@ -81,10 +84,9 @@ export default function MembershipCardCheckout({
   if (priceClp < MP_MIN_AMOUNT_CLP) {
     return (
       <p className="rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-100">
-        El precio actual es ${priceLabel} CLP, pero Mercado Pago Chile exige al
-        menos ${MP_MIN_AMOUNT_CLP} CLP para Visa Débito/Crédito. Sube el precio
-        en <strong>Admin → Ajustes</strong> (ej. {MP_MIN_AMOUNT_CLP}) y vuelve a
-        intentar.
+        El precio actual es ${priceLabel} CLP, pero las suscripciones de Mercado
+        Pago Chile exigen al menos ${MP_MIN_AMOUNT_CLP} CLP. Sube el precio en{" "}
+        <strong>Admin → Ajustes</strong> y vuelve a intentar.
       </p>
     );
   }

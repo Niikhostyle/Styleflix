@@ -129,7 +129,8 @@ export default function AdminSettingsClient() {
             Estos valores se usan en la página de membresía, el cobro de Mercado
             Pago y las cuentas revendedor. Vigentes ahora: membresía $
             {formatClp(membershipPrice)} · revendedor ${formatClp(resellerPrice)}
-            . Mínimo Mercado Pago Chile (Visa): ${formatClp(minPriceClp)} CLP.
+            . Mínimo suscripciones Mercado Pago Chile: $
+            {formatClp(minPriceClp)} CLP.
           </p>
           <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
             Membresía directa (CLP / mes)

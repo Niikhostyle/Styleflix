@@ -162,5 +162,8 @@ function friendlyMpError(raw: string): string {
   if (raw.includes("Invalid card_token_id") || raw.includes("card_token")) {
     return "La tarjeta no se pudo validar. Verifica los datos e intenta nuevamente.";
   }
+  if (raw.includes("lower than") || /amount lower than/i.test(raw)) {
+    return "Mercado Pago rechazó el monto: en Chile las suscripciones exigen mínimo $950 CLP. Sube el precio en Admin → Ajustes.";
+  }
   return raw;
 }
