@@ -7,6 +7,7 @@ import {
   vimeusHasTmdbId,
 } from "@/lib/vimeus";
 import { findPlutoMatch, resolvePlutoHlsUrl } from "@/lib/pluto";
+import { findAnimeAv1Match, resolveAnimeAv1Embed } from "@/lib/animeav1";
 import { findArchiveMatch } from "@/lib/sources/archive";
 import { findCustomStream } from "@/lib/sources/custom";
 import { isSourceEnabled } from "@/lib/sources/types";
@@ -19,8 +20,7 @@ import {
 
 /**
  * Resuelve la fuente de reproducción en cascada.
- * Requiere membresía activa. Avisa resolución máxima del plan.
- * Orden: links propios → Vimeus → Pluto → Archive → tráiler.
+ * Orden: links propios → AnimeAV1 (animes) → Vimeus → Pluto → Archive → tráiler.
  */
 export async function GET(request: Request) {
   const session = await auth();
@@ -100,6 +100,30 @@ export async function GET(request: Request) {
           embedUrl: custom.embedUrl,
         })
       );
+    }
+
+    // Animes: AnimeAV1 primero (mismo catálogo que /animes)
+    if (anime && title && isSourceEnabled("animeav1")) {
+      const av1 = await findAnimeAv1Match({
+        title,
+        year: safeYear,
+        season: type === "tv" ? season : undefined,
+      }).catch(() => null);
+      if (av1?.slug) {
+        const embed = await resolveAnimeAv1Embed({
+          slug: av1.slug,
+          episode: type === "tv" ? episode ?? 1 : 1,
+        }).catch(() => null);
+        if (embed?.url) {
+          return NextResponse.json(
+            withPlanMeta({
+              source: "animeav1",
+              label: "VeoTV",
+              embedUrl: embed.url,
+            })
+          );
+        }
+      }
     }
 
     if (isSourceEnabled("vimeus")) {

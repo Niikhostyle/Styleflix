@@ -1,6 +1,12 @@
 import type { MediaItem, MediaType } from "@/lib/tmdb";
 
-export type SourceId = "vimeus" | "tmdb" | "jikan" | "pluto" | "archive";
+export type SourceId =
+  | "vimeus"
+  | "tmdb"
+  | "jikan"
+  | "pluto"
+  | "archive"
+  | "animeav1";
 
 export const ALL_SOURCES: SourceId[] = [
   "vimeus",
@@ -8,6 +14,7 @@ export const ALL_SOURCES: SourceId[] = [
   "jikan",
   "pluto",
   "archive",
+  "animeav1",
 ];
 
 export const SOURCE_LABELS: Record<SourceId, string> = {
@@ -16,6 +23,7 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   jikan: "MyAnimeList",
   pluto: "Pluto TV",
   archive: "Archive.org",
+  animeav1: "VeoTV Anime",
 };
 
 /**
@@ -53,6 +61,7 @@ export function enabledSources(): SourceId[] {
     if (id === "tmdb" || id === "jikan") {
       return Boolean(process.env.NEXT_PUBLIC_TMDB_API_KEY);
     }
+    if (id === "animeav1") return true;
     return true;
   });
 }

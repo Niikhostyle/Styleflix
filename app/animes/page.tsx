@@ -14,7 +14,7 @@ export default async function AnimesPage() {
   return (
     <CatalogClient
       pageTitle="Animes"
-      subtitle="Todo el catálogo de anime de VeoTV."
+      subtitle="Catálogo de animes listo para ver."
       featured={featured}
       defaultMediaType="tv"
       rows={rows}

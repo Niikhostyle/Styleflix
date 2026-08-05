@@ -11,6 +11,7 @@
 import { enrichWithTmdb, getVimeusAvailability, getVimeusAnimes, getVimeusMovies, getVimeusSeries } from "@/lib/vimeus";
 import { getTmdbAnimeRows, getTmdbMovieRows, getTmdbSeriesRows } from "@/lib/sources/tmdbSource";
 import { getJikanAnimeRows } from "@/lib/sources/jikan";
+import { getAnimeAv1Rows, getAnimeAv1Items } from "@/lib/sources/animeav1";
 import { getPlutoMovies, getPlutoSeries } from "@/lib/sources/plutoSource";
 import { getArchiveRows } from "@/lib/sources/archive";
 import { withTimeout } from "@/lib/sources/match";
@@ -240,23 +241,42 @@ export async function getSeriesCatalog(): Promise<CatalogPage> {
   };
 }
 
+async function loadAnimeAv1Rows(): Promise<LoadedRow[]> {
+  if (!enabledSources().includes("animeav1")) return [];
+  return withTimeout(getAnimeAv1Rows(), SLOW_TIMEOUT_MS, [], "animeav1:rows");
+}
+
+async function loadAnimeAv1Items(): Promise<CatalogItem[]> {
+  if (!enabledSources().includes("animeav1")) return [];
+  return withTimeout(getAnimeAv1Items(), SLOW_TIMEOUT_MS, [], "animeav1:items");
+}
+
 export async function getAnimeCatalog(): Promise<CatalogPage> {
-  const [vimeus1, vimeus2, vimeus3, tmdbRows, jikanRows] = await Promise.all([
-    loadVimeus("animes", [1]),
-    loadVimeus("animes", [2]),
-    loadVimeus("animes", [3]),
+  const [av1Rows, tmdbRows, jikanRows] = await Promise.all([
+    loadAnimeAv1Rows(),
     loadTmdbRows("anime", [1, 2]),
     loadJikanRows(),
   ]);
 
-  const playableRows: LoadedRow[] = vimeusRows([
-    { title: "Recién añadidos", items: vimeus1, mediaType: "tv" },
-    { title: "Más animes", items: vimeus2, mediaType: "tv" },
-    { title: "Seguir explorando", items: vimeus3, mediaType: "tv" },
-  ]);
+  const playableRows: LoadedRow[] = av1Rows.length
+    ? av1Rows
+    : // fallback si AnimeAV1 falla: Vimeus
+      vimeusRows([
+        {
+          title: "Recién añadidos",
+          items: await loadVimeus("animes", [1]),
+          mediaType: "tv",
+        },
+      ]);
 
-  const available = buildAvailabilityIndex(await loadAvailability(), playableRows);
-  const discoveryRows = applyAvailability([...jikanRows, ...tmdbRows], available);
+  const available = buildAvailabilityIndex(
+    await loadAvailability(),
+    playableRows
+  );
+  const discoveryRows = applyAvailability(
+    [...jikanRows, ...tmdbRows],
+    available
+  );
   const allRows = [...playableRows, ...discoveryRows];
 
   return {
@@ -274,7 +294,7 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
   const [
     vimeusMovies,
     vimeusSeries,
-    vimeusAnimes,
+    animeAv1Items,
     tmdbMovieRows,
     tmdbSeriesRows,
     tmdbAnimeRows,
@@ -285,7 +305,7 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
   ] = await Promise.all([
     loadVimeus("movies", [1, 2]),
     loadVimeus("series", [1, 2]),
-    loadVimeus("animes", [1]),
+    loadAnimeAv1Items(),
     loadTmdbRows("movies", [1]),
     loadTmdbRows("series", [1]),
     loadTmdbRows("anime", [1]),
@@ -299,8 +319,12 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     ...vimeusRows([
       { title: "Películas para ver ya", items: vimeusMovies, mediaType: "movie" },
       { title: "Series para ver ya", items: vimeusSeries, mediaType: "tv" },
-      { title: "Animes para ver ya", items: vimeusAnimes, mediaType: "tv" },
     ]),
+    {
+      title: "Animes para ver ya",
+      mediaType: "tv",
+      items: animeAv1Items,
+    },
     { title: "Películas destacadas", mediaType: "movie", items: plutoMovies },
     { title: "Series destacadas", mediaType: "tv", items: plutoSeries },
     ...archiveRows.slice(0, 2),
