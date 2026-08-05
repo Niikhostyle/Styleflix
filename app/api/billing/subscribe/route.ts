@@ -4,9 +4,7 @@ import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import {
-  checkoutUrl,
   createAuthorizedMembershipPreapproval,
-  createMembershipPreapproval,
   createMembershipPreference,
   preferenceCheckoutUrl,
 } from "@/lib/mercadopago";
@@ -128,48 +126,26 @@ export async function POST(request: Request) {
       }
     }
 
-    // Redirect: intenta preapproval; si falla (500), usa Checkout Pro preference.
-    try {
-      const preapproval = await createMembershipPreapproval({
-        userId: user.id,
-        payerEmail: user.email,
-      });
-
-      await markSubscriptionStatus(user.id, "PENDING", {
-        mpPreapprovalId: preapproval.id,
-      });
-
-      const url = checkoutUrl(preapproval);
-      if (!url) {
-        throw new Error("No se obtuvo URL de checkout de Mercado Pago.");
-      }
-
-      return NextResponse.json({
-        ok: true,
-        init_point: url,
-        preapprovalId: preapproval.id,
-      });
-    } catch (preErr) {
-      console.warn("[billing/subscribe] preapproval fallback → preference", preErr);
-      const preference = await createMembershipPreference({
-        userId: user.id,
-        payerEmail: user.email,
-      });
-      await markSubscriptionStatus(user.id, "PENDING");
-      const url = preferenceCheckoutUrl(preference);
-      if (!url) {
-        return NextResponse.json(
-          { error: "No se obtuvo URL de Checkout Pro." },
-          { status: 502 }
-        );
-      }
-      return NextResponse.json({
-        ok: true,
-        init_point: url,
-        preferenceId: preference.id,
-        mode: "preference",
-      });
+    // Redirect Checkout Pro (preferencia). Evitamos /preapproval: en esta cuenta
+    // responde 500 Internal server error de forma consistente.
+    const preference = await createMembershipPreference({
+      userId: user.id,
+      payerEmail: user.email,
+    });
+    await markSubscriptionStatus(user.id, "PENDING");
+    const url = preferenceCheckoutUrl(preference);
+    if (!url) {
+      return NextResponse.json(
+        { error: "No se obtuvo URL de Checkout Pro." },
+        { status: 502 }
+      );
     }
+    return NextResponse.json({
+      ok: true,
+      init_point: url,
+      preferenceId: preference.id,
+      mode: "preference",
+    });
   } catch (err) {
     console.error("[billing/subscribe]", err);
     const raw = err instanceof Error ? err.message : "";

@@ -1,23 +1,15 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { subscriptionLabel } from "@/lib/access";
-import { useMembershipPrice, useRefreshPricing } from "@/components/PricingProvider";
+import {
+  useMembershipPrice,
+  useRefreshPricing,
+} from "@/components/PricingProvider";
 import { Check, ShieldCheck, Sparkles } from "lucide-react";
-
-const MembershipCardCheckout = dynamic(
-  () => import("@/components/MembershipCardCheckout"),
-  {
-    ssr: false,
-    loading: () => (
-      <p className="text-sm text-neutral-400">Cargando checkout…</p>
-    ),
-  }
-);
 
 type Props = {
   status: string;
@@ -39,7 +31,6 @@ export default function MembershipClient({
   const refreshPricing = useRefreshPricing();
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [showCheckout, setShowCheckout] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(flash || "");
 
@@ -48,6 +39,7 @@ export default function MembershipClient({
   useEffect(() => {
     void refreshPricing();
   }, [refreshPricing]);
+
   const ends = currentPeriodEnd
     ? new Date(currentPeriodEnd).toLocaleDateString("es-CL", {
         day: "2-digit",
@@ -55,9 +47,6 @@ export default function MembershipClient({
         year: "numeric",
       })
     : null;
-  const hasPublicKey = Boolean(
-    process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim()
-  );
 
   async function startRedirectCheckout() {
     setError("");
@@ -152,8 +141,8 @@ export default function MembershipClient({
           Todo VeoTV, sin límites.
         </h1>
         <p className="mt-4 max-w-xl text-base leading-7 text-slate-400">
-          Películas, series y anime con renovación mensual segura a través de
-          Mercado Pago.
+          Películas, series y anime. Pagas de forma segura en Mercado Pago y
+          vuelves con tu membresía activa.
         </p>
       </div>
 
@@ -170,7 +159,10 @@ export default function MembershipClient({
               "Progreso y recomendaciones personales",
               "Cancelación cuando quieras",
             ].map((feature) => (
-              <div key={feature} className="flex items-center gap-3 text-sm text-slate-300">
+              <div
+                key={feature}
+                className="flex items-center gap-3 text-sm text-slate-300"
+              >
                 <span className="grid h-7 w-7 place-items-center rounded-lg bg-teal-300/10 text-teal-300">
                   <Check className="h-4 w-4" />
                 </span>
@@ -181,8 +173,8 @@ export default function MembershipClient({
           <div className="mt-7 flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4">
             <ShieldCheck className="h-5 w-5 text-teal-300" />
             <p className="text-xs leading-5 text-slate-400">
-              Pago protegido por Mercado Pago. Tus datos de tarjeta no se
-              almacenan en VeoTV.
+              El pago se completa en Mercado Pago. Tus datos de tarjeta no se
+              ingresan en VeoTV.
             </p>
           </div>
         </section>
@@ -219,53 +211,8 @@ export default function MembershipClient({
             </div>
           )}
 
-        <div className="mt-6 flex flex-col gap-3">
-        {!membershipActive && (
-          <>
-            {hasPublicKey ? (
-              <>
-                {!showCheckout ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCheckout(true);
-                      setError("");
-                    }}
-                    className="brand-button rounded-xl py-3.5 text-base font-extrabold transition"
-                  >
-                    Activar membresía
-                  </button>
-                ) : (
-                  <MembershipCardCheckout
-                    onBusy={setLoading}
-                    onError={(msg) => setError(msg)}
-                    onPaid={async ({ activated, message: msg }) => {
-                      if (activated) {
-                        setMessage("¡Membresía activada!");
-                        setShowCheckout(false);
-                        await update();
-                        router.refresh();
-                      } else {
-                        setMessage(
-                          msg ||
-                            "Pago recibido. Pulsa «Actualizar estado» en unos segundos."
-                        );
-                        await update();
-                        router.refresh();
-                      }
-                    }}
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={() => void startRedirectCheckout()}
-                  disabled={loading}
-                  className="text-sm text-neutral-400 underline hover:text-neutral-200 disabled:opacity-60"
-                >
-                  Preferir pagar en Mercado Pago (redirección)
-                </button>
-              </>
-            ) : (
+          <div className="mt-6 flex flex-col gap-3">
+            {!membershipActive && (
               <button
                 type="button"
                 onClick={() => void startRedirectCheckout()}
@@ -274,40 +221,38 @@ export default function MembershipClient({
               >
                 {loading
                   ? "Redirigiendo a Mercado Pago…"
-                  : "Activar con Mercado Pago"}
+                  : "Pagar con Mercado Pago"}
               </button>
             )}
-          </>
-        )}
 
-        {membershipActive && status === "ACTIVE" && (
-          <button
-            type="button"
-            onClick={() => void cancelSub()}
-            disabled={cancelling}
-            className="rounded-lg border border-white/25 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/5 disabled:opacity-60"
-          >
-            {cancelling ? "Cancelando…" : "Cancelar renovación automática"}
-          </button>
-        )}
+            {membershipActive && status === "ACTIVE" && (
+              <button
+                type="button"
+                onClick={() => void cancelSub()}
+                disabled={cancelling}
+                className="rounded-lg border border-white/25 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/5 disabled:opacity-60"
+              >
+                {cancelling ? "Cancelando…" : "Cancelar renovación automática"}
+              </button>
+            )}
 
-        <button
-          type="button"
-          onClick={() => void refreshStatus()}
-          className="text-sm text-neutral-400 underline hover:text-neutral-200"
-        >
-          Actualizar estado
-        </button>
+            <button
+              type="button"
+              onClick={() => void refreshStatus()}
+              className="text-sm text-neutral-400 underline hover:text-neutral-200"
+            >
+              Actualizar estado
+            </button>
 
-        {membershipActive && (
-          <Link
-            href="/"
-            className="mt-2 text-center text-sm font-semibold text-white underline"
-          >
-            Ir a VeoTV
-          </Link>
-        )}
-        </div>
+            {membershipActive && (
+              <Link
+                href="/"
+                className="mt-2 text-center text-sm font-semibold text-white underline"
+              >
+                Ir a VeoTV
+              </Link>
+            )}
+          </div>
         </section>
       </div>
     </div>
