@@ -7,6 +7,8 @@ import {
   checkoutUrl,
   createAuthorizedMembershipPreapproval,
   createMembershipPreapproval,
+  createMembershipPreference,
+  preferenceCheckoutUrl,
 } from "@/lib/mercadopago";
 import {
   activateMembership,
@@ -70,69 +72,104 @@ export async function POST(request: Request) {
 
     // Checkout API (en sitio): token de tarjeta → suscripción authorized
     if (cardTokenId && !forceRedirect) {
-      const preapproval = await createAuthorizedMembershipPreapproval({
-        userId: user.id,
-        payerEmail: user.email,
-        cardTokenId,
-      });
-
-      const status = (preapproval.status || "").toLowerCase();
-      if (status === "authorized" || status === "active") {
-        await activateMembership({
+      try {
+        const preapproval = await createAuthorizedMembershipPreapproval({
           userId: user.id,
-          months: 1,
+          payerEmail: user.email,
+          cardTokenId,
+        });
+
+        const status = (preapproval.status || "").toLowerCase();
+        if (status === "authorized" || status === "active") {
+          await activateMembership({
+            userId: user.id,
+            months: 1,
+            mpPreapprovalId: preapproval.id,
+            payment: {
+              externalId: preapproval.id,
+              status: "subscription_authorized",
+              rawPayload: preapproval as object,
+            },
+          });
+          return NextResponse.json({
+            ok: true,
+            activated: true,
+            preapprovalId: preapproval.id,
+            status: preapproval.status,
+          });
+        }
+
+        await markSubscriptionStatus(user.id, "PENDING", {
           mpPreapprovalId: preapproval.id,
-          payment: {
-            externalId: preapproval.id,
-            status: "subscription_authorized",
-            rawPayload: preapproval as object,
-          },
         });
         return NextResponse.json({
           ok: true,
-          activated: true,
+          activated: false,
+          pending: true,
           preapprovalId: preapproval.id,
           status: preapproval.status,
+          message:
+            "Pago en revisión. En unos segundos pulsa «Actualizar estado».",
         });
+      } catch (preErr) {
+        const msg = preErr instanceof Error ? preErr.message : "";
+        // Suscripciones (/preapproval) a menudo responde 500 en cuentas sin el
+        // producto habilitado. El Brick debe usar /api/billing/pay.
+        if (msg.includes("500") || /Internal server error/i.test(msg)) {
+          return NextResponse.json(
+            {
+              error:
+                "Las suscripciones automáticas de Mercado Pago no están disponibles en esta cuenta. Usa el formulario de tarjeta (pago mensual) o contacta soporte MP.",
+            },
+            { status: 502 }
+          );
+        }
+        throw preErr;
       }
+    }
+
+    // Redirect: intenta preapproval; si falla (500), usa Checkout Pro preference.
+    try {
+      const preapproval = await createMembershipPreapproval({
+        userId: user.id,
+        payerEmail: user.email,
+      });
 
       await markSubscriptionStatus(user.id, "PENDING", {
         mpPreapprovalId: preapproval.id,
       });
+
+      const url = checkoutUrl(preapproval);
+      if (!url) {
+        throw new Error("No se obtuvo URL de checkout de Mercado Pago.");
+      }
+
       return NextResponse.json({
         ok: true,
-        activated: false,
-        pending: true,
+        init_point: url,
         preapprovalId: preapproval.id,
-        status: preapproval.status,
-        message:
-          "Pago en revisión. En unos segundos pulsa «Actualizar estado».",
+      });
+    } catch (preErr) {
+      console.warn("[billing/subscribe] preapproval fallback → preference", preErr);
+      const preference = await createMembershipPreference({
+        userId: user.id,
+        payerEmail: user.email,
+      });
+      await markSubscriptionStatus(user.id, "PENDING");
+      const url = preferenceCheckoutUrl(preference);
+      if (!url) {
+        return NextResponse.json(
+          { error: "No se obtuvo URL de Checkout Pro." },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        init_point: url,
+        preferenceId: preference.id,
+        mode: "preference",
       });
     }
-
-    // Fallback: redirect a checkout de Mercado Pago
-    const preapproval = await createMembershipPreapproval({
-      userId: user.id,
-      payerEmail: user.email,
-    });
-
-    await markSubscriptionStatus(user.id, "PENDING", {
-      mpPreapprovalId: preapproval.id,
-    });
-
-    const url = checkoutUrl(preapproval);
-    if (!url) {
-      return NextResponse.json(
-        { error: "No se obtuvo URL de checkout de Mercado Pago." },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      init_point: url,
-      preapprovalId: preapproval.id,
-    });
   } catch (err) {
     console.error("[billing/subscribe]", err);
     const raw = err instanceof Error ? err.message : "";
@@ -163,7 +200,10 @@ function friendlyMpError(raw: string): string {
     return "La tarjeta no se pudo validar. Verifica los datos e intenta nuevamente.";
   }
   if (raw.includes("lower than") || /amount lower than/i.test(raw)) {
-    return "Mercado Pago rechazó el monto: en Chile las suscripciones exigen mínimo $950 CLP. Sube el precio en Admin → Ajustes.";
+    return "Mercado Pago rechazó el monto: en Chile exigen mínimo $950 CLP. Sube el precio en Admin → Ajustes.";
+  }
+  if (/Internal server error/i.test(raw) || raw.includes("500")) {
+    return "Mercado Pago no pudo crear la suscripción (error interno). Prueba el pago con tarjeta en el sitio o Checkout Pro.";
   }
   return raw;
 }

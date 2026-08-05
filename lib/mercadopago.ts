@@ -243,6 +243,58 @@ export async function cancelPreapproval(id: string): Promise<MpPreapproval> {
   });
 }
 
+/**
+ * Checkout Pro (preferencia) — alternativa cuando /preapproval falla con 500
+ * en la cuenta (común si Suscripciones no está habilitada).
+ */
+export async function createMembershipPreference(opts: {
+  userId: string;
+  payerEmail: string;
+}): Promise<{ id: string; init_point?: string; sandbox_init_point?: string }> {
+  const amount = await membershipAmount();
+  const base = publicBaseUrl();
+  const payerEmail = resolvePayerEmail(opts.payerEmail);
+
+  return mpFetch("/checkout/preferences", {
+    method: "POST",
+    body: JSON.stringify({
+      items: [
+        {
+          id: "veotv-mensual",
+          title: "VeoTV Mensual",
+          quantity: 1,
+          unit_price: amount,
+          currency_id: "CLP",
+        },
+      ],
+      payer: { email: payerEmail },
+      external_reference: opts.userId,
+      back_urls: {
+        success: `${base}/membresia?status=ok`,
+        failure: `${base}/membresia`,
+        pending: `${base}/membresia?status=ok`,
+      },
+      auto_return: "approved",
+      notification_url: `${base}/api/billing/webhook`,
+      statement_descriptor: "VEOTV",
+      metadata: {
+        user_id: opts.userId,
+        product: "veotv_mensual",
+      },
+    }),
+  });
+}
+
+export function preferenceCheckoutUrl(pref: {
+  init_point?: string;
+  sandbox_init_point?: string;
+}): string {
+  if (isMercadoPagoTestMode()) {
+    return pref.sandbox_init_point || pref.init_point || "";
+  }
+  return pref.init_point || pref.sandbox_init_point || "";
+}
+
 export function checkoutUrl(preapproval: MpPreapproval): string {
   if (isMercadoPagoTestMode()) {
     return preapproval.sandbox_init_point || preapproval.init_point || "";

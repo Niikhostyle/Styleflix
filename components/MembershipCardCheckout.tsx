@@ -33,10 +33,10 @@ function brickErrorMessage(err: unknown): string {
     msg.includes("información de pago") ||
     msg.includes("informacion de pago")
   ) {
-    return `Mercado Pago no pudo leer la tarjeta. Revisa el precio (mín. $${MP_MIN_AMOUNT_CLP} CLP en suscripciones Chile) o prueba otra tarjeta.`;
+    return `Mercado Pago no pudo leer la tarjeta. Revisa el precio (mín. $${MP_MIN_AMOUNT_CLP} CLP en Chile) o prueba otra tarjeta.`;
   }
   if (msg.includes("lower than") || msg.includes("950")) {
-    return `Mercado Pago exige mínimo $${MP_MIN_AMOUNT_CLP} CLP en suscripciones. Sube el precio en Admin → Ajustes.`;
+    return `Mercado Pago exige mínimo $${MP_MIN_AMOUNT_CLP} CLP. Sube el precio en Admin → Ajustes.`;
   }
   if (e.message?.trim()) return e.message.trim();
   return "Error en el formulario de Mercado Pago.";
@@ -56,7 +56,6 @@ export default function MembershipCardCheckout({
 
   useEffect(() => {
     if (!publicKey) return;
-    // locale es-CL = sitio Chile (MLC); sin locale el Brick puede fallar al resolver medios.
     initMercadoPago(publicKey, { locale: "es-CL" });
     setSdkReady(true);
   }, [publicKey]);
@@ -84,8 +83,8 @@ export default function MembershipCardCheckout({
   if (priceClp < MP_MIN_AMOUNT_CLP) {
     return (
       <p className="rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-100">
-        El precio actual es ${priceLabel} CLP, pero las suscripciones de Mercado
-        Pago Chile exigen al menos ${MP_MIN_AMOUNT_CLP} CLP. Sube el precio en{" "}
+        El precio actual es ${priceLabel} CLP, pero Mercado Pago Chile exige al
+        menos ${MP_MIN_AMOUNT_CLP} CLP. Sube el precio en{" "}
         <strong>Admin → Ajustes</strong> y vuelve a intentar.
       </p>
     );
@@ -104,7 +103,7 @@ export default function MembershipCardCheckout({
 
       <p className="rounded-xl bg-teal-50 px-3 py-2 text-xs text-teal-900">
         Pago real con Mercado Pago. Usa tu tarjeta; el cobro es de ${priceLabel}{" "}
-        CLP al mes.
+        CLP por 30 días de acceso.
       </p>
 
       <Payment
@@ -120,8 +119,6 @@ export default function MembershipCardCheckout({
             style: { theme: "default" },
           },
           paymentMethods: {
-            // prepaidCard es obligatorio desde 2025; sin esto MP muestra
-            // "No pudimos obtener la información de pago".
             creditCard: "all",
             debitCard: "all",
             prepaidCard: "all",
@@ -132,25 +129,17 @@ export default function MembershipCardCheckout({
           onBusy?.(true);
           onError("");
           try {
-            const token =
-              (formData as { token?: string }).token ||
-              (formData as { card_token_id?: string }).card_token_id;
-
-            if (!token) {
-              onError("El Brick no devolvió token de tarjeta. Reintenta.");
-              throw new Error("missing_token");
-            }
-
-            // Suscripción autorizada (preapproval) con card_token_id.
-            const res = await fetch("/api/billing/subscribe", {
+            // En esta cuenta /preapproval (suscripciones) responde 500.
+            // Cobramos con Checkout API /v1/payments y activamos 1 mes.
+            const res = await fetch("/api/billing/pay", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cardTokenId: token }),
+              body: JSON.stringify(formData),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-              onError(data.error || "No se pudo activar la membresía.");
-              throw new Error(data.error || "subscribe_failed");
+              onError(data.error || "No se pudo procesar el pago.");
+              throw new Error(data.error || "pay_failed");
             }
 
             onPaid({
@@ -160,7 +149,7 @@ export default function MembershipCardCheckout({
           } catch (err) {
             if (
               err instanceof Error &&
-              !["missing_token", "subscribe_failed"].includes(err.message) &&
+              !["pay_failed", "missing_token"].includes(err.message) &&
               !err.message.includes("Mercado Pago")
             ) {
               onError(err.message || "Error de red al pagar.");
