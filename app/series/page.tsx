@@ -5,20 +5,19 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Series | VeoTV",
-  description: "Series de Vimeus, Pluto TV y TMDB en VeoTV",
+  description: "Series en VeoTV",
 };
 
 export default async function SeriesPage() {
-  const { featured, rows, activeSources } = await getSeriesCatalog();
+  const { featured, rows } = await getSeriesCatalog();
 
   return (
     <CatalogClient
       pageTitle="Series"
-      subtitle="Catálogo reunido desde Vimeus, Pluto TV y TMDB."
+      subtitle="Todo el catálogo de series de VeoTV."
       featured={featured}
       defaultMediaType="tv"
       rows={rows}
-      activeSources={activeSources}
     />
   );
 }

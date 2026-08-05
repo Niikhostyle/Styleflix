@@ -28,6 +28,7 @@ function isMembershipExempt(pathname: string) {
   if (pathname.startsWith("/api/billing")) return true;
   if (pathname.startsWith("/api/account")) return true;
   if (pathname.startsWith("/api/admin")) return true;
+  if (pathname === "/api/requests") return true;
   if (pathname === "/api/pricing") return true;
   return false;
 }

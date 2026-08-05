@@ -9,11 +9,13 @@ import {
   UserCircle,
   ArrowLeft,
   Link2,
+  Inbox,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const nav = [
   { href: "/admin", label: "Usuarios", icon: Users },
+  { href: "/admin/solicitudes", label: "Solicitudes", icon: Inbox },
   { href: "/admin/streams", label: "Links propios", icon: Link2 },
   { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
   { href: "/cuenta", label: "Mi cuenta", icon: UserCircle },

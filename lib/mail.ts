@@ -140,6 +140,30 @@ export async function sendPasswordChangedNotice(opts: {
   return sendMail({ to: opts.to, subject, html, text });
 }
 
+export async function sendTitleRequestNotice(opts: {
+  to: string;
+  requesterName: string;
+  requesterEmail: string;
+  title: string;
+  mediaType: string;
+  tmdbId: number;
+  year?: number | null;
+}) {
+  const adminUrl = `${publicBaseUrl()}/admin/solicitudes`;
+  const kind = opts.mediaType === "tv" ? "Serie" : "Película";
+  const yearBit = opts.year ? ` (${opts.year})` : "";
+  const subject = `Solicitud de título · ${opts.title}${yearBit}`;
+  const text = `${opts.requesterName} <${opts.requesterEmail}> solicitó ${kind}: ${opts.title}${yearBit} (TMDB ${opts.tmdbId}).\nRevisa: ${adminUrl}\n`;
+  const html = wrapHtml(
+    "Nueva solicitud de título",
+    `<p style="margin:0 0 12px;color:#cfcfcf;line-height:1.55;"><strong style="color:#fff;">${escapeHtml(opts.requesterName)}</strong> (${escapeHtml(opts.requesterEmail)}) pidió:</p>
+     <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#fff;">${escapeHtml(kind)} · ${escapeHtml(opts.title)}${yearBit}</p>
+     <p style="margin:0 0 20px;color:#888;font-size:13px;">TMDB ID: ${opts.tmdbId}</p>
+     <p style="margin:0;"><a href="${adminUrl}" style="display:inline-block;background:#5EEAD4;color:#07111D;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">Ver solicitudes</a></p>`
+  );
+  return sendMail({ to: opts.to, subject, html, text });
+}
+
 function escapeHtml(s: string) {
   return s
     .replace(/&/g, "&amp;")

@@ -45,6 +45,7 @@ model User {
   payments     Payment[]
   authTokens   AuthToken[]
   profiles     Profile[]
+  titleRequests TitleRequest[]
 }
 
 /// Perfiles de visionado (límite según plan)
@@ -149,4 +150,24 @@ model StreamOverride {
 
   @@index([mediaType, tmdbId, enabled])
   @@index([tmdbId])
+}
+
+/// Solicitudes de títulos por usuarios con plan que lo permite
+model TitleRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// movie | tv
+  mediaType String
+  tmdbId    Int
+  title     String
+  year      Int?
+  note      String?
+  /// PENDING | DONE | REJECTED
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, mediaType, tmdbId])
+  @@index([status, createdAt])
 }

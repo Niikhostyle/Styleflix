@@ -1,7 +1,5 @@
 /**
- * Pluto TV (LATAM / Chile) — segunda fuente si Vimeus no tiene el título.
- * Usa el catálogo VOD público y abre la página on-demand en iframe.
- * Docs internas: https://api.pluto.tv/v3/vod/categories
+ * Pluto TV (LATAM) — catálogo VOD + stream HLS (sin abrir su web).
  */
 
 export type PlutoMatch = {
@@ -10,6 +8,7 @@ export type PlutoMatch = {
   name: string;
   type: "movie" | "series";
   year: number | null;
+  /** @deprecated no usar: abre la web de Pluto */
   watchUrl: string;
 };
 
@@ -20,8 +19,30 @@ type PlutoRawItem = {
   type?: string;
 };
 
+type BootVodMovie = {
+  id?: string;
+  type?: string;
+  stitched?: { path?: string };
+};
+
+type BootVodSeries = {
+  id?: string;
+  type?: string;
+  seasons?: Array<{
+    number?: number;
+    episodes?: Array<{
+      _id?: string;
+      number?: number;
+      season?: number;
+      stitched?: { path?: string };
+    }>;
+  }>;
+};
+
 const PLUTO_API = "https://api.pluto.tv/v3/vod/categories";
 const WATCH_BASE = "https://pluto.tv/latam/on-demand";
+const BOOT_URL = "https://boot.pluto.tv/v4/start";
+const APP_VERSION = "5.113.0";
 
 let catalogCache: {
   at: number;
@@ -49,7 +70,8 @@ function yearFromSlug(slug: string): number | null {
 
 function toMatch(item: PlutoRawItem): PlutoMatch | null {
   if (!item._id || !item.slug || !item.name) return null;
-  const type = item.type === "series" ? "series" : item.type === "movie" ? "movie" : null;
+  const type =
+    item.type === "series" ? "series" : item.type === "movie" ? "movie" : null;
   if (!type) return null;
   const path = type === "series" ? "series" : "movies";
   return {
@@ -113,7 +135,8 @@ function scoreMatch(
 
   let score = 0;
   if (nameNorm === queryNorm) score += 100;
-  else if (nameNorm.includes(queryNorm) || queryNorm.includes(nameNorm)) score += 60;
+  else if (nameNorm.includes(queryNorm) || queryNorm.includes(nameNorm))
+    score += 60;
   else {
     const qWords = queryNorm.split(" ").filter((w) => w.length > 2);
     const hits = qWords.filter((w) => nameNorm.includes(w)).length;
@@ -130,11 +153,6 @@ function scoreMatch(
   return score;
 }
 
-/**
- * Catálogo VOD completo de Pluto TV (LATAM), cacheado en memoria.
- * Lo consume la capa de fuentes para armar filas propias, no solo el respaldo
- * de reproducción.
- */
 export async function getPlutoCatalog(): Promise<{
   movies: PlutoMatch[];
   series: PlutoMatch[];
@@ -148,9 +166,6 @@ export async function getPlutoCatalog(): Promise<{
   }
 }
 
-/**
- * Busca en VOD Pluto (LATAM) por título TMDB (+ año opcional).
- */
 export async function findPlutoMatch(opts: {
   title: string;
   mediaType: "movie" | "tv";
@@ -163,7 +178,7 @@ export async function findPlutoMatch(opts: {
   const pool = opts.mediaType === "tv" ? catalog.series : catalog.movies;
 
   let best: PlutoMatch | null = null;
-  let bestScore = 40; // umbral mínimo
+  let bestScore = 40;
 
   for (const item of pool) {
     const s = scoreMatch(item, queryNorm, opts.year);
@@ -174,4 +189,129 @@ export async function findPlutoMatch(opts: {
   }
 
   return best;
+}
+
+function isAllowedPlutoHost(hostname: string) {
+  return (
+    hostname === "pluto.tv" ||
+    hostname.endsWith(".pluto.tv") ||
+    hostname.endsWith(".plutotv.net")
+  );
+}
+
+export function isPlutoStreamUrl(urlStr: string) {
+  try {
+    const u = new URL(urlStr);
+    return u.protocol === "https:" && isAllowedPlutoHost(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resuelve HLS master de un título Pluto (película o episodio).
+ * No usa la web de pluto.tv — solo el stitcher.
+ */
+export async function resolvePlutoHlsUrl(opts: {
+  match: PlutoMatch;
+  season?: number;
+  episode?: number;
+}): Promise<string | null> {
+  const clientID = crypto.randomUUID();
+  const params = new URLSearchParams({
+    appName: "web",
+    appVersion: APP_VERSION,
+    clientID,
+    clientModelNumber: "1.0",
+    deviceVersion: "chrome",
+    deviceType: "web",
+    deviceMake: "chrome",
+    deviceModel: "web",
+    deviceId: clientID,
+    deviceDNT: "1",
+  });
+
+  if (opts.match.type === "series") {
+    params.set("seriesIDs", opts.match.id);
+  } else {
+    params.set("episodeIDs", opts.match.id);
+  }
+
+  const bootRes = await fetch(`${BOOT_URL}?${params}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!bootRes.ok) return null;
+  const boot = (await bootRes.json()) as {
+    servers?: { stitcher?: string };
+    session?: { sessionID?: string };
+    VOD?: Record<string, BootVodMovie | BootVodSeries>;
+  };
+
+  const stitcher = boot.servers?.stitcher;
+  const sid = boot.session?.sessionID;
+  if (!stitcher) return null;
+
+  let path: string | undefined;
+
+  if (opts.match.type === "movie") {
+    const entry = Object.values(boot.VOD || {}).find(
+      (v) => (v as BootVodMovie).id === opts.match.id
+    ) as BootVodMovie | undefined;
+    path = entry?.stitched?.path;
+  } else {
+    const entry = Object.values(boot.VOD || {}).find(
+      (v) => (v as BootVodSeries).id === opts.match.id
+    ) as BootVodSeries | undefined;
+    const wantSe = opts.season ?? 1;
+    const wantEp = opts.episode ?? 1;
+    const season =
+      entry?.seasons?.find((s) => s.number === wantSe) || entry?.seasons?.[0];
+    const ep =
+      season?.episodes?.find((e) => e.number === wantEp) ||
+      season?.episodes?.[0];
+    path = ep?.stitched?.path;
+  }
+
+  if (!path) return null;
+
+  const qs = new URLSearchParams({
+    deviceType: "web",
+    deviceMake: "chrome",
+    deviceModel: "web",
+    deviceId: clientID,
+    deviceVersion: "chrome",
+    appName: "web",
+    appVersion: APP_VERSION,
+    deviceDNT: "1",
+    serverSideAds: "true",
+  });
+  if (sid) qs.set("sid", sid);
+
+  return `${stitcher}${path}?${qs}`;
+}
+
+/**
+ * Reescribe una playlist m3u8 para que segmentos/URIs pasen por nuestro proxy.
+ */
+export function rewritePlutoPlaylist(
+  body: string,
+  playlistUrl: string,
+  proxyBase: string
+): string {
+  const base = new URL(playlistUrl);
+  return body
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return line.replace(/URI="([^"]+)"/g, (_m, uri: string) => {
+          const abs = new URL(uri, base).toString();
+          return `URI="${proxyBase}${encodeURIComponent(abs)}"`;
+        });
+      }
+      const abs = new URL(trimmed, base).toString();
+      return `${proxyBase}${encodeURIComponent(abs)}`;
+    })
+    .join("\n");
 }

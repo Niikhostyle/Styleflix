@@ -48,8 +48,8 @@ export async function getPlutoRows(): Promise<
   ]);
 
   return [
-    { title: "Gratis en Pluto TV", mediaType: "movie", items: movies },
-    { title: "Series gratis en Pluto TV", mediaType: "tv", items: series },
+    { title: "Películas destacadas", mediaType: "movie", items: movies },
+    { title: "Series destacadas", mediaType: "tv", items: series },
   ];
 }
 

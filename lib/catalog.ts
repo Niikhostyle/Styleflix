@@ -196,7 +196,7 @@ export async function getMoviesCatalog(): Promise<CatalogPage> {
       { title: "Más películas", items: vimeus2, mediaType: "movie" },
       { title: "Seguir explorando", items: vimeus3, mediaType: "movie" },
     ]),
-    { title: "Gratis en Pluto TV", mediaType: "movie", items: plutoMovies },
+    { title: "Películas destacadas", mediaType: "movie", items: plutoMovies },
     ...archiveRows,
   ];
 
@@ -226,7 +226,7 @@ export async function getSeriesCatalog(): Promise<CatalogPage> {
       { title: "Más series", items: vimeus2, mediaType: "tv" },
       { title: "Seguir explorando", items: vimeus3, mediaType: "tv" },
     ]),
-    { title: "Series gratis en Pluto TV", mediaType: "tv", items: plutoSeries },
+    { title: "Series destacadas", mediaType: "tv", items: plutoSeries },
   ];
 
   const available = buildAvailabilityIndex(await loadAvailability(), playableRows);
@@ -301,8 +301,8 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
       { title: "Series para ver ya", items: vimeusSeries, mediaType: "tv" },
       { title: "Animes para ver ya", items: vimeusAnimes, mediaType: "tv" },
     ]),
-    { title: "Gratis en Pluto TV", mediaType: "movie", items: plutoMovies },
-    { title: "Series gratis en Pluto TV", mediaType: "tv", items: plutoSeries },
+    { title: "Películas destacadas", mediaType: "movie", items: plutoMovies },
+    { title: "Series destacadas", mediaType: "tv", items: plutoSeries },
     ...archiveRows.slice(0, 2),
   ];
 

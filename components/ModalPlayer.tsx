@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { isBackKey } from "@/lib/tv";
 import type { MediaType } from "@/lib/tmdb";
+import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 
 export type SeasonMeta = {
   seasonNumber: number;
@@ -31,7 +32,7 @@ interface ModalPlayerProps {
 
 /**
  * Player fullscreen. Sin preview: requiere membresía (middleware).
- * Resolución máxima según plan (notice en resolve).
+ * Soporta iframe (embeds) y HLS nativo (p. ej. Pluto vía proxy).
  */
 export default function ModalPlayer({
   open,
@@ -50,7 +51,7 @@ export default function ModalPlayer({
 
   const [frameNonce, setFrameNonce] = useState(0);
   const [embedPath, setEmbedPath] = useState("");
-  const [sourceLabel, setSourceLabel] = useState<string | null>(null);
+  const [playKind, setPlayKind] = useState<"iframe" | "hls">("iframe");
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [resolving, setResolving] = useState(false);
@@ -62,7 +63,7 @@ export default function ModalPlayer({
   useEffect(() => {
     if (!open) {
       setEmbedPath("");
-      setSourceLabel(null);
+      setPlayKind("iframe");
       setSourceId(null);
       setNotice("");
       setResolveError("");
@@ -79,7 +80,7 @@ export default function ModalPlayer({
     setResolving(true);
     setResolveError("");
     setEmbedPath("");
-    setSourceLabel(null);
+    setPlayKind("iframe");
     setSourceId(null);
     setNotice("");
 
@@ -100,20 +101,23 @@ export default function ModalPlayer({
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
-        if (!res.ok || !data.embedUrl) {
+        const url = (data.streamUrl || data.embedUrl || "") as string;
+        if (!res.ok || !url) {
           setResolveError(
             data.error ||
-              "Este título todavía no está disponible en ninguna fuente."
+              "Este título todavía no está disponible."
           );
           setEmbedPath("");
-          setSourceLabel(null);
           setSourceId(null);
           return;
         }
+        const kind = data.playKind === "hls" ? "hls" : "iframe";
+        setPlayKind(kind);
         setEmbedPath(
-          `${data.embedUrl}${data.embedUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`
+          kind === "hls"
+            ? url
+            : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
         );
-        setSourceLabel(data.label || data.source || null);
         setSourceId(data.source || null);
         setNotice(data.notice || "");
       })
@@ -231,11 +235,6 @@ export default function ModalPlayer({
       </button>
 
       <div className="absolute right-3 top-3 z-20 flex flex-col items-end gap-2 md:right-6 md:top-6">
-        {sourceLabel && showPlayer && (
-          <span className="rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-neutral-200 backdrop-blur-sm">
-            {sourceLabel}
-          </span>
-        )}
         {notice && showPlayer && (
           <span className="max-w-[260px] rounded bg-black/70 px-3 py-1.5 text-right text-xs font-medium text-amber-200 backdrop-blur-sm">
             {notice}
@@ -251,7 +250,7 @@ export default function ModalPlayer({
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-white">
             {resolveError ||
-              "Este título todavía no está disponible en ninguna fuente."}
+              "Este título todavía no está disponible."}
           </p>
           <button
             type="button"
@@ -262,6 +261,12 @@ export default function ModalPlayer({
             Cerrar
           </button>
         </div>
+      ) : playKind === "hls" ? (
+        <HlsVideoPlayer
+          key={`hls-${mediaId}-${season}-${episode}-${frameNonce}`}
+          src={embedPath}
+          title={title}
+        />
       ) : (
         <iframe
           key={`player-${mediaId}-${season}-${episode}-${frameNonce}-${sourceId}`}

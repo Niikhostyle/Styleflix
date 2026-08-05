@@ -47,6 +47,7 @@ export default function DetailClient({
   const { status, data: session } = useSession();
   const [playing, setPlaying] = useState(false);
   const [requestMsg, setRequestMsg] = useState("");
+  const [requestBusy, setRequestBusy] = useState(false);
   const canRequest =
     session?.user?.role === "SUPER_ADMIN" ||
     Boolean(session?.user?.planCanRequest);
@@ -308,14 +309,43 @@ export default function DetailClient({
                   <button
                     type="button"
                     data-tv-focus
-                    onClick={() =>
-                      setRequestMsg(
-                        "Solicitud registrada. Tu plan permite pedir títulos; te avisaremos cuando esté disponible."
-                      )
-                    }
-                    className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2.5 text-sm font-semibold text-fuchsia-200 transition hover:bg-fuchsia-500/20"
+                    disabled={requestBusy}
+                    onClick={() => {
+                      void (async () => {
+                        setRequestBusy(true);
+                        setRequestMsg("");
+                        try {
+                          const res = await fetch("/api/requests", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              mediaType,
+                              tmdbId: details.id,
+                              title,
+                              year: year || null,
+                            }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) {
+                            setRequestMsg(
+                              data.error || "No se pudo enviar la solicitud."
+                            );
+                            return;
+                          }
+                          setRequestMsg(
+                            data.message ||
+                              "Solicitud enviada al equipo de VeoTV."
+                          );
+                        } catch {
+                          setRequestMsg("Error de red al solicitar.");
+                        } finally {
+                          setRequestBusy(false);
+                        }
+                      })();
+                    }}
+                    className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2.5 text-sm font-semibold text-fuchsia-200 transition hover:bg-fuchsia-500/20 disabled:opacity-60"
                   >
-                    Solicitar título
+                    {requestBusy ? "Enviando…" : "Solicitar título"}
                   </button>
                 ) : (
                   <Link
@@ -353,7 +383,16 @@ export default function DetailClient({
               </div>
 
               {requestMsg && (
-                <p className="mb-4 text-sm text-emerald-300">{requestMsg}</p>
+                <p
+                  className={`mb-4 text-sm ${
+                    requestMsg.toLowerCase().includes("error") ||
+                    requestMsg.toLowerCase().includes("no se pudo")
+                      ? "text-red-300"
+                      : "text-emerald-300"
+                  }`}
+                >
+                  {requestMsg}
+                </p>
               )}
 
               {status !== "authenticated" && (

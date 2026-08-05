@@ -6,7 +6,7 @@ import {
   vimeusEmbedHasSources,
   vimeusHasTmdbId,
 } from "@/lib/vimeus";
-import { findPlutoMatch } from "@/lib/pluto";
+import { findPlutoMatch, resolvePlutoHlsUrl } from "@/lib/pluto";
 import { findArchiveMatch } from "@/lib/sources/archive";
 import { findCustomStream } from "@/lib/sources/custom";
 import { isSourceEnabled } from "@/lib/sources/types";
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
         return NextResponse.json(
           withPlanMeta({
             source: "vimeus",
-            label: "Vimeus",
+            label: "VeoTV",
             embedUrl: getVimeusEmbedUrl(type, tmdb, vimeusOpts),
           })
         );
@@ -126,19 +126,24 @@ export async function GET(request: Request) {
         year: safeYear,
       });
       if (pluto) {
-        return NextResponse.json(
-          withPlanMeta({
-            source: "pluto",
-            label: "Pluto TV",
-            embedUrl: pluto.watchUrl,
-            pluto: {
-              id: pluto.id,
-              slug: pluto.slug,
-              name: pluto.name,
-              type: pluto.type,
-            },
-          })
-        );
+        const hls = await resolvePlutoHlsUrl({
+          match: pluto,
+          season: type === "tv" ? season : undefined,
+          episode: type === "tv" ? episode : undefined,
+        }).catch(() => null);
+        if (hls) {
+          const origin = new URL(request.url).origin;
+          const streamUrl = `${origin}/api/play/pluto-hls?u=${encodeURIComponent(hls)}`;
+          return NextResponse.json(
+            withPlanMeta({
+              source: "pluto",
+              label: "VeoTV",
+              playKind: "hls",
+              streamUrl,
+              embedUrl: streamUrl,
+            })
+          );
+        }
       }
     }
 
@@ -148,7 +153,7 @@ export async function GET(request: Request) {
         return NextResponse.json(
           withPlanMeta({
             source: "archive",
-            label: "Archive.org",
+            label: "VeoTV",
             embedUrl: archive.embedUrl,
             archive: { identifier: archive.identifier },
           })

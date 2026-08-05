@@ -4,7 +4,6 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import MediaRow from "@/components/MediaRow";
 import Footer from "@/components/Footer";
-import SourceLegend from "@/components/SourceLegend";
 import type { CatalogItem, CatalogRow, SourceId } from "@/lib/sources/types";
 import type { MediaType } from "@/lib/tmdb";
 
@@ -16,6 +15,7 @@ interface CatalogClientProps {
   featured: CatalogItem[];
   rows: CatalogRow[];
   defaultMediaType?: MediaType;
+  /** @deprecated ya no se muestra leyenda de fuentes externas */
   activeSources?: SourceId[];
 }
 
@@ -25,7 +25,6 @@ export default function CatalogClient({
   featured,
   rows,
   defaultMediaType = "movie",
-  activeSources = [],
 }: CatalogClientProps) {
   const hero = featured[0] ?? null;
 
@@ -59,8 +58,6 @@ export default function CatalogClient({
             priorityCount={index === 0 ? 6 : 0}
           />
         ))}
-
-        <SourceLegend sources={activeSources} />
       </main>
 
       <Footer />

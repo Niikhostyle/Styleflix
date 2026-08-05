@@ -216,7 +216,7 @@ export default function AdminStreamsClient() {
   return (
     <AdminShell
       title="Links propios"
-      subtitle="Sube embeds o reproductores por ID de TMDB. Tienen prioridad sobre Vimeus, Pluto y Archive."
+      subtitle="Sube embeds o reproductores por ID de TMDB. Estos links tienen prioridad al reproducir."
     >
       <form
         onSubmit={onSubmit}

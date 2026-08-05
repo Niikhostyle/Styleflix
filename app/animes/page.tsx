@@ -5,20 +5,19 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Animes | VeoTV",
-  description: "Anime de Vimeus, MyAnimeList y TMDB en VeoTV",
+  description: "Animes en VeoTV",
 };
 
 export default async function AnimesPage() {
-  const { featured, rows, activeSources } = await getAnimeCatalog();
+  const { featured, rows } = await getAnimeCatalog();
 
   return (
     <CatalogClient
       pageTitle="Animes"
-      subtitle="Catálogo reunido desde Vimeus, MyAnimeList y TMDB."
+      subtitle="Todo el catálogo de anime de VeoTV."
       featured={featured}
       defaultMediaType="tv"
       rows={rows}
-      activeSources={activeSources}
     />
   );
 }
