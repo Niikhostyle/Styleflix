@@ -55,9 +55,8 @@ export default function MembershipCardCheckout({
       </div>
 
       <p className="rounded-md bg-neutral-100 px-3 py-2 text-xs text-neutral-700">
-        Prueba CL: <strong>5416 7526 0258 2580</strong> · CVV <strong>123</strong>{" "}
-        · <strong>11/30</strong> · titular <strong>APRO</strong> · RUT{" "}
-        <strong>12345678-5</strong>
+        Pago real con Mercado Pago. Usa tu tarjeta; el cobro es de $
+        {MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL")} CLP al mes.
       </p>
 
       <Payment

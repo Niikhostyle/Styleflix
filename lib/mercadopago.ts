@@ -51,6 +51,7 @@ export function isMercadoPagoTestMode(): boolean {
   const mode = (process.env.MERCADOPAGO_MODE || "").trim().toLowerCase();
   if (mode === "production" || mode === "prod") return false;
   if (mode === "test" || mode === "sandbox") return true;
+  // Sin MODE explícito: si hay vars de test, asumimos sandbox
   return Boolean(
     process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim() ||
       process.env.MERCADOPAGO_TEST_PAYER_USER?.trim()
