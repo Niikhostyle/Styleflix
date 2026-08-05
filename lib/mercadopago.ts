@@ -380,14 +380,19 @@ export function checkoutUrl(preapproval: MpPreapproval): string {
   return preapproval.init_point || preapproval.sandbox_init_point || "";
 }
 
-/** Validación básica de webhook (si hay secret configurado). */
+/**
+ * Webhooks nuevos envían x-signature. IPN legacy no.
+ * Si hay firma, la validamos. Si no hay firma, aceptamos (IPN / prueba MP).
+ */
 export function verifyWebhookSignature(request: Request): boolean {
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim();
   if (!secret) return true;
 
   const xSignature = request.headers.get("x-signature") || "";
   const xRequestId = request.headers.get("x-request-id") || "";
-  if (!xSignature) return false;
+
+  // IPN / tests sin firma: no bloquear (activación igual exige pago approved en API).
+  if (!xSignature) return true;
 
   const parts = Object.fromEntries(
     xSignature.split(",").map((p) => {
@@ -400,7 +405,9 @@ export function verifyWebhookSignature(request: Request): boolean {
   if (!ts || !hash) return false;
 
   const url = new URL(request.url);
-  const dataId = url.searchParams.get("data.id") || "";
+  // Webhooks usan data.id; IPN usa id.
+  const dataId =
+    url.searchParams.get("data.id") || url.searchParams.get("id") || "";
   const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
   const computed = createHmac("sha256", secret).update(manifest).digest("hex");
   return computed === hash;
