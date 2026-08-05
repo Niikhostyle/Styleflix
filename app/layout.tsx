@@ -5,6 +5,9 @@ import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { getPricing } from "@/lib/pricing";
 import "./globals.css";
 
+/** Precio (MEMBERSHIP_PRICE_CLP) y sesión deben leerse en cada request, no en el build. */
+export const dynamic = "force-dynamic";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

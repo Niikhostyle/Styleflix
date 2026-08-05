@@ -9,7 +9,7 @@
  *   MERCADOPAGO_TEST_PAYER_USER=TESTUSER… (Comprador) — el panel no muestra email
  *   MERCADOPAGO_TEST_PAYER_EMAIL=opcional si ya conoces test_user_…@testuser.com
  *   MERCADOPAGO_WEBHOOK_SECRET=... (opcional)
- *   MEMBERSHIP_PRICE_CLP=4990
+ *   MEMBERSHIP_PRICE_CLP=5
  *   AUTH_URL=https://veotv.cloud
  */
 

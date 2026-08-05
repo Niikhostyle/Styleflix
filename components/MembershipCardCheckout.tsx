@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
 import { useSession } from "next-auth/react";
-import { useMembershipPrice } from "@/components/PricingProvider";
+import {
+  useMembershipPrice,
+  usePricingReady,
+} from "@/components/PricingProvider";
 
 type Props = {
   onPaid: (result: { activated: boolean; message?: string }) => void;
@@ -17,15 +20,16 @@ export default function MembershipCardCheckout({
   onBusy,
 }: Props) {
   const { data: session } = useSession();
+  const pricingReady = usePricingReady();
   const { clp: priceClp, label: priceLabel } = useMembershipPrice();
-  const [ready, setReady] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
   const publicKey =
     process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim() || "";
 
   useEffect(() => {
     if (!publicKey) return;
     initMercadoPago(publicKey, { locale: "es-CL" });
-    setReady(true);
+    setSdkReady(true);
   }, [publicKey]);
 
   if (!publicKey) {
@@ -38,9 +42,13 @@ export default function MembershipCardCheckout({
     );
   }
 
-  if (!ready) {
+  if (!pricingReady || !sdkReady) {
     return (
-      <p className="text-sm text-neutral-400">Cargando Payment Brick…</p>
+      <p className="text-sm text-neutral-400">
+        {pricingReady
+          ? "Cargando Payment Brick…"
+          : "Obteniendo precio de membresía…"}
+      </p>
     );
   }
 

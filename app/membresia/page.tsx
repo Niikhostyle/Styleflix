@@ -5,6 +5,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { hasActiveMembership } from "@/lib/access";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Membresía | VeoTV",
   description: "Activa tu membresía mensual VeoTV con Mercado Pago",

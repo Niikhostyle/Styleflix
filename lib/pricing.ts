@@ -1,9 +1,11 @@
 /**
  * Precios de membresía.
  *
- * MEMBERSHIP_PRICE_CLP / RESELLER_PRICE_CLP son variables de servidor: no existen
- * en el bundle del navegador. Por eso se leen aquí en cada request y se envían al
- * cliente vía PricingProvider / /api/pricing en lugar de importar una constante.
+ * Fuente de verdad: MEMBERSHIP_PRICE_CLP / RESELLER_PRICE_CLP (Coolify / .env).
+ * Son variables de servidor: no existen en el bundle del navegador. Se leen en
+ * cada request y se envían al cliente vía PricingProvider / /api/pricing.
+ *
+ * Los DEFAULT solo aplican si la variable falta o es inválida.
  */
 
 export const DEFAULT_MEMBERSHIP_PRICE_CLP = 4990;
