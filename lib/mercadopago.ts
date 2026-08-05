@@ -6,7 +6,8 @@
  *   MERCADOPAGO_ACCESS_TOKEN=APP_USR-...   (ojo: APP_USR, no APP_USER)
  *   NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=APP_USR-...
  *   MERCADOPAGO_MODE=test|production
- *   MERCADOPAGO_TEST_PAYER_EMAIL=email del comprador de prueba (obligatorio en test)
+ *   MERCADOPAGO_TEST_PAYER_USER=TESTUSER… (Comprador) — el panel no muestra email
+ *   MERCADOPAGO_TEST_PAYER_EMAIL=opcional si ya conoces test_user_…@testuser.com
  *   MERCADOPAGO_WEBHOOK_SECRET=... (opcional)
  *   MEMBERSHIP_PRICE_CLP=4990
  *   AUTH_URL=https://veotv.cloud
@@ -50,7 +51,30 @@ export function isMercadoPagoTestMode(): boolean {
   const mode = (process.env.MERCADOPAGO_MODE || "").trim().toLowerCase();
   if (mode === "production" || mode === "prod") return false;
   if (mode === "test" || mode === "sandbox") return true;
-  return Boolean(process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim());
+  return Boolean(
+    process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim() ||
+      process.env.MERCADOPAGO_TEST_PAYER_USER?.trim()
+  );
+}
+
+/**
+ * El panel de MP solo muestra Usuario/clave; el email real es:
+ *   TESTUSER1232723510 → test_user_1232723510@testuser.com
+ */
+export function testUserToEmail(usernameOrEmail: string): string {
+  const raw = usernameOrEmail.trim();
+  if (!raw) return "";
+  if (raw.includes("@")) return raw.toLowerCase();
+
+  const upper = raw.toUpperCase();
+  if (upper.startsWith("TESTUSER")) {
+    const num = upper.slice("TESTUSER".length);
+    if (num) return `test_user_${num}@testuser.com`;
+  }
+  if (/^\d+$/.test(raw)) {
+    return `test_user_${raw}@testuser.com`;
+  }
+  return `${raw.toLowerCase()}@testuser.com`;
 }
 
 function accessToken() {
@@ -71,16 +95,18 @@ export function membershipAmount(): number {
   return MEMBERSHIP_PRICE_CLP;
 }
 
-/** Email que debe ir a MP: en test, el comprador de prueba. */
+/** Email que debe ir a MP: en test, el comprador de prueba (no el vendedor). */
 export function resolvePayerEmail(accountEmail: string): string {
   if (isMercadoPagoTestMode()) {
-    const testEmail = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
-    if (!testEmail) {
-      throw new Error(
-        "Modo test: configura MERCADOPAGO_TEST_PAYER_EMAIL con el email del comprador de prueba (Cuentas de prueba → Comprador)."
-      );
-    }
-    return testEmail.toLowerCase();
+    const explicit = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
+    if (explicit) return testUserToEmail(explicit);
+
+    const testUser = process.env.MERCADOPAGO_TEST_PAYER_USER?.trim();
+    if (testUser) return testUserToEmail(testUser);
+
+    throw new Error(
+      "Modo test: el panel no muestra email. Pon MERCADOPAGO_TEST_PAYER_USER=TESTUSER… del Comprador (no del Vendedor)."
+    );
   }
   return accountEmail.toLowerCase().trim();
 }
