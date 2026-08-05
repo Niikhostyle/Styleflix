@@ -8,19 +8,19 @@ import {
   IMAGE_POSTER_URL,
   getDisplayTitle,
   getReleaseYear,
-  type MediaItem,
   type MediaType,
 } from "@/lib/tmdb";
+import type { CatalogItem } from "@/lib/sources/types";
 
 interface MediaRowProps {
   title: string;
-  items: MediaItem[];
+  items: CatalogItem[];
   mediaType?: MediaType;
   /** Prioriza las primeras N imágenes (primera fila visible). */
   priorityCount?: number;
 }
 
-function resolveType(item: MediaItem, fallback?: MediaType): MediaType {
+function resolveType(item: CatalogItem, fallback?: MediaType): MediaType {
   return item.media_type ?? fallback ?? "movie";
 }
 
@@ -106,6 +106,11 @@ export default function MediaRow({
                   <div className="flex h-full w-full items-center justify-center bg-zinc-800 p-2 text-center text-xs text-neutral-400">
                     {name}
                   </div>
+                )}
+                {item.playable === false && (
+                  <span className="pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-200 backdrop-blur-sm">
+                    Ficha
+                  </span>
                 )}
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#07101d]/95 via-transparent to-transparent opacity-80 transition group-hover/card:opacity-100" />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3">

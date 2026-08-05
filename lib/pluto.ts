@@ -84,10 +84,9 @@ async function loadCatalog() {
     return catalogCache;
   }
 
-  const pages = await Promise.all([
-    fetchCatalogPage(1),
-    fetchCatalogPage(2),
-  ]);
+  const pages = await Promise.all(
+    [1, 2, 3, 4].map((page) => fetchCatalogPage(page).catch(() => []))
+  );
   const seen = new Set<string>();
   const movies: PlutoMatch[] = [];
   const series: PlutoMatch[] = [];
@@ -129,6 +128,24 @@ function scoreMatch(
   }
 
   return score;
+}
+
+/**
+ * Catálogo VOD completo de Pluto TV (LATAM), cacheado en memoria.
+ * Lo consume la capa de fuentes para armar filas propias, no solo el respaldo
+ * de reproducción.
+ */
+export async function getPlutoCatalog(): Promise<{
+  movies: PlutoMatch[];
+  series: PlutoMatch[];
+}> {
+  try {
+    const catalog = await loadCatalog();
+    return { movies: catalog.movies, series: catalog.series };
+  } catch (err) {
+    console.error("[pluto] catálogo no disponible", err);
+    return { movies: [], series: [] };
+  }
 }
 
 /**

@@ -4,20 +4,19 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import MediaRow from "@/components/MediaRow";
 import Footer from "@/components/Footer";
-import type { MediaItem, MediaType } from "@/lib/tmdb";
+import SourceLegend from "@/components/SourceLegend";
+import type { CatalogItem, CatalogRow, SourceId } from "@/lib/sources/types";
+import type { MediaType } from "@/lib/tmdb";
 
-export interface CatalogRow {
-  title: string;
-  items: MediaItem[];
-  mediaType?: MediaType;
-}
+export type { CatalogRow };
 
 interface CatalogClientProps {
   pageTitle: string;
   subtitle?: string;
-  featured: MediaItem[];
+  featured: CatalogItem[];
   rows: CatalogRow[];
   defaultMediaType?: MediaType;
+  activeSources?: SourceId[];
 }
 
 export default function CatalogClient({
@@ -26,6 +25,7 @@ export default function CatalogClient({
   featured,
   rows,
   defaultMediaType = "movie",
+  activeSources = [],
 }: CatalogClientProps) {
   const hero = featured[0] ?? null;
 
@@ -52,13 +52,15 @@ export default function CatalogClient({
 
         {rows.map((row, index) => (
           <MediaRow
-            key={row.title}
+            key={`${row.title}-${index}`}
             title={row.title}
             items={row.items}
             mediaType={row.mediaType ?? defaultMediaType}
             priorityCount={index === 0 ? 6 : 0}
           />
         ))}
+
+        <SourceLegend sources={activeSources} />
       </main>
 
       <Footer />

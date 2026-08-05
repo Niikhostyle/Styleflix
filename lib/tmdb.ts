@@ -1,3 +1,5 @@
+import { normalizeTitle, scoreTitleMatch, yearFrom } from "@/lib/sources/match";
+
 const BASE_URL = "https://api.themoviedb.org/3";
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -107,14 +109,26 @@ function assertApiKey() {
   }
 }
 
+export interface ListOptions {
+  /** Páginas TMDB a pedir. Por defecto las 2 primeras. */
+  pages?: number[];
+  /** Máximo de ítems devueltos tras deduplicar. */
+  limit?: number;
+}
+
 async function fetchList(
   endpoint: string,
-  mediaType?: MediaType
+  mediaType?: MediaType,
+  options?: ListOptions
 ): Promise<MediaItem[]> {
   assertApiKey();
 
+  const pageNumbers =
+    options?.pages ?? Array.from({ length: LIST_PAGES }, (_, i) => i + 1);
+  const limit = options?.limit ?? LIST_LIMIT;
+
   const pages = await Promise.all(
-    Array.from({ length: LIST_PAGES }, (_, i) => i + 1).map(async (page) => {
+    pageNumbers.map(async (page) => {
       const res = await fetch(buildUrl(endpoint, `&page=${page}`), {
         next: { revalidate: 7200, tags: ["tmdb", `tmdb-list`] },
       });
@@ -135,9 +149,21 @@ async function fetchList(
       ...item,
       media_type: item.media_type ?? mediaType,
     });
-    if (merged.length >= LIST_LIMIT) break;
+    if (merged.length >= limit) break;
   }
   return merged;
+}
+
+/**
+ * Listado TMDB arbitrario — lo usa la capa de fuentes para armar filas
+ * sin tener que declarar una función por cada endpoint.
+ */
+export function tmdbList(
+  endpoint: string,
+  mediaType?: MediaType,
+  options?: ListOptions
+): Promise<MediaItem[]> {
+  return fetchList(endpoint, mediaType, options);
 }
 
 async function fetchDetails(
@@ -413,6 +439,78 @@ export async function searchMulti(query: string): Promise<MediaItem[]> {
       ...item,
       media_type: item.media_type as MediaType,
     }));
+}
+
+/**
+ * Busca el título en TMDB para obtener su id.
+ * Lo usan las fuentes que no manejan ids TMDB (Jikan, Pluto TV, Archive.org):
+ * así todo el catálogo comparte el mismo id y las rutas /titulo/[type]/[id]
+ * siguen funcionando sin cambios.
+ */
+export async function findTmdbMatch(opts: {
+  title: string;
+  mediaType: MediaType;
+  year?: number | null;
+  /** Título alternativo (ej. nombre original en japonés). */
+  altTitle?: string | null;
+}): Promise<MediaItem | null> {
+  const queries = [opts.title, opts.altTitle]
+    .map((t) => (t || "").trim())
+    .filter(Boolean);
+  if (!queries.length || !API_KEY) return null;
+
+  // El año NO va como filtro de la consulta: las fuentes externas suelen
+  // diferir en un año del estreno que registra TMDB y filtrar devolvería cero
+  // resultados. Se usa solo para puntuar candidatos.
+  for (const query of queries) {
+    try {
+      const res = await fetch(
+        buildUrl(
+          `/search/${opts.mediaType}`,
+          `&query=${encodeURIComponent(query)}&include_adult=false`
+        ),
+        { next: { revalidate: 86400, tags: ["tmdb", "tmdb-match"] } }
+      );
+      if (!res.ok) continue;
+
+      const data: TMDBListResponse = await res.json();
+      const results = data.results ?? [];
+      if (!results.length) continue;
+
+      const queryNorm = normalizeTitle(query);
+      let best: MediaItem | null = null;
+      let bestScore = 30;
+
+      for (const item of results) {
+        const score = scoreTitleMatch(getDisplayTitle(item), queryNorm, {
+          candidateYear: yearFrom(item.release_date || item.first_air_date),
+          queryYear: opts.year ?? null,
+        });
+        if (score > bestScore) {
+          bestScore = score;
+          best = item;
+        }
+      }
+
+      if (best) return { ...best, media_type: opts.mediaType };
+    } catch {
+      // Sin match por esta consulta; probamos la siguiente.
+    }
+  }
+
+  return null;
+}
+
+/** Tráiler de YouTube con controles — usado cuando no hay stream disponible. */
+export function getTrailerPlayerUrl(videoKey: string) {
+  const params = new URLSearchParams({
+    autoplay: "1",
+    modestbranding: "1",
+    rel: "0",
+    playsinline: "1",
+    iv_load_policy: "3",
+  });
+  return `https://www.youtube-nocookie.com/embed/${videoKey}?${params.toString()}`;
 }
 
 /** @deprecated Usar MediaItem — alias de compatibilidad */

@@ -242,6 +242,27 @@ export function getVimeusAnimes(pages: number[] = [1, 2]) {
   return listAsMedia("animes", pages, "tv");
 }
 
+/**
+ * Índice de ids TMDB con stream en Vimeus, barriendo varias páginas de cada
+ * tipo. Permite marcar como reproducibles los títulos que llegan de fuentes
+ * de descubrimiento (TMDB, MyAnimeList) sin consultar Vimeus título por título.
+ */
+export async function getVimeusAvailability(
+  pages: number[] = [1, 2, 3, 4]
+): Promise<Set<number>> {
+  if (!process.env.VIMEUS_API_KEY) return new Set();
+
+  const [movies, series, animes] = await Promise.all([
+    getVimeusMovies(pages),
+    getVimeusSeries(pages),
+    getVimeusAnimes(pages),
+  ]);
+
+  const ids = new Set<number>();
+  for (const item of [...movies, ...series, ...animes]) ids.add(item.id);
+  return ids;
+}
+
 export async function getVimeusHomeCatalog() {
   const [movies, series, animes, moviesP3, seriesP3] = await Promise.all([
     getVimeusMovies([1]),

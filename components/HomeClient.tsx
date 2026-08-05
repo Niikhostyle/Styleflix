@@ -5,30 +5,19 @@ import Hero from "@/components/Hero";
 import MediaRow from "@/components/MediaRow";
 import Footer from "@/components/Footer";
 import PersonalizedRows from "@/components/PersonalizedRows";
-import type { MediaItem } from "@/lib/tmdb";
+import SourceLegend from "@/components/SourceLegend";
+import type { CatalogItem, CatalogRow, SourceId } from "@/lib/sources/types";
 
 interface HomeClientProps {
-  featured: MediaItem;
-  trendingMovies: MediaItem[];
-  popularMovies: MediaItem[];
-  topRatedMovies: MediaItem[];
-  actionMovies: MediaItem[];
-  trendingSeries: MediaItem[];
-  popularSeries: MediaItem[];
-  popularAnime: MediaItem[];
-  animeMovies: MediaItem[];
+  featured: CatalogItem;
+  rows: CatalogRow[];
+  activeSources?: SourceId[];
 }
 
 export default function HomeClient({
   featured,
-  trendingMovies,
-  popularMovies,
-  topRatedMovies,
-  actionMovies,
-  trendingSeries,
-  popularSeries,
-  popularAnime,
-  animeMovies,
+  rows,
+  activeSources = [],
 }: HomeClientProps) {
   return (
     <div className="app-page">
@@ -38,44 +27,18 @@ export default function HomeClient({
 
       <main className="relative z-10 -mt-16 space-y-1 pb-10 md:-mt-24">
         <PersonalizedRows />
-        <MediaRow
-          title="Películas en Vimeus"
-          items={trendingMovies}
-          mediaType="movie"
-          priorityCount={8}
-        />
-        <MediaRow
-          title="Series en Vimeus"
-          items={popularSeries}
-          mediaType="tv"
-          priorityCount={4}
-        />
-        <MediaRow
-          title="Animes en Vimeus"
-          items={popularAnime}
-          mediaType="tv"
-        />
-        <MediaRow
-          title="Más películas"
-          items={popularMovies}
-          mediaType="movie"
-        />
-        <MediaRow
-          title="Más series"
-          items={trendingSeries}
-          mediaType="tv"
-        />
-        <MediaRow
-          title="Seguir explorando"
-          items={topRatedMovies}
-          mediaType="movie"
-        />
-        <MediaRow title="Acción" items={actionMovies} mediaType="movie" />
-        <MediaRow
-          title="Películas de anime"
-          items={animeMovies}
-          mediaType="movie"
-        />
+
+        {rows.map((row, index) => (
+          <MediaRow
+            key={`${row.title}-${index}`}
+            title={row.title}
+            items={row.items}
+            mediaType={row.mediaType}
+            priorityCount={index === 0 ? 8 : index === 1 ? 4 : 0}
+          />
+        ))}
+
+        <SourceLegend sources={activeSources} />
       </main>
 
       <Footer />

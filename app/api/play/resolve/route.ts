@@ -5,10 +5,18 @@ import {
   vimeusHasTmdbId,
 } from "@/lib/vimeus";
 import { findPlutoMatch } from "@/lib/pluto";
-import type { MediaType } from "@/lib/tmdb";
+import { findArchiveMatch } from "@/lib/sources/archive";
+import { isSourceEnabled } from "@/lib/sources/types";
+import {
+  getBestTrailerKey,
+  getMediaDetails,
+  getTrailerPlayerUrl,
+  type MediaType,
+} from "@/lib/tmdb";
 
 /**
- * Resuelve fuente de reproducción: Vimeus primero, PlutoTV de respaldo.
+ * Resuelve la fuente de reproducción en cascada:
+ * Vimeus → Pluto TV → Archive.org → tráiler de TMDB.
  * GET /api/play/resolve?tmdb=&type=movie|tv&title=&year=&se=&ep=&anime=1
  */
 export async function GET(request: Request) {
@@ -26,6 +34,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Parámetros inválidos." }, { status: 400 });
   }
 
+  const safeYear = Number.isFinite(year as number) ? year : null;
   const season = se != null ? Number(se) : type === "tv" ? 1 : undefined;
   const episode = ep != null ? Number(ep) : type === "tv" ? 1 : undefined;
   const vimeusOpts = {
@@ -35,25 +44,26 @@ export async function GET(request: Request) {
   };
 
   try {
-    let vimeusOk = await vimeusHasTmdbId(type, tmdb, { anime });
-    if (!vimeusOk) {
-      vimeusOk = await vimeusEmbedHasSources(type, tmdb, vimeusOpts);
+    if (isSourceEnabled("vimeus")) {
+      let vimeusOk = await vimeusHasTmdbId(type, tmdb, { anime });
+      if (!vimeusOk) {
+        vimeusOk = await vimeusEmbedHasSources(type, tmdb, vimeusOpts);
+      }
+
+      if (vimeusOk && process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY) {
+        return NextResponse.json({
+          source: "vimeus",
+          label: "Vimeus",
+          embedUrl: getVimeusEmbedUrl(type, tmdb, vimeusOpts),
+        });
+      }
     }
 
-    if (vimeusOk && process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY) {
-      const embedUrl = getVimeusEmbedUrl(type, tmdb, vimeusOpts);
-      return NextResponse.json({
-        source: "vimeus",
-        label: "Vimeus",
-        embedUrl,
-      });
-    }
-
-    if (title) {
+    if (title && isSourceEnabled("pluto")) {
       const pluto = await findPlutoMatch({
         title,
         mediaType: type,
-        year: Number.isFinite(year as number) ? year : null,
+        year: safeYear,
       });
       if (pluto) {
         return NextResponse.json({
@@ -70,9 +80,37 @@ export async function GET(request: Request) {
       }
     }
 
+    // Archive.org solo tiene largometrajes de dominio público.
+    if (title && type === "movie" && isSourceEnabled("archive")) {
+      const archive = await findArchiveMatch({ title, year: safeYear });
+      if (archive) {
+        return NextResponse.json({
+          source: "archive",
+          label: "Archive.org",
+          embedUrl: archive.embedUrl,
+          archive: { identifier: archive.identifier },
+        });
+      }
+    }
+
+    // Sin stream: ofrecemos el tráiler para no dejar al usuario sin nada.
+    const trailerKey = await getMediaDetails(type, tmdb)
+      .then(getBestTrailerKey)
+      .catch(() => null);
+
+    if (trailerKey) {
+      return NextResponse.json({
+        source: "trailer",
+        label: "Tráiler",
+        embedUrl: getTrailerPlayerUrl(trailerKey),
+        fallback: true,
+        notice: "Aún no hay stream de este título. Te mostramos el tráiler.",
+      });
+    }
+
     return NextResponse.json(
       {
-        error: "No disponible en Vimeus ni Pluto TV",
+        error: "Este título todavía no está disponible en ninguna fuente.",
         source: null,
       },
       { status: 404 }

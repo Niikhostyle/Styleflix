@@ -55,7 +55,8 @@ function writePreviewMs(userId: string, ms: number) {
 }
 
 /**
- * Player fullscreen: Vimeus primero, Pluto TV de respaldo.
+ * Player fullscreen. La fuente la decide /api/play/resolve en cascada:
+ * Vimeus → Pluto TV → Archive.org → tráiler.
  * Sin membresía: máx. 5 min acumulados, luego invitación a pagar.
  */
 export default function ModalPlayer({
@@ -84,6 +85,8 @@ export default function ModalPlayer({
   );
   const [embedPath, setEmbedPath] = useState("");
   const [sourceLabel, setSourceLabel] = useState<string | null>(null);
+  const [sourceId, setSourceId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
   const backBtnRef = useRef<HTMLButtonElement>(null);
@@ -114,6 +117,8 @@ export default function ModalPlayer({
     if (!open) {
       setEmbedPath("");
       setSourceLabel(null);
+      setSourceId(null);
+      setNotice("");
       setResolveError("");
       setResolving(false);
       return;
@@ -124,6 +129,8 @@ export default function ModalPlayer({
     setResolveError("");
     setEmbedPath("");
     setSourceLabel(null);
+    setSourceId(null);
+    setNotice("");
 
     const params = new URLSearchParams({
       tmdb: String(mediaId),
@@ -144,14 +151,18 @@ export default function ModalPlayer({
         if (cancelled) return;
         if (!res.ok || !data.embedUrl) {
           setResolveError(
-            data.error || "No disponible en Vimeus ni Pluto TV"
+            data.error ||
+              "Este título todavía no está disponible en ninguna fuente."
           );
           setEmbedPath("");
           setSourceLabel(null);
+          setSourceId(null);
           return;
         }
         setEmbedPath(`${data.embedUrl}${data.embedUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`);
         setSourceLabel(data.label || data.source || null);
+        setSourceId(data.source || null);
+        setNotice(data.notice || "");
       })
       .catch(() => {
         if (!cancelled) {
@@ -305,6 +316,11 @@ export default function ModalPlayer({
             {sourceLabel}
           </span>
         )}
+        {notice && showPlayer && (
+          <span className="max-w-[260px] rounded bg-black/70 px-3 py-1.5 text-right text-xs font-medium text-amber-200 backdrop-blur-sm">
+            {notice}
+          </span>
+        )}
         {!unlimited && remainingSec != null && !paywall && (
           <div className="rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-sm">
             Prueba {mins}:{String(secs).padStart(2, "0")}
@@ -348,7 +364,8 @@ export default function ModalPlayer({
       ) : resolveError || !embedPath ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-white">
-            {resolveError || "No disponible en Vimeus ni Pluto TV"}
+            {resolveError ||
+              "Este título todavía no está disponible en ninguna fuente."}
           </p>
           <button
             type="button"
@@ -361,7 +378,7 @@ export default function ModalPlayer({
         </div>
       ) : (
         <iframe
-          key={`player-${mediaId}-${season}-${episode}-${frameNonce}-${sourceLabel}`}
+          key={`player-${mediaId}-${season}-${episode}-${frameNonce}-${sourceId}`}
           src={embedPath}
           title={title}
           tabIndex={-1}
@@ -372,7 +389,9 @@ export default function ModalPlayer({
           allowFullScreen
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           referrerPolicy={
-            sourceLabel === "Pluto TV" ? "no-referrer-when-downgrade" : "origin"
+            sourceId && sourceId !== "vimeus"
+              ? "no-referrer-when-downgrade"
+              : "origin"
           }
         />
       )}

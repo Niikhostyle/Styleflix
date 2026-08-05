@@ -1,36 +1,24 @@
 import CatalogClient from "@/components/CatalogClient";
-import { enrichWithTmdb, getVimeusSeries } from "@/lib/vimeus";
+import { getSeriesCatalog } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Series | VeoTV",
-  description: "Series disponibles para reproducir en VeoTV",
+  description: "Series de Vimeus, Pluto TV y TMDB en VeoTV",
 };
 
 export default async function SeriesPage() {
-  const [page1, page2, page3] = await Promise.all([
-    getVimeusSeries([1]),
-    getVimeusSeries([2]),
-    getVimeusSeries([3]),
-  ]);
-
-  const featured = [...page1, ...page2];
-  if (featured[0]) {
-    featured[0] = await enrichWithTmdb(featured[0]);
-  }
+  const { featured, rows, activeSources } = await getSeriesCatalog();
 
   return (
     <CatalogClient
       pageTitle="Series"
-      subtitle="Solo series con stream disponible en Vimeus."
+      subtitle="Catálogo reunido desde Vimeus, Pluto TV y TMDB."
       featured={featured}
       defaultMediaType="tv"
-      rows={[
-        { title: "Recién sincronizadas", items: page1, mediaType: "tv" },
-        { title: "Más series", items: page2, mediaType: "tv" },
-        { title: "Seguir explorando", items: page3, mediaType: "tv" },
-      ]}
+      rows={rows}
+      activeSources={activeSources}
     />
   );
 }

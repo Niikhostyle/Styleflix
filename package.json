@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
+    "sources:check": "npx tsx scripts/check-sources.ts",
     "db:setup": "prisma db push && npx tsx prisma/seed.ts",
     "db:up": "docker compose up -d"
   },
