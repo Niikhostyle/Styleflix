@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 function isPublicPath(pathname: string) {
+  if (pathname === "/") return true;
   if (pathname === "/login") return true;
   if (pathname === "/registro") return true;
   if (pathname === "/recuperar") return true;
@@ -12,7 +13,21 @@ function isPublicPath(pathname: string) {
   if (pathname.startsWith("/downloads/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
   if (pathname === "/api/billing/webhook") return true;
-  // El precio se muestra en login/registro, antes de tener sesión
+  if (pathname === "/api/pricing") return true;
+  if (pathname === "/api/settings/preview") return true;
+  if (pathname.startsWith("/onboarding")) return true;
+  return false;
+}
+
+/** Rutas que exigen sesión pero no membresía (pago / cuenta). */
+function isMembershipExempt(pathname: string) {
+  if (pathname.startsWith("/onboarding")) return true;
+  if (pathname.startsWith("/membresia")) return true;
+  if (pathname.startsWith("/cuenta")) return true;
+  if (pathname.startsWith("/admin")) return true;
+  if (pathname.startsWith("/api/billing")) return true;
+  if (pathname.startsWith("/api/account")) return true;
+  if (pathname.startsWith("/api/admin")) return true;
   if (pathname === "/api/pricing") return true;
   return false;
 }
@@ -61,14 +76,24 @@ function isLoggedIn(
 }
 
 /**
- * Soft paywall: login obligatorio para catálogo.
- * Sin membresía se puede navegar y ver 5 min (límite en el player).
+ * Paywall duro: catálogo requiere sesión + membresía activa.
+ * Landing `/` pública; sin plan → onboarding.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const token = await readToken(request);
   const loggedIn = isLoggedIn(token, request);
+  const membershipActive = Boolean(
+    token?.membershipActive || token?.role === "SUPER_ADMIN"
+  );
+
+  if (pathname === "/") {
+    if (loggedIn && !membershipActive) {
+      return NextResponse.redirect(new URL("/onboarding/planes", request.url));
+    }
+    return NextResponse.next();
+  }
 
   if (isPublicPath(pathname)) {
     if (
@@ -78,11 +103,15 @@ export async function middleware(request: NextRequest) {
         pathname === "/restablecer-clave") &&
       loggedIn
     ) {
+      const dest = membershipActive ? "/" : "/onboarding/planes";
       const callback = request.nextUrl.searchParams.get("callbackUrl");
       const safe =
         callback && callback.startsWith("/") && !callback.startsWith("//")
           ? callback
-          : "/";
+          : dest;
+      if (!membershipActive && !safe.startsWith("/onboarding") && safe !== "/membresia" && !safe.startsWith("/cuenta")) {
+        return NextResponse.redirect(new URL("/onboarding/planes", request.url));
+      }
       return NextResponse.redirect(new URL(safe, request.url));
     }
     return NextResponse.next();
@@ -102,15 +131,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  if (!membershipActive && !isMembershipExempt(pathname)) {
+    return NextResponse.redirect(new URL("/onboarding/planes", request.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Excluir webhook/IPN de Mercado Pago del middleware por completo
-     * (ni JWT ni redirects) para que la sonda del panel no falle.
-     */
     "/((?!_next/static|_next/image|favicon.ico|api/billing/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

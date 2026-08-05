@@ -15,6 +15,7 @@
 
 import { createHmac } from "crypto";
 import { getMembershipPriceClp } from "@/lib/settings";
+import { MP_MIN_AMOUNT_CLP } from "@/lib/pricing";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -246,40 +247,57 @@ export async function cancelPreapproval(id: string): Promise<MpPreapproval> {
 /**
  * Checkout Pro (preferencia) — alternativa cuando /preapproval falla con 500
  * en la cuenta (común si Suscripciones no está habilitada).
+ * Soporta moneda local; si MP rechaza, el caller puede reintentar con CLP.
  */
 export async function createMembershipPreference(opts: {
   userId: string;
   payerEmail: string;
+  title?: string;
+  amount: number;
+  currencyId: string;
+  amountClp: number;
+  planTier: string;
+  planPeriod: string;
+  months: number;
+  fxRate?: number;
+  country?: string;
 }): Promise<{ id: string; init_point?: string; sandbox_init_point?: string }> {
-  const amount = await membershipAmount();
   const base = publicBaseUrl();
   const payerEmail = resolvePayerEmail(opts.payerEmail);
+  const title = opts.title || "VeoTV Membresía";
 
   return mpFetch("/checkout/preferences", {
     method: "POST",
     body: JSON.stringify({
       items: [
         {
-          id: "veotv-mensual",
-          title: "VeoTV Mensual",
+          id: `veotv-${opts.planTier}-${opts.planPeriod}`,
+          title,
           quantity: 1,
-          unit_price: amount,
-          currency_id: "CLP",
+          unit_price: opts.amount,
+          currency_id: opts.currencyId,
         },
       ],
       payer: { email: payerEmail },
       external_reference: opts.userId,
       back_urls: {
-        success: `${base}/membresia?status=ok`,
-        failure: `${base}/membresia?status=failure`,
-        pending: `${base}/membresia?status=pending`,
+        success: `${base}/onboarding/listo?status=ok`,
+        failure: `${base}/onboarding/planes?status=failure`,
+        pending: `${base}/onboarding/listo?status=pending`,
       },
       auto_return: "approved",
       notification_url: `${base}/api/billing/webhook`,
       statement_descriptor: "VEOTV",
       metadata: {
         user_id: opts.userId,
-        product: "veotv_mensual",
+        product: "veotv_plan",
+        plan_tier: opts.planTier,
+        plan_period: opts.planPeriod,
+        months: opts.months,
+        amount_clp: opts.amountClp,
+        fx_rate: opts.fxRate ?? null,
+        country: opts.country ?? null,
+        charge_currency: opts.currencyId,
       },
     }),
   });
@@ -338,12 +356,23 @@ export async function findLatestApprovedPaymentForUser(
 
 /**
  * Valida que un pago de MP corresponde a este usuario y está aprobado.
- * No activa membresía; solo verifica.
+ * Acepta cobro en moneda local (metadata.amount_clp) o CLP legacy.
  */
 export async function assertApprovedMembershipPayment(opts: {
   payment: MpPaymentDetail;
   userId: string;
-}): Promise<{ ok: true; amount: number } | { ok: false; reason: string }> {
+}): Promise<
+  | {
+      ok: true;
+      amount: number;
+      currency: string;
+      planTier?: string;
+      planPeriod?: string;
+      months: number;
+      amountClp?: number;
+    }
+  | { ok: false; reason: string }
+> {
   const status = (opts.payment.status || "").toLowerCase();
   if (status !== "approved") {
     return {
@@ -357,20 +386,56 @@ export async function assertApprovedMembershipPayment(opts: {
     return { ok: false, reason: "El pago no corresponde a esta cuenta." };
   }
 
-  const expected = await membershipAmount();
   const amount = Number(opts.payment.transaction_amount);
   if (!Number.isFinite(amount) || amount <= 0) {
     return { ok: false, reason: "Monto de pago inválido." };
   }
-  // Tolerancia mínima: no activar si cobraron menos del mínimo de membresía.
-  if (amount + 0.01 < expected) {
+
+  const meta = (opts.payment.metadata || {}) as Record<string, unknown>;
+  const amountClpMeta = Number(meta.amount_clp);
+  const monthsMeta = Number(meta.months);
+  const months =
+    Number.isFinite(monthsMeta) && monthsMeta >= 1 ? Math.round(monthsMeta) : 1;
+  const currency = String(
+    opts.payment.currency_id || meta.charge_currency || "CLP"
+  ).toUpperCase();
+
+  if (Number.isFinite(amountClpMeta) && amountClpMeta > 0) {
+    // Cobro multi-moneda: confiar en metadata del preference + monto > 0
+    if (amount + 0.01 < amountClpMeta * 0.01 && currency === "CLP") {
+      return {
+        ok: false,
+        reason: `El monto pagado ($${amount}) es menor al plan ($${amountClpMeta} CLP).`,
+      };
+    }
     return {
-      ok: false,
-      reason: `El monto pagado ($${amount}) es menor al precio de membresía ($${expected}).`,
+      ok: true,
+      amount,
+      currency,
+      planTier: meta.plan_tier ? String(meta.plan_tier) : undefined,
+      planPeriod: meta.plan_period ? String(meta.plan_period) : undefined,
+      months,
+      amountClp: amountClpMeta,
     };
   }
 
-  return { ok: true, amount };
+  const expected = await membershipAmount();
+  if (currency === "CLP" && amount + 0.01 < Math.min(expected, MP_MIN_AMOUNT_CLP)) {
+    return {
+      ok: false,
+      reason: `El monto pagado ($${amount}) es menor al mínimo de membresía.`,
+    };
+  }
+
+  return {
+    ok: true,
+    amount,
+    currency,
+    planTier: meta.plan_tier ? String(meta.plan_tier) : undefined,
+    planPeriod: meta.plan_period ? String(meta.plan_period) : undefined,
+    months,
+    amountClp: currency === "CLP" ? amount : undefined,
+  };
 }
 
 export function checkoutUrl(preapproval: MpPreapproval): string {

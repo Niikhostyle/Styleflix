@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
+import ProfilesManager from "@/components/ProfilesManager";
 import { KeyRound, Shield, UserRound } from "lucide-react";
 import { subscriptionLabel } from "@/lib/access";
 
@@ -122,6 +123,8 @@ export default function AccountClient() {
           <p className="mt-10 text-neutral-400">Cargando…</p>
         ) : (
           <div className="mt-10 space-y-6">
+            <ProfilesManager />
+
             <section className="surface-panel rounded-3xl p-6 md:p-7">
               <div className="mb-5 flex items-center gap-2">
                 <UserRound className="h-5 w-5 text-teal-300" />

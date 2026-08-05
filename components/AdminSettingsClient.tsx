@@ -4,23 +4,22 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { useRefreshPricing } from "@/components/PricingProvider";
 import { formatClp, MP_MIN_AMOUNT_CLP } from "@/lib/pricing";
+import {
+  DEFAULT_PLANS_CATALOG,
+  type PlansCatalog,
+  type PlanTierDef,
+} from "@/lib/plans";
 
 export default function AdminSettingsClient() {
   const refreshPricing = useRefreshPricing();
 
-  const [previewMinutes, setPreviewMinutes] = useState(5);
-  const [previewDraft, setPreviewDraft] = useState(5);
-  const [membershipPrice, setMembershipPrice] = useState(4990);
-  const [membershipDraft, setMembershipDraft] = useState(4990);
+  const [catalog, setCatalog] = useState<PlansCatalog>(DEFAULT_PLANS_CATALOG);
   const [resellerPrice, setResellerPrice] = useState(2990);
   const [resellerDraft, setResellerDraft] = useState(2990);
   const [minPriceClp, setMinPriceClp] = useState(MP_MIN_AMOUNT_CLP);
-  const [settingsBusy, setSettingsBusy] = useState(false);
-  const [pricingBusy, setPricingBusy] = useState(false);
-  const [settingsMsg, setSettingsMsg] = useState("");
-  const [pricingMsg, setPricingMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
-  const [pricingError, setPricingError] = useState("");
 
   const loadSettings = useCallback(async () => {
     try {
@@ -30,14 +29,7 @@ export default function AdminSettingsClient() {
         setError(data.error || "No se pudieron cargar los ajustes.");
         return;
       }
-      if (data.previewMinutes) {
-        setPreviewMinutes(data.previewMinutes);
-        setPreviewDraft(data.previewMinutes);
-      }
-      if (typeof data.membershipPriceClp === "number") {
-        setMembershipPrice(data.membershipPriceClp);
-        setMembershipDraft(data.membershipPriceClp);
-      }
+      if (data.catalog) setCatalog(data.catalog);
       if (typeof data.resellerPriceClp === "number") {
         setResellerPrice(data.resellerPriceClp);
         setResellerDraft(data.resellerPriceClp);
@@ -54,158 +46,246 @@ export default function AdminSettingsClient() {
     void loadSettings();
   }, [loadSettings]);
 
-  async function savePreviewMinutes(e: FormEvent) {
+  function updateTier(id: string, patch: Partial<PlanTierDef>) {
+    setCatalog((prev) => ({
+      ...prev,
+      tiers: prev.tiers.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    }));
+  }
+
+  async function save(e: FormEvent) {
     e.preventDefault();
-    setSettingsBusy(true);
-    setSettingsMsg("");
+    setBusy(true);
+    setMsg("");
     setError("");
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ previewMinutes: previewDraft }),
+        body: JSON.stringify({
+          catalog: {
+            tiers: catalog.tiers,
+            periodDiscounts: catalog.periodDiscounts,
+          },
+          resellerPriceClp: resellerDraft,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "No se pudo guardar.");
         return;
       }
-      setPreviewMinutes(data.previewMinutes);
-      setPreviewDraft(data.previewMinutes);
-      setSettingsMsg(`Guardado: ${data.previewMinutes} min de preview.`);
-    } catch {
-      setError("Error de red.");
-    } finally {
-      setSettingsBusy(false);
-    }
-  }
-
-  async function savePricing(e: FormEvent) {
-    e.preventDefault();
-    setPricingBusy(true);
-    setPricingMsg("");
-    setPricingError("");
-    try {
-      const res = await fetch("/api/admin/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          membershipPriceClp: membershipDraft,
-          resellerPriceClp: resellerDraft,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setPricingError(data.error || "No se pudo guardar.");
-        return;
-      }
-      setMembershipPrice(data.membershipPriceClp);
-      setMembershipDraft(data.membershipPriceClp);
+      if (data.catalog) setCatalog(data.catalog);
       setResellerPrice(data.resellerPriceClp);
       setResellerDraft(data.resellerPriceClp);
       await refreshPricing();
-      setPricingMsg(
-        `Precios guardados: membresía $${formatClp(data.membershipPriceClp)} · revendedor $${formatClp(data.resellerPriceClp)}.`
-      );
+      setMsg("Planes y precios guardados.");
     } catch {
-      setPricingError("Error de red.");
+      setError("Error de red.");
     } finally {
-      setPricingBusy(false);
+      setBusy(false);
     }
   }
 
   return (
     <AdminShell
       title="Ajustes"
-      subtitle="Configuración global de la plataforma."
+      subtitle="Planes, precios CLP y límites reales por tier."
     >
-      <div className="space-y-6">
-        <form
-          onSubmit={savePricing}
-          className="surface-panel max-w-lg space-y-4 rounded-3xl p-6 md:p-7"
-        >
-          <h2 className="text-lg font-bold">Precios de membresía</h2>
+      <form onSubmit={save} className="space-y-6">
+        <div className="surface-panel space-y-4 rounded-3xl p-6 md:p-7">
+          <h2 className="text-lg font-bold">Catálogo de planes (CLP / mes)</h2>
           <p className="text-sm text-slate-400">
-            Estos valores se usan en la página de membresía, el cobro de Mercado
-            Pago y las cuentas revendedor. Vigentes ahora: membresía $
-            {formatClp(membershipPrice)} · revendedor ${formatClp(resellerPrice)}
-            . Mínimo suscripciones Mercado Pago Chile: $
-            {formatClp(minPriceClp)} CLP.
+            El cobro convierte según la IP del usuario. Mínimo Mercado Pago
+            Chile: ${formatClp(minPriceClp)} CLP.
           </p>
-          <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-            Membresía directa (CLP / mes)
-            <input
-              type="number"
-              min={minPriceClp}
-              max={1000000}
-              value={membershipDraft}
-              onChange={(e) =>
-                setMembershipDraft(Number(e.target.value) || minPriceClp)
-              }
-              className="w-32 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
-            />
-          </label>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {catalog.tiers.map((t) => (
+              <div
+                key={t.id}
+                className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wider text-fuchsia-300">
+                  {t.id}
+                </p>
+                <label className="block text-sm text-slate-300">
+                  Nombre
+                  <input
+                    value={t.name}
+                    onChange={(e) => updateTier(t.id, { name: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-fuchsia-400/40"
+                  />
+                </label>
+                <label className="block text-sm text-slate-300">
+                  Precio mensual CLP
+                  <input
+                    type="number"
+                    min={minPriceClp}
+                    value={t.priceMonthlyClp}
+                    onChange={(e) =>
+                      updateTier(t.id, {
+                        priceMonthlyClp: Number(e.target.value) || minPriceClp,
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-fuchsia-400/40"
+                  />
+                </label>
+                <label className="block text-sm text-slate-300">
+                  Perfiles máx.
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={t.maxProfiles}
+                    onChange={(e) =>
+                      updateTier(t.id, {
+                        maxProfiles: Number(e.target.value) || 1,
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2"
+                  />
+                </label>
+                <label className="block text-sm text-slate-300">
+                  Resolución
+                  <select
+                    value={t.maxResolution}
+                    onChange={(e) =>
+                      updateTier(t.id, {
+                        maxResolution: Number(e.target.value) as 720 | 1080,
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2"
+                  >
+                    <option value={720}>720p</option>
+                    <option value={1080}>1080p</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={t.features.canRequest}
+                    onChange={(e) =>
+                      updateTier(t.id, {
+                        features: {
+                          ...t.features,
+                          canRequest: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  Solicitar títulos
+                </label>
+                <label className="block text-sm text-slate-300">
+                  Cupo solicitudes
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={t.features.requestQuota}
+                    onChange={(e) =>
+                      updateTier(t.id, {
+                        features: {
+                          ...t.features,
+                          requestQuota: Number(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={t.features.canDownload}
+                    onChange={(e) =>
+                      updateTier(t.id, {
+                        features: {
+                          ...t.features,
+                          canDownload: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  Descargas
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-4 pt-2">
+            <label className="text-sm text-slate-300">
+              Desc. 6 meses %
+              <input
+                type="number"
+                min={0}
+                max={80}
+                value={catalog.periodDiscounts.semiannual}
+                onChange={(e) =>
+                  setCatalog((c) => ({
+                    ...c,
+                    periodDiscounts: {
+                      ...c.periodDiscounts,
+                      semiannual: Number(e.target.value) || 0,
+                    },
+                  }))
+                }
+                className="ml-2 w-20 rounded-xl border border-white/10 bg-[#08101d]/70 px-2 py-1.5"
+              />
+            </label>
+            <label className="text-sm text-slate-300">
+              Desc. anual %
+              <input
+                type="number"
+                min={0}
+                max={80}
+                value={catalog.periodDiscounts.annual}
+                onChange={(e) =>
+                  setCatalog((c) => ({
+                    ...c,
+                    periodDiscounts: {
+                      ...c.periodDiscounts,
+                      annual: Number(e.target.value) || 0,
+                    },
+                  }))
+                }
+                className="ml-2 w-20 rounded-xl border border-white/10 bg-[#08101d]/70 px-2 py-1.5"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="surface-panel max-w-lg space-y-4 rounded-3xl p-6 md:p-7">
+          <h2 className="text-lg font-bold">Revendedor</h2>
+          <p className="text-sm text-slate-400">
+            Precio de referencia para cuentas prepaid (ahora $
+            {formatClp(resellerPrice)}).
+          </p>
           <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
             Precio revendedor (CLP)
             <input
               type="number"
               min={minPriceClp}
-              max={1000000}
               value={resellerDraft}
               onChange={(e) =>
                 setResellerDraft(Number(e.target.value) || minPriceClp)
               }
-              className="w-32 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
+              className="w-32 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2"
             />
           </label>
-          {pricingError && (
-            <p className="text-sm text-red-300">{pricingError}</p>
-          )}
-          {pricingMsg && (
-            <p className="text-sm text-emerald-300">{pricingMsg}</p>
-          )}
-          <button
-            type="submit"
-            disabled={pricingBusy}
-            className="brand-button rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-60"
-          >
-            {pricingBusy ? "Guardando…" : "Guardar precios"}
-          </button>
-        </form>
+        </div>
 
-        <form
-          onSubmit={savePreviewMinutes}
-          className="surface-panel max-w-lg space-y-4 rounded-3xl p-6 md:p-7"
+        {error && <p className="text-sm text-red-300">{error}</p>}
+        {msg && <p className="text-sm text-emerald-300">{msg}</p>}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
         >
-          <h2 className="text-lg font-bold">Preview sin membresía</h2>
-          <p className="text-sm text-slate-400">
-            Minutos de prueba para cuentas sin plan activo (ahora:{" "}
-            {previewMinutes} min).
-          </p>
-          <label className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-            Minutos
-            <input
-              type="number"
-              min={1}
-              max={180}
-              value={previewDraft}
-              onChange={(e) => setPreviewDraft(Number(e.target.value) || 1)}
-              className="w-24 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
-            />
-          </label>
-          {error && <p className="text-sm text-red-300">{error}</p>}
-          {settingsMsg && (
-            <p className="text-sm text-emerald-300">{settingsMsg}</p>
-          )}
-          <button
-            type="submit"
-            disabled={settingsBusy}
-            className="brand-button rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-60"
-          >
-            {settingsBusy ? "Guardando…" : "Guardar"}
-          </button>
-        </form>
-      </div>
+          {busy ? "Guardando…" : "Guardar ajustes"}
+        </button>
+      </form>
     </AdminShell>
   );
 }

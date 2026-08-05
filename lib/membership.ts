@@ -1,5 +1,5 @@
 import { addDays, addMonths } from "@/lib/access";
-import { getResellerPriceClp } from "@/lib/settings";
+import { getPlansCatalog, getResellerPriceClp } from "@/lib/settings";
 import {
   assertApprovedMembershipPayment,
   findLatestApprovedPaymentForUser,
@@ -9,15 +9,26 @@ import {
 } from "@/lib/mercadopago";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import {
+  isPlanPeriod,
+  isPlanTier,
+  planEntitlementSnapshot,
+  type PlanPeriod,
+  type PlanTier,
+} from "@/lib/plans";
+import { ensurePrimaryProfile } from "@/lib/profiles";
 
 export async function activateMembership(opts: {
   userId: string;
   months?: number;
   mpPreapprovalId?: string | null;
+  planTier?: PlanTier | string | null;
+  planPeriod?: PlanPeriod | string | null;
   payment?: {
     externalId?: string | null;
     status: string;
     amount?: number;
+    currency?: string;
     rawPayload?: Prisma.InputJsonValue;
     paidAt?: Date | null;
   };
@@ -26,6 +37,23 @@ export async function activateMembership(opts: {
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { id: opts.userId } });
   if (!user) return null;
+
+  const catalog = await getPlansCatalog();
+  const tier = isPlanTier(opts.planTier)
+    ? opts.planTier
+    : isPlanTier(user.planTier)
+      ? user.planTier
+      : "premium";
+  const period = isPlanPeriod(opts.planPeriod)
+    ? opts.planPeriod
+    : isPlanPeriod(user.planPeriod)
+      ? user.planPeriod
+      : months >= 12
+        ? "annual"
+        : months >= 6
+          ? "semiannual"
+          : "monthly";
+  const entitlements = planEntitlementSnapshot(catalog, tier);
 
   // Idempotencia: si este pago MP ya activó, no duplicar ni extender de nuevo.
   if (opts.payment?.externalId) {
@@ -43,8 +71,7 @@ export async function activateMembership(opts: {
       ) {
         return user;
       }
-      // Pago ya registrado pero membresía caída: reactivar sin nuevo payment row.
-      return prisma.user.update({
+      const reactivated = await prisma.user.update({
         where: { id: opts.userId },
         data: {
           subscriptionStatus: "ACTIVE",
@@ -53,11 +80,22 @@ export async function activateMembership(opts: {
           cancelledAt: null,
           planSource: user.planSource || "DIRECT",
           prepaidDays: null,
+          planTier: entitlements.planTier,
+          planPeriod: period,
+          planMaxProfiles: entitlements.planMaxProfiles,
+          planMaxResolution: entitlements.planMaxResolution,
+          planFeatures: entitlements.planFeatures,
           ...(opts.mpPreapprovalId
             ? { mpPreapprovalId: opts.mpPreapprovalId }
             : {}),
         },
       });
+      await ensurePrimaryProfile({
+        userId: opts.userId,
+        name: user.name,
+        maxProfiles: entitlements.planMaxProfiles,
+      });
+      return reactivated;
     }
   }
 
@@ -76,10 +114,21 @@ export async function activateMembership(opts: {
       cancelledAt: null,
       planSource: user.planSource || "DIRECT",
       prepaidDays: null,
+      planTier: entitlements.planTier,
+      planPeriod: period,
+      planMaxProfiles: entitlements.planMaxProfiles,
+      planMaxResolution: entitlements.planMaxResolution,
+      planFeatures: entitlements.planFeatures,
       ...(opts.mpPreapprovalId
         ? { mpPreapprovalId: opts.mpPreapprovalId }
         : {}),
     },
+  });
+
+  await ensurePrimaryProfile({
+    userId: opts.userId,
+    name: user.name,
+    maxProfiles: entitlements.planMaxProfiles,
   });
 
   if (opts.payment) {
@@ -88,7 +137,7 @@ export async function activateMembership(opts: {
         userId: opts.userId,
         externalId: opts.payment.externalId ?? undefined,
         amount: opts.payment.amount ?? (await membershipAmount()),
-        currency: "CLP",
+        currency: opts.payment.currency || "CLP",
         status: opts.payment.status,
         rawPayload: opts.payment.rawPayload,
         paidAt: opts.payment.paidAt ?? now,
@@ -129,11 +178,14 @@ export async function activateFromMercadoPagoPayment(opts: {
 
   await activateMembership({
     userId: opts.userId,
-    months: 1,
+    months: check.months,
+    planTier: check.planTier,
+    planPeriod: check.planPeriod,
     payment: {
       externalId,
       status: "approved",
       amount: check.amount,
+      currency: check.currency,
       rawPayload: opts.payment as object,
       paidAt: opts.payment.date_approved
         ? new Date(opts.payment.date_approved)
@@ -206,6 +258,8 @@ export async function activatePrepaidOnFirstUse(userId: string) {
   const days = user.prepaidDays && user.prepaidDays > 0 ? user.prepaidDays : 30;
   const now = new Date();
   const currentPeriodEnd = addDays(now, days);
+  const catalog = await getPlansCatalog();
+  const entitlements = planEntitlementSnapshot(catalog, "premium");
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -216,7 +270,18 @@ export async function activatePrepaidOnFirstUse(userId: string) {
       cancelledAt: null,
       prepaidDays: null,
       planSource: "RESELLER",
+      planTier: entitlements.planTier,
+      planPeriod: "monthly",
+      planMaxProfiles: entitlements.planMaxProfiles,
+      planMaxResolution: entitlements.planMaxResolution,
+      planFeatures: entitlements.planFeatures,
     },
+  });
+
+  await ensurePrimaryProfile({
+    userId,
+    name: user.name,
+    maxProfiles: entitlements.planMaxProfiles,
   });
 
   await prisma.payment.create({

@@ -48,7 +48,7 @@ export function formatClp(amount: number): string {
 }
 
 export function membershipHint(membershipPriceClp: number): string {
-  return `Sin membresía puedes ver una prueba corta del contenido. Plan completo $${formatClp(
+  return `Elige tu plan y activa VeoTV desde $${formatClp(
     membershipPriceClp
-  )}/mes.`;
+  )}/mes. Cancela cuando quieras.`;
 }

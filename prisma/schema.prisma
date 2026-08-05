@@ -24,16 +24,42 @@ model User {
   mpPreapprovalId    String?
   membershipStartedAt DateTime?
   cancelledAt        DateTime?
-  /// DIRECT (MP $4990) | RESELLER ($2990, activación diferida)
+  /// DIRECT (MP) | RESELLER (activación diferida)
   planSource         String    @default("DIRECT")
   /// Días a activar al primer uso (solo PREPAID / revendedor)
   prepaidDays        Int?
+
+  /// standard | premium | plus
+  planTier           String?
+  /// monthly | semiannual | annual
+  planPeriod         String?
+  planMaxProfiles    Int?
+  /// 720 | 1080
+  planMaxResolution  Int?
+  /// { canRequest, requestQuota, canDownload }
+  planFeatures       Json?
 
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   watchHistory WatchProgress[]
   payments     Payment[]
   authTokens   AuthToken[]
+  profiles     Profile[]
+}
+
+/// Perfiles de visionado (límite según plan)
+model Profile {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  avatarKey String   @default("1")
+  isKids    Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, sortOrder])
 }
 
 /// Tokens de verificación de email y restablecimiento de contraseña
@@ -58,7 +84,7 @@ model Payment {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider   String   @default("MERCADOPAGO")
   externalId String?
-  amount     Decimal  @db.Decimal(10, 2)
+  amount     Decimal  @db.Decimal(12, 2)
   currency   String   @default("CLP")
   status     String
   rawPayload Json?
@@ -93,7 +119,7 @@ model WatchProgress {
   @@index([userId, lastWatchedAt])
 }
 
-/// Config global (ej. minutos de preview sin membresía)
+/// Config global (precios, catálogo de planes, etc.)
 model AppSetting {
   key       String   @id
   value     String

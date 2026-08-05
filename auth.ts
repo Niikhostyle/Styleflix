@@ -18,6 +18,11 @@ declare module "next-auth" {
     subscriptionStatus: SubscriptionStatus;
     currentPeriodEnd: string | null;
     membershipActive: boolean;
+    planTier: string | null;
+    planMaxProfiles: number | null;
+    planMaxResolution: number | null;
+    planCanRequest: boolean;
+    planCanDownload: boolean;
   }
 
   interface Session {
@@ -29,6 +34,11 @@ declare module "next-auth" {
       subscriptionStatus: SubscriptionStatus;
       currentPeriodEnd: string | null;
       membershipActive: boolean;
+      planTier: string | null;
+      planMaxProfiles: number | null;
+      planMaxResolution: number | null;
+      planCanRequest: boolean;
+      planCanDownload: boolean;
     };
   }
 }
@@ -40,6 +50,11 @@ declare module "next-auth/jwt" {
     subscriptionStatus: SubscriptionStatus;
     currentPeriodEnd: string | null;
     membershipActive: boolean;
+    planTier: string | null;
+    planMaxProfiles: number | null;
+    planMaxResolution: number | null;
+    planCanRequest: boolean;
+    planCanDownload: boolean;
   }
 }
 
@@ -59,11 +74,24 @@ function membershipFromUser(user: {
   role: string;
   subscriptionStatus: string;
   currentPeriodEnd: Date | null;
+  planTier?: string | null;
+  planMaxProfiles?: number | null;
+  planMaxResolution?: number | null;
+  planFeatures?: unknown;
 }) {
   const subscriptionStatus = user.subscriptionStatus as SubscriptionStatus;
   const currentPeriodEnd = user.currentPeriodEnd
     ? user.currentPeriodEnd.toISOString()
     : null;
+  const features =
+    user.planFeatures &&
+    typeof user.planFeatures === "object" &&
+    !Array.isArray(user.planFeatures)
+      ? (user.planFeatures as {
+          canRequest?: boolean;
+          canDownload?: boolean;
+        })
+      : {};
   return {
     role: user.role as Role,
     subscriptionStatus,
@@ -73,6 +101,11 @@ function membershipFromUser(user: {
       subscriptionStatus,
       currentPeriodEnd: user.currentPeriodEnd,
     }),
+    planTier: user.planTier ?? null,
+    planMaxProfiles: user.planMaxProfiles ?? null,
+    planMaxResolution: user.planMaxResolution ?? null,
+    planCanRequest: Boolean(features.canRequest),
+    planCanDownload: Boolean(features.canDownload),
   };
 }
 
@@ -138,6 +171,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.subscriptionStatus = user.subscriptionStatus;
         token.currentPeriodEnd = user.currentPeriodEnd;
         token.membershipActive = user.membershipActive;
+        token.planTier = user.planTier;
+        token.planMaxProfiles = user.planMaxProfiles;
+        token.planMaxResolution = user.planMaxResolution;
+        token.planCanRequest = user.planCanRequest;
+        token.planCanDownload = user.planCanDownload;
       }
 
       if ((trigger === "update" || user) && token.id) {
@@ -150,6 +188,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: true,
             subscriptionStatus: true,
             currentPeriodEnd: true,
+            planTier: true,
+            planMaxProfiles: true,
+            planMaxResolution: true,
+            planFeatures: true,
           },
         });
 
@@ -163,6 +205,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               email: activated.email,
               subscriptionStatus: activated.subscriptionStatus,
               currentPeriodEnd: activated.currentPeriodEnd,
+              planTier: activated.planTier,
+              planMaxProfiles: activated.planMaxProfiles,
+              planMaxResolution: activated.planMaxResolution,
+              planFeatures: activated.planFeatures,
             };
           }
         }
@@ -175,6 +221,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.subscriptionStatus = membership.subscriptionStatus;
           token.currentPeriodEnd = membership.currentPeriodEnd;
           token.membershipActive = membership.membershipActive;
+          token.planTier = membership.planTier;
+          token.planMaxProfiles = membership.planMaxProfiles;
+          token.planMaxResolution = membership.planMaxResolution;
+          token.planCanRequest = membership.planCanRequest;
+          token.planCanDownload = membership.planCanDownload;
         }
       }
 
@@ -189,6 +240,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.currentPeriodEnd =
           (token.currentPeriodEnd as string | null) ?? null;
         session.user.membershipActive = Boolean(token.membershipActive);
+        session.user.planTier = (token.planTier as string | null) ?? null;
+        session.user.planMaxProfiles =
+          (token.planMaxProfiles as number | null) ?? null;
+        session.user.planMaxResolution =
+          (token.planMaxResolution as number | null) ?? null;
+        session.user.planCanRequest = Boolean(token.planCanRequest);
+        session.user.planCanDownload = Boolean(token.planCanDownload);
       }
       return session;
     },

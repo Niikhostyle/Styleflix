@@ -4,19 +4,29 @@ import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import {
-  createAuthorizedMembershipPreapproval,
   createMembershipPreference,
   preferenceCheckoutUrl,
 } from "@/lib/mercadopago";
+import { markSubscriptionStatus } from "@/lib/membership";
+import { getPlanPriceClp, getPlansCatalog } from "@/lib/settings";
 import {
-  activateMembership,
-  markSubscriptionStatus,
-} from "@/lib/membership";
+  convertClpToLocal,
+  countryFromRequest,
+  getFxQuote,
+  CHARGEABLE_CURRENCIES,
+} from "@/lib/geo-fx";
+import {
+  getTier,
+  isPlanPeriod,
+  isPlanTier,
+  periodLabel,
+} from "@/lib/plans";
 
 const bodySchema = z.object({
-  cardTokenId: z.string().min(8).optional(),
-  /** Si true y no hay token, usa redirect legacy a MP */
-  redirect: z.boolean().optional(),
+  planTier: z.enum(["standard", "premium", "plus"]),
+  planPeriod: z.enum(["monthly", "semiannual", "annual"]),
+  /** Forzar cobro en CLP */
+  forceClp: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -54,8 +64,17 @@ export async function POST(request: Request) {
 
   const raw = await request.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(raw);
-  const cardTokenId = parsed.success ? parsed.data.cardTokenId : undefined;
-  const forceRedirect = parsed.success && parsed.data.redirect === true;
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Elige un plan y un periodo válidos." },
+      { status: 400 }
+    );
+  }
+
+  const { planTier, planPeriod, forceClp } = parsed.data;
+  if (!isPlanTier(planTier) || !isPlanPeriod(planPeriod)) {
+    return NextResponse.json({ error: "Plan inválido." }, { status: 400 });
+  }
 
   try {
     const user = await prisma.user.findUnique({
@@ -68,71 +87,66 @@ export async function POST(request: Request) {
       );
     }
 
-    // Checkout API (en sitio): token de tarjeta → suscripción authorized
-    if (cardTokenId && !forceRedirect) {
-      try {
-        const preapproval = await createAuthorizedMembershipPreapproval({
-          userId: user.id,
-          payerEmail: user.email,
-          cardTokenId,
-        });
+    const catalog = await getPlansCatalog();
+    const tier = getTier(catalog, planTier);
+    const months = catalog.periodMonths[planPeriod];
+    const amountClp = await getPlanPriceClp(planTier, planPeriod);
 
-        const status = (preapproval.status || "").toLowerCase();
-        if (status === "authorized" || status === "active") {
-          await activateMembership({
-            userId: user.id,
-            months: 1,
-            mpPreapprovalId: preapproval.id,
-            payment: {
-              externalId: preapproval.id,
-              status: "subscription_authorized",
-              rawPayload: preapproval as object,
-            },
-          });
-          return NextResponse.json({
-            ok: true,
-            activated: true,
-            preapprovalId: preapproval.id,
-            status: preapproval.status,
-          });
-        }
+    const country = countryFromRequest(request);
+    const fx = await getFxQuote(country);
+    let currencyId = forceClp ? "CLP" : fx.currency;
+    if (!CHARGEABLE_CURRENCIES.has(currencyId)) currencyId = "CLP";
 
-        await markSubscriptionStatus(user.id, "PENDING", {
-          mpPreapprovalId: preapproval.id,
-        });
-        return NextResponse.json({
-          ok: true,
-          activated: false,
-          pending: true,
-          preapprovalId: preapproval.id,
-          status: preapproval.status,
-          message:
-            "Pago en revisión. En unos segundos pulsa «Actualizar estado».",
-        });
-      } catch (preErr) {
-        const msg = preErr instanceof Error ? preErr.message : "";
-        // Suscripciones (/preapproval) a menudo responde 500 en cuentas sin el
-        // producto habilitado. El Brick debe usar /api/billing/pay.
-        if (msg.includes("500") || /Internal server error/i.test(msg)) {
-          return NextResponse.json(
-            {
-              error:
-                "Las suscripciones automáticas de Mercado Pago no están disponibles en esta cuenta. Usa el formulario de tarjeta (pago mensual) o contacta soporte MP.",
-            },
-            { status: 502 }
-          );
-        }
-        throw preErr;
+    let amount =
+      currencyId === "CLP"
+        ? amountClp
+        : convertClpToLocal(amountClp, fx.rateFromClp, currencyId);
+    let usedFallback = false;
+
+    const title = `VeoTV ${tier.name} · ${periodLabel(planPeriod)}`;
+
+    async function createPref(cur: string, amt: number) {
+      return createMembershipPreference({
+        userId: user!.id,
+        payerEmail: user!.email,
+        title,
+        amount: amt,
+        currencyId: cur,
+        amountClp,
+        planTier,
+        planPeriod,
+        months,
+        fxRate: fx.rateFromClp,
+        country,
+      });
+    }
+
+    let preference;
+    try {
+      preference = await createPref(currencyId, amount);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (currencyId !== "CLP") {
+        console.warn("[billing/subscribe] currency fail, fallback CLP", msg);
+        currencyId = "CLP";
+        amount = amountClp;
+        usedFallback = true;
+        preference = await createPref("CLP", amountClp);
+      } else {
+        throw err;
       }
     }
 
-    // Redirect Checkout Pro (preferencia). Evitamos /preapproval: en esta cuenta
-    // responde 500 Internal server error de forma consistente.
-    const preference = await createMembershipPreference({
-      userId: user.id,
-      payerEmail: user.email,
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        subscriptionStatus: "PENDING",
+        planTier,
+        planPeriod,
+      },
     });
     await markSubscriptionStatus(user.id, "PENDING");
+
     const url = preferenceCheckoutUrl(preference);
     if (!url) {
       return NextResponse.json(
@@ -145,15 +159,18 @@ export async function POST(request: Request) {
       init_point: url,
       preferenceId: preference.id,
       mode: "preference",
+      currency: currencyId,
+      amount,
+      amountClp,
+      usedClpFallback: usedFallback,
     });
   } catch (err) {
     console.error("[billing/subscribe]", err);
-    const raw = err instanceof Error ? err.message : "";
-    return NextResponse.json({ error: friendlyMpError(raw) }, { status: 500 });
+    const rawMsg = err instanceof Error ? err.message : "";
+    return NextResponse.json({ error: friendlyMpError(rawMsg) }, { status: 500 });
   }
 }
 
-/** Traduce los errores más comunes de Mercado Pago. */
 function friendlyMpError(raw: string): string {
   if (!raw) return "No se pudo iniciar el pago.";
   if (
@@ -161,25 +178,13 @@ function friendlyMpError(raw: string): string {
     raw.includes("Payer and collector") ||
     raw.includes("del Vendedor")
   ) {
-    return "El pagador de prueba es el mismo que el cobrador (Vendedor). En Coolify cambia MERCADOPAGO_TEST_PAYER_USER al TESTUSER del Comprador (Cuentas de prueba → Comprador), no el de «Datos de las credenciales».";
-  }
-  if (raw.includes("cardholder.document")) {
-    return "El RUT no es válido. Usa uno con dígito verificador, por ejemplo 12345678-5 (no 123456789).";
-  }
-  if (raw.includes("without cvv validation")) {
-    return "Falta el código de seguridad (CVV) de la tarjeta. Complétalo e intenta de nuevo.";
-  }
-  if (raw.includes("real or test users")) {
-    return "El pagador y el cobrador deben ser ambos de prueba o ambos reales. Revisa MERCADOPAGO_MODE y las credenciales.";
-  }
-  if (raw.includes("Invalid card_token_id") || raw.includes("card_token")) {
-    return "La tarjeta no se pudo validar. Verifica los datos e intenta nuevamente.";
+    return "El pagador de prueba es el mismo que el cobrador (Vendedor).";
   }
   if (raw.includes("lower than") || /amount lower than/i.test(raw)) {
     return "Mercado Pago rechazó el monto: en Chile exigen mínimo $950 CLP. Sube el precio en Admin → Ajustes.";
   }
-  if (/Internal server error/i.test(raw) || raw.includes("500")) {
-    return "Mercado Pago no pudo crear la suscripción (error interno). Prueba el pago con tarjeta en el sitio o Checkout Pro.";
+  if (/currency/i.test(raw) && /invalid|not supported/i.test(raw)) {
+    return "Mercado Pago no aceptó esa moneda. Reintenta; cobraremos en CLP.";
   }
   return raw;
 }

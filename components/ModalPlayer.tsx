@@ -1,16 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { isBackKey } from "@/lib/tv";
-import {
-  APP_NAME,
-  DEFAULT_PREVIEW_MINUTES,
-  previewStorageKey,
-} from "@/lib/brand";
-import { useMembershipPrice } from "@/components/PricingProvider";
 import type { MediaType } from "@/lib/tmdb";
 
 export type SeasonMeta = {
@@ -36,28 +29,9 @@ interface ModalPlayerProps {
   isAnime?: boolean;
 }
 
-function readPreviewMs(userId: string) {
-  try {
-    const raw = localStorage.getItem(previewStorageKey(userId));
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writePreviewMs(userId: string, ms: number) {
-  try {
-    localStorage.setItem(previewStorageKey(userId), String(Math.floor(ms)));
-  } catch {
-    /* ignore */
-  }
-}
-
 /**
- * Player fullscreen. La fuente la decide /api/play/resolve en cascada:
- * Vimeus → Pluto TV → Archive.org → tráiler.
- * Sin membresía: máx. 5 min acumulados, luego invitación a pagar.
+ * Player fullscreen. Sin preview: requiere membresía (middleware).
+ * Resolución máxima según plan (notice en resolve).
  */
 export default function ModalPlayer({
   open,
@@ -71,18 +45,10 @@ export default function ModalPlayer({
   isAnime = false,
 }: ModalPlayerProps) {
   const { data: session } = useSession();
-  const { label: price } = useMembershipPrice();
   const membershipActive = Boolean(session?.user?.membershipActive);
-  const userId = session?.user?.id || "anon";
   const isAdmin = session?.user?.role === "SUPER_ADMIN";
-  const unlimited = membershipActive || isAdmin;
 
   const [frameNonce, setFrameNonce] = useState(0);
-  const [paywall, setPaywall] = useState(false);
-  const [remainingSec, setRemainingSec] = useState<number | null>(null);
-  const [previewLimitMs, setPreviewLimitMs] = useState(
-    DEFAULT_PREVIEW_MINUTES * 60 * 1000
-  );
   const [embedPath, setEmbedPath] = useState("");
   const [sourceLabel, setSourceLabel] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
@@ -92,26 +58,6 @@ export default function ModalPlayer({
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const pushedRef = useRef(false);
   const closingRef = useRef(false);
-  const usedMsRef = useRef(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/settings/preview")
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        const mins = Number(data.previewMinutes);
-        if (Number.isFinite(mins) && mins >= 1) {
-          setPreviewLimitMs(Math.floor(mins) * 60 * 1000);
-        }
-      })
-      .catch(() => {
-        /* keep default */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -121,6 +67,11 @@ export default function ModalPlayer({
       setNotice("");
       setResolveError("");
       setResolving(false);
+      return;
+    }
+
+    if (!membershipActive && !isAdmin) {
+      setResolveError("Necesitas una membresía activa para reproducir.");
       return;
     }
 
@@ -159,7 +110,9 @@ export default function ModalPlayer({
           setSourceId(null);
           return;
         }
-        setEmbedPath(`${data.embedUrl}${data.embedUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`);
+        setEmbedPath(
+          `${data.embedUrl}${data.embedUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`
+        );
         setSourceLabel(data.label || data.source || null);
         setSourceId(data.source || null);
         setNotice(data.notice || "");
@@ -176,49 +129,18 @@ export default function ModalPlayer({
     return () => {
       cancelled = true;
     };
-  }, [open, mediaId, mediaType, title, year, season, episode, isAnime]);
-
-  // Preview timer
-  useEffect(() => {
-    if (!open || unlimited) {
-      setPaywall(false);
-      setRemainingSec(null);
-      return;
-    }
-
-    usedMsRef.current = readPreviewMs(userId);
-    if (usedMsRef.current >= previewLimitMs) {
-      setPaywall(true);
-      setRemainingSec(0);
-      return;
-    }
-
-    setPaywall(false);
-    const started = Date.now();
-    const base = usedMsRef.current;
-
-    const tick = window.setInterval(() => {
-      const elapsed = base + (Date.now() - started);
-      usedMsRef.current = elapsed;
-      writePreviewMs(userId, elapsed);
-      const left = Math.max(0, previewLimitMs - elapsed);
-      setRemainingSec(Math.ceil(left / 1000));
-      if (elapsed >= previewLimitMs) {
-        setPaywall(true);
-        setRemainingSec(0);
-        window.clearInterval(tick);
-      }
-    }, 1000);
-
-    setRemainingSec(Math.ceil((previewLimitMs - base) / 1000));
-
-    return () => {
-      window.clearInterval(tick);
-      const finalMs = base + (Date.now() - started);
-      usedMsRef.current = Math.min(finalMs, previewLimitMs);
-      writePreviewMs(userId, usedMsRef.current);
-    };
-  }, [open, unlimited, userId, previewLimitMs]);
+  }, [
+    open,
+    mediaId,
+    mediaType,
+    title,
+    year,
+    season,
+    episode,
+    isAnime,
+    membershipActive,
+    isAdmin,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -285,9 +207,7 @@ export default function ModalPlayer({
     }
   }
 
-  const mins = remainingSec != null ? Math.floor(remainingSec / 60) : 0;
-  const secs = remainingSec != null ? remainingSec % 60 : 0;
-  const showPlayer = Boolean(embedPath) && !paywall && !resolving && !resolveError;
+  const showPlayer = Boolean(embedPath) && !resolving && !resolveError;
 
   return (
     <div
@@ -321,43 +241,9 @@ export default function ModalPlayer({
             {notice}
           </span>
         )}
-        {!unlimited && remainingSec != null && !paywall && (
-          <div className="rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-amber-200 backdrop-blur-sm">
-            Prueba {mins}:{String(secs).padStart(2, "0")}
-          </div>
-        )}
       </div>
 
-      {paywall ? (
-        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-teal-300">
-            {APP_NAME}
-          </p>
-          <h2 className="max-w-md text-2xl font-black text-white md:text-3xl">
-            Se acabó tu preview de prueba
-          </h2>
-          <p className="max-w-sm text-sm text-neutral-300">
-            Activa la membresía mensual por ${price} CLP y mira sin límites
-            películas, series y animes.
-          </p>
-          <Link
-            href="/membresia"
-            data-tv-focus
-            data-tv-autofocus
-            className="brand-button tv-cta rounded-xl px-6 py-3 text-base font-bold transition"
-          >
-            Activar membresía
-          </Link>
-          <button
-            type="button"
-            onClick={handleCloseClick}
-            data-tv-focus
-            className="text-sm text-neutral-400 underline hover:text-white"
-          >
-            Volver al catálogo
-          </button>
-        </div>
-      ) : resolving ? (
+      {resolving ? (
         <div className="flex h-full items-center justify-center text-neutral-300">
           Buscando fuente…
         </div>

@@ -54,8 +54,8 @@ export default function DescargarPage() {
           </li>
           <li>Abre el archivo e instala.</li>
           <li>
-            Crea tu cuenta en la app o inicia sesión. Sin membresía tienes 5
-            minutos de prueba.
+            Crea tu cuenta en la app o inicia sesión. Necesitas un plan activo
+            para ver el catálogo.
           </li>
         </ol>
 

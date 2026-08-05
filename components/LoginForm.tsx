@@ -39,15 +39,21 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    const dest = safeCallback(callbackUrl);
-    const t = window.setTimeout(() => {
+    const t = window.setTimeout(async () => {
+      const session = await getSession();
+      const dest = session?.user?.membershipActive
+        ? safeCallback(callbackUrl)
+        : "/onboarding/planes";
       window.location.replace(dest);
     }, 50);
     return () => window.clearTimeout(t);
   }, [status, callbackUrl]);
 
   async function afterAuth() {
-    const dest = safeCallback(callbackUrl);
+    const session = await getSession();
+    const dest = session?.user?.membershipActive
+      ? safeCallback(callbackUrl)
+      : "/onboarding/planes";
     window.location.assign(dest);
   }
 

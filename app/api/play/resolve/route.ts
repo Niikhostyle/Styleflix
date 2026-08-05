@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { hasActiveMembership } from "@/lib/access";
 import {
   getVimeusEmbedUrl,
   vimeusEmbedHasSources,
@@ -15,11 +17,31 @@ import {
 } from "@/lib/tmdb";
 
 /**
- * Resuelve la fuente de reproducción en cascada:
- * Vimeus → Pluto TV → Archive.org → tráiler de TMDB.
- * GET /api/play/resolve?tmdb=&type=movie|tv&title=&year=&se=&ep=&anime=1
+ * Resuelve la fuente de reproducción en cascada.
+ * Requiere membresía activa. Avisa resolución máxima del plan.
  */
 export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  }
+  if (
+    !hasActiveMembership({
+      role: session.user.role,
+      subscriptionStatus: session.user.subscriptionStatus,
+      currentPeriodEnd: session.user.currentPeriodEnd,
+    })
+  ) {
+    return NextResponse.json(
+      { error: "Necesitas una membresía activa para reproducir." },
+      { status: 403 }
+    );
+  }
+
+  const maxRes = session.user.planMaxResolution || 1080;
+  const resNotice =
+    maxRes <= 720 ? "Tu plan Estándar reproduce hasta 720p." : undefined;
+
   const { searchParams } = new URL(request.url);
   const tmdb = Number(searchParams.get("tmdb"));
   const type = (searchParams.get("type") || "movie") as MediaType;
@@ -30,7 +52,11 @@ export async function GET(request: Request) {
   const ep = searchParams.get("ep");
   const anime = searchParams.get("anime") === "1";
 
-  if (!Number.isFinite(tmdb) || tmdb <= 0 || (type !== "movie" && type !== "tv")) {
+  if (
+    !Number.isFinite(tmdb) ||
+    tmdb <= 0 ||
+    (type !== "movie" && type !== "tv")
+  ) {
     return NextResponse.json({ error: "Parámetros inválidos." }, { status: 400 });
   }
 
@@ -43,6 +69,20 @@ export async function GET(request: Request) {
     anime: type === "tv" ? anime : undefined,
   };
 
+  function withPlanMeta(payload: Record<string, unknown>) {
+    const notice =
+      typeof payload.notice === "string" && payload.notice
+        ? resNotice
+          ? `${payload.notice} · ${resNotice}`
+          : payload.notice
+        : resNotice;
+    return {
+      ...payload,
+      maxResolution: maxRes,
+      ...(notice ? { notice } : {}),
+    };
+  }
+
   try {
     if (isSourceEnabled("vimeus")) {
       let vimeusOk = await vimeusHasTmdbId(type, tmdb, { anime });
@@ -51,11 +91,13 @@ export async function GET(request: Request) {
       }
 
       if (vimeusOk && process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY) {
-        return NextResponse.json({
-          source: "vimeus",
-          label: "Vimeus",
-          embedUrl: getVimeusEmbedUrl(type, tmdb, vimeusOpts),
-        });
+        return NextResponse.json(
+          withPlanMeta({
+            source: "vimeus",
+            label: "Vimeus",
+            embedUrl: getVimeusEmbedUrl(type, tmdb, vimeusOpts),
+          })
+        );
       }
     }
 
@@ -66,46 +108,50 @@ export async function GET(request: Request) {
         year: safeYear,
       });
       if (pluto) {
-        return NextResponse.json({
-          source: "pluto",
-          label: "Pluto TV",
-          embedUrl: pluto.watchUrl,
-          pluto: {
-            id: pluto.id,
-            slug: pluto.slug,
-            name: pluto.name,
-            type: pluto.type,
-          },
-        });
+        return NextResponse.json(
+          withPlanMeta({
+            source: "pluto",
+            label: "Pluto TV",
+            embedUrl: pluto.watchUrl,
+            pluto: {
+              id: pluto.id,
+              slug: pluto.slug,
+              name: pluto.name,
+              type: pluto.type,
+            },
+          })
+        );
       }
     }
 
-    // Archive.org solo tiene largometrajes de dominio público.
     if (title && type === "movie" && isSourceEnabled("archive")) {
       const archive = await findArchiveMatch({ title, year: safeYear });
       if (archive) {
-        return NextResponse.json({
-          source: "archive",
-          label: "Archive.org",
-          embedUrl: archive.embedUrl,
-          archive: { identifier: archive.identifier },
-        });
+        return NextResponse.json(
+          withPlanMeta({
+            source: "archive",
+            label: "Archive.org",
+            embedUrl: archive.embedUrl,
+            archive: { identifier: archive.identifier },
+          })
+        );
       }
     }
 
-    // Sin stream: ofrecemos el tráiler para no dejar al usuario sin nada.
     const trailerKey = await getMediaDetails(type, tmdb)
       .then(getBestTrailerKey)
       .catch(() => null);
 
     if (trailerKey) {
-      return NextResponse.json({
-        source: "trailer",
-        label: "Tráiler",
-        embedUrl: getTrailerPlayerUrl(trailerKey),
-        fallback: true,
-        notice: "Aún no hay stream de este título. Te mostramos el tráiler.",
-      });
+      return NextResponse.json(
+        withPlanMeta({
+          source: "trailer",
+          label: "Tráiler",
+          embedUrl: getTrailerPlayerUrl(trailerKey),
+          fallback: true,
+          notice: "Aún no hay stream de este título. Te mostramos el tráiler.",
+        })
+      );
     }
 
     return NextResponse.json(

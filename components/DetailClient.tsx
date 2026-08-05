@@ -44,8 +44,12 @@ export default function DetailClient({
 }: DetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const [playing, setPlaying] = useState(false);
+  const [requestMsg, setRequestMsg] = useState("");
+  const canRequest =
+    session?.user?.role === "SUPER_ADMIN" ||
+    Boolean(session?.user?.planCanRequest);
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
   const [hasProgress, setHasProgress] = useState(false);
@@ -300,6 +304,28 @@ export default function DetailClient({
                   <Plus className="h-5 w-5" />
                 </button>
 
+                {canRequest ? (
+                  <button
+                    type="button"
+                    data-tv-focus
+                    onClick={() =>
+                      setRequestMsg(
+                        "Solicitud registrada. Tu plan permite pedir títulos; te avisaremos cuando esté disponible."
+                      )
+                    }
+                    className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2.5 text-sm font-semibold text-fuchsia-200 transition hover:bg-fuchsia-500/20"
+                  >
+                    Solicitar título
+                  </button>
+                ) : (
+                  <Link
+                    href="/onboarding/planes"
+                    className="rounded-xl border border-white/15 px-4 py-2.5 text-sm text-white/55 hover:text-white"
+                  >
+                    Solicitar (upgrade)
+                  </Link>
+                )}
+
                 <button
                   type="button"
                   data-tv-focus
@@ -326,16 +352,19 @@ export default function DetailClient({
                 )}
               </div>
 
+              {requestMsg && (
+                <p className="mb-4 text-sm text-emerald-300">{requestMsg}</p>
+              )}
+
               {status !== "authenticated" && (
                 <p className="mb-4 text-sm text-neutral-400">
-                  Puedes ver todo sin cuenta.{" "}
                   <Link
-                    href="/registro"
+                    href="/login"
                     className="text-white underline hover:text-neutral-200"
                   >
-                    Regístrate
+                    Inicia sesión
                   </Link>{" "}
-                  para guardar progreso y recomendaciones.
+                  y activa un plan para ver el catálogo completo.
                 </p>
               )}
 

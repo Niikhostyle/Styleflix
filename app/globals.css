@@ -3,9 +3,9 @@
 :root {
   --background: #070b14;
   --foreground: #f4f7fb;
-  --brand: #5eead4;
-  --brand-strong: #2dd4bf;
-  --accent: #8b5cf6;
+  --brand: #c026d3;
+  --brand-strong: #a21caf;
+  --accent: #7c3aed;
   --surface: #0d1424;
   --surface-strong: #111b2e;
   --muted: #91a0b8;
@@ -89,13 +89,13 @@ select {
 }
 
 .brand-button {
-  color: #06111a;
-  background: linear-gradient(135deg, #99f6e4, #5eead4 52%, #67e8f9);
-  box-shadow: 0 12px 34px rgba(45, 212, 191, 0.2);
+  color: #fff;
+  background: linear-gradient(90deg, #7c3aed, #d946ef);
+  box-shadow: 0 12px 34px rgba(192, 38, 211, 0.28);
 }
 
 .brand-button:hover {
-  filter: brightness(1.07);
+  filter: brightness(1.08);
   transform: translateY(-1px);
 }
 

@@ -8,39 +8,33 @@ import {
   parsePriceClp,
   type Pricing,
 } from "@/lib/pricing";
+import {
+  DEFAULT_PLANS_CATALOG,
+  normalizePlansCatalog,
+  priceClpForPeriod,
+  type PlanPeriod,
+  type PlansCatalog,
+  type PlanTier,
+} from "@/lib/plans";
 
 export const PREVIEW_MINUTES_KEY = "previewMinutes";
 export const MEMBERSHIP_PRICE_KEY = "membershipPriceClp";
 export const RESELLER_PRICE_KEY = "resellerPriceClp";
+export const PLANS_CATALOG_KEY = "plansCatalog";
 
-export const DEFAULT_PREVIEW_MINUTES = 5;
+export const DEFAULT_PREVIEW_MINUTES = 0;
 
 /** Alineado al mínimo de suscripciones Mercado Pago Chile ($950). */
 const MIN_PRICE_CLP = MP_MIN_AMOUNT_CLP;
 const MAX_PRICE_CLP = 1_000_000;
 
+/** Preview desactivado (paywall duro). */
 export async function getPreviewMinutes(): Promise<number> {
-  try {
-    const row = await prisma.appSetting.findUnique({
-      where: { key: PREVIEW_MINUTES_KEY },
-    });
-    const n = Number(row?.value ?? DEFAULT_PREVIEW_MINUTES);
-    if (!Number.isFinite(n) || n < 1) return DEFAULT_PREVIEW_MINUTES;
-    return Math.min(180, Math.floor(n));
-  } catch (err) {
-    console.warn("[settings] getPreviewMinutes", err);
-    return DEFAULT_PREVIEW_MINUTES;
-  }
+  return 0;
 }
 
-export async function setPreviewMinutes(minutes: number): Promise<number> {
-  const value = Math.min(180, Math.max(1, Math.floor(minutes)));
-  await prisma.appSetting.upsert({
-    where: { key: PREVIEW_MINUTES_KEY },
-    create: { key: PREVIEW_MINUTES_KEY, value: String(value) },
-    update: { value: String(value) },
-  });
-  return value;
+export async function setPreviewMinutes(_minutes: number): Promise<number> {
+  return 0;
 }
 
 function clampPriceClp(n: number): number {
@@ -61,8 +55,11 @@ async function readPriceSetting(
   }
 }
 
-/** Precio efectivo: DB (admin) → env → default. */
+/** Precio legacy (premium mensual) — compat. */
 export async function getMembershipPriceClp(): Promise<number> {
+  const catalog = await getPlansCatalog();
+  const premium = catalog.tiers.find((t) => t.id === "premium");
+  if (premium) return premium.priceMonthlyClp;
   return readPriceSetting(MEMBERSHIP_PRICE_KEY, envMembershipPriceClp());
 }
 
@@ -109,7 +106,47 @@ export async function setPricing(input: {
   return { membershipPriceClp, resellerPriceClp };
 }
 
-/** Defaults de código (sin DB ni env); útil para docs. */
+export async function getPlansCatalog(): Promise<PlansCatalog> {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: PLANS_CATALOG_KEY },
+    });
+    if (!row?.value?.trim()) return DEFAULT_PLANS_CATALOG;
+    return normalizePlansCatalog(JSON.parse(row.value));
+  } catch (err) {
+    console.warn("[settings] getPlansCatalog", err);
+    return DEFAULT_PLANS_CATALOG;
+  }
+}
+
+export async function setPlansCatalog(
+  input: unknown
+): Promise<PlansCatalog> {
+  const catalog = normalizePlansCatalog(input);
+  await prisma.appSetting.upsert({
+    where: { key: PLANS_CATALOG_KEY },
+    create: {
+      key: PLANS_CATALOG_KEY,
+      value: JSON.stringify(catalog),
+    },
+    update: { value: JSON.stringify(catalog) },
+  });
+  // Mantener membershipPriceClp legacy alineado al premium mensual
+  const premium = catalog.tiers.find((t) => t.id === "premium");
+  if (premium) {
+    await setMembershipPriceClp(premium.priceMonthlyClp);
+  }
+  return catalog;
+}
+
+export async function getPlanPriceClp(
+  tier: PlanTier,
+  period: PlanPeriod
+): Promise<number> {
+  const catalog = await getPlansCatalog();
+  return priceClpForPeriod(catalog, tier, period);
+}
+
 export const PRICING_CODE_DEFAULTS = {
   membershipPriceClp: DEFAULT_MEMBERSHIP_PRICE_CLP,
   resellerPriceClp: DEFAULT_RESELLER_PRICE_CLP,
