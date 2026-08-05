@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Providers from "@/components/Providers";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
-import { getPricing } from "@/lib/pricing";
+import { getPricing } from "@/lib/settings";
 import "./globals.css";
 
-/** Precio (MEMBERSHIP_PRICE_CLP) y sesión deben leerse en cada request, no en el build. */
+/** Precio y sesión deben leerse en cada request (admin puede cambiar precios). */
 export const dynamic = "force-dynamic";
 
 const geistSans = Geist({
@@ -26,11 +26,13 @@ export const metadata: Metadata = {
   description: `${APP_NAME} — ${APP_TAGLINE}`,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pricing = await getPricing();
+
   return (
     <html
       lang="es"
@@ -42,7 +44,7 @@ export default function RootLayout({
             __html: `(function(){try{if(!/ngrok/i.test(location.hostname))return;var f=window.fetch.bind(window);window.fetch=function(i,n){n=n||{};var h=new Headers(n.headers||(i&&i.headers)||{});h.set("ngrok-skip-browser-warning","1");n.headers=h;return f(i,n);};}catch(e){}})();`,
           }}
         />
-        <Providers pricing={getPricing()}>{children}</Providers>
+        <Providers pricing={pricing}>{children}</Providers>
       </body>
     </html>
   );

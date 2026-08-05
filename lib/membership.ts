@@ -1,5 +1,5 @@
 import { addDays, addMonths } from "@/lib/access";
-import { getResellerPriceClp } from "@/lib/pricing";
+import { getResellerPriceClp } from "@/lib/settings";
 import { membershipAmount } from "@/lib/mercadopago";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
@@ -47,7 +47,7 @@ export async function activateMembership(opts: {
       data: {
         userId: opts.userId,
         externalId: opts.payment.externalId ?? undefined,
-        amount: opts.payment.amount ?? membershipAmount(),
+        amount: opts.payment.amount ?? (await membershipAmount()),
         currency: "CLP",
         status: opts.payment.status,
         rawPayload: opts.payment.rawPayload,
@@ -87,7 +87,7 @@ export async function activatePrepaidOnFirstUse(userId: string) {
   await prisma.payment.create({
     data: {
       userId,
-      amount: getResellerPriceClp(),
+      amount: await getResellerPriceClp(),
       currency: "CLP",
       status: "reseller_first_use",
       paidAt: now,
@@ -121,7 +121,7 @@ export async function grantPrepaidReseller(opts: {
   await prisma.payment.create({
     data: {
       userId: opts.userId,
-      amount: getResellerPriceClp(),
+      amount: await getResellerPriceClp(),
       currency: "CLP",
       status: "reseller_prepaid",
       paidAt: now,

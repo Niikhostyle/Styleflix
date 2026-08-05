@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getResellerPriceClp } from "@/lib/pricing";
+import { getResellerPriceClp } from "@/lib/settings";
 
 const createUserSchema = z.object({
   name: z.string().min(2).max(60),
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       await prisma.payment.create({
         data: {
           userId: user.id,
-          amount: getResellerPriceClp(),
+          amount: await getResellerPriceClp(),
           currency: "CLP",
           status: "reseller_prepaid",
           paidAt: now,

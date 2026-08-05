@@ -14,9 +14,10 @@
  */
 
 import { createHmac } from "crypto";
-import { getMembershipPriceClp } from "@/lib/pricing";
+import { getMembershipPriceClp } from "@/lib/settings";
 
 const MP_API = "https://api.mercadopago.com";
+
 
 export type MpPreapproval = {
   id: string;
@@ -92,7 +93,7 @@ function publicBaseUrl() {
   ).replace(/\/$/, "");
 }
 
-export function membershipAmount(): number {
+export async function membershipAmount(): Promise<number> {
   return getMembershipPriceClp();
 }
 
@@ -175,7 +176,7 @@ export async function createMembershipPreapproval(opts: {
   userId: string;
   payerEmail: string;
 }): Promise<MpPreapproval> {
-  const amount = membershipAmount();
+  const amount = await membershipAmount();
   const backUrl = `${publicBaseUrl()}/membresia?status=ok`;
   const payerEmail = resolvePayerEmail(opts.payerEmail);
   await assertPayerNotCollector(payerEmail);
@@ -207,7 +208,7 @@ export async function createAuthorizedMembershipPreapproval(opts: {
   payerEmail: string;
   cardTokenId: string;
 }): Promise<MpPreapproval> {
-  const amount = membershipAmount();
+  const amount = await membershipAmount();
   const backUrl = `${publicBaseUrl()}/membresia?status=ok`;
   const payerEmail = resolvePayerEmail(opts.payerEmail);
   await assertPayerNotCollector(payerEmail);

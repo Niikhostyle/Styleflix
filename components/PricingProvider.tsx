@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   DEFAULT_MEMBERSHIP_PRICE_CLP,
   DEFAULT_RESELLER_PRICE_CLP,
@@ -15,17 +21,16 @@ const FALLBACK: Pricing = {
 
 type PricingState = {
   pricing: Pricing;
-  /** true cuando el valor viene del servidor (layout o /api/pricing), no del fallback. */
+  /** true cuando el valor viene del servidor (layout o /api/pricing). */
   ready: boolean;
+  refreshPricing: () => Promise<void>;
 };
 
 const PricingContext = createContext<PricingState>({
   pricing: FALLBACK,
   ready: false,
+  refreshPricing: async () => {},
 });
-
-/** Precio confirmado contra el servidor en esta sesión de navegador. */
-let runtimePricing: Pricing | null = null;
 
 function isValidPricing(data: unknown): data is Pricing {
   if (!data || typeof data !== "object") return false;
@@ -48,51 +53,40 @@ export default function PricingProvider({
   children: React.ReactNode;
 }) {
   const hasServerValue = isValidPricing(value);
-  const [state, setState] = useState<PricingState>(() => {
-    if (runtimePricing) {
-      return { pricing: runtimePricing, ready: true };
-    }
-    if (hasServerValue) {
-      return { pricing: value, ready: true };
-    }
-    return { pricing: FALLBACK, ready: false };
-  });
+  const [pricing, setPricing] = useState<Pricing>(
+    hasServerValue ? value : FALLBACK
+  );
+  const [ready, setReady] = useState(hasServerValue);
 
-  const serverMembership = value?.membershipPriceClp;
-  const serverReseller = value?.resellerPriceClp;
-
-  useEffect(() => {
-    if (!hasServerValue || serverMembership == null || serverReseller == null) {
-      return;
-    }
-    const next = {
-      membershipPriceClp: serverMembership,
-      resellerPriceClp: serverReseller,
-    };
-    runtimePricing = next;
-    setState({ pricing: next, ready: true });
-  }, [hasServerValue, serverMembership, serverReseller]);
-
-  // Siempre revalidamos contra /api/pricing: el layout puede haber sido
-  // generado con un valor viejo; Coolify cambia MEMBERSHIP_PRICE_CLP en runtime.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/pricing", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: unknown) => {
-        if (cancelled || !isValidPricing(data)) return;
-        runtimePricing = data;
-        setState({ pricing: data, ready: true });
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
+  const applyPricing = useCallback((data: Pricing) => {
+    setPricing(data);
+    setReady(true);
   }, []);
 
+  const refreshPricing = useCallback(async () => {
+    try {
+      const res = await fetch("/api/pricing", { cache: "no-store" });
+      if (!res.ok) return;
+      const data: unknown = await res.json();
+      if (isValidPricing(data)) applyPricing(data);
+    } catch {
+      /* keep current */
+    }
+  }, [applyPricing]);
+
+  useEffect(() => {
+    if (!hasServerValue || !value) return;
+    applyPricing(value);
+  }, [hasServerValue, value, applyPricing]);
+
+  useEffect(() => {
+    void refreshPricing();
+  }, [refreshPricing]);
+
   return (
-    <PricingContext.Provider value={state}>{children}</PricingContext.Provider>
+    <PricingContext.Provider value={{ pricing, ready, refreshPricing }}>
+      {children}
+    </PricingContext.Provider>
   );
 }
 
@@ -100,9 +94,12 @@ export function usePricing(): Pricing {
   return useContext(PricingContext).pricing;
 }
 
-/** true cuando el precio ya viene del servidor (seguro para cobrar). */
 export function usePricingReady(): boolean {
   return useContext(PricingContext).ready;
+}
+
+export function useRefreshPricing(): () => Promise<void> {
+  return useContext(PricingContext).refreshPricing;
 }
 
 export function useMembershipPrice(): { clp: number; label: string } {

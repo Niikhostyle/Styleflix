@@ -82,7 +82,7 @@ export async function POST(request: Request) {
           payment: {
             externalId: preapproval.id,
             status: "subscription_authorized",
-            amount: membershipAmount(),
+            amount: await membershipAmount(),
             rawPayload: preapproval as object,
           },
         });
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
           payment: {
             externalId: String(payment.id),
             status: "approved",
-            amount: payment.transaction_amount ?? membershipAmount(),
+            amount: payment.transaction_amount ?? (await membershipAmount()),
             rawPayload: payment as object,
           },
         });
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
           data: {
             userId,
             externalId: String(payment.id),
-            amount: payment.transaction_amount ?? membershipAmount(),
+            amount: payment.transaction_amount ?? (await membershipAmount()),
             currency: "CLP",
             status: payment.status,
             rawPayload: payment as object,

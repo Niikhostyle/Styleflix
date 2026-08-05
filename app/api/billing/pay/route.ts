@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     const payerEmail = resolvePayerEmail(user.email);
     await assertPayerNotCollector(payerEmail);
 
-    const amount = membershipAmount();
+    const amount = await membershipAmount();
     const payerIn = (formData.payer || {}) as Record<string, unknown>;
 
     const payment = await createPayment({

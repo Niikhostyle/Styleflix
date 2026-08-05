@@ -1,12 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { subscriptionLabel } from "@/lib/access";
-import { useMembershipPrice } from "@/components/PricingProvider";
+import { useMembershipPrice, useRefreshPricing } from "@/components/PricingProvider";
 import { Check, ShieldCheck, Sparkles } from "lucide-react";
 
 const MembershipCardCheckout = dynamic(
@@ -36,6 +36,7 @@ export default function MembershipClient({
 }: Props) {
   const router = useRouter();
   const { update } = useSession();
+  const refreshPricing = useRefreshPricing();
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -43,6 +44,10 @@ export default function MembershipClient({
   const [message, setMessage] = useState(flash || "");
 
   const { label: price } = useMembershipPrice();
+
+  useEffect(() => {
+    void refreshPricing();
+  }, [refreshPricing]);
   const ends = currentPeriodEnd
     ? new Date(currentPeriodEnd).toLocaleDateString("es-CL", {
         day: "2-digit",

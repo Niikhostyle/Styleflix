@@ -1,11 +1,10 @@
 /**
- * Precios de membresía.
+ * Precios de membresía (tipos y helpers sync).
  *
- * Fuente de verdad: MEMBERSHIP_PRICE_CLP / RESELLER_PRICE_CLP (Coolify / .env).
- * Son variables de servidor: no existen en el bundle del navegador. Se leen en
- * cada request y se envían al cliente vía PricingProvider / /api/pricing.
+ * Resolución efectiva en servidor (async): ver lib/settings.ts
+ *   AppSetting (panel admin) → env MEMBERSHIP_PRICE_CLP / RESELLER_PRICE_CLP → defaults
  *
- * Los DEFAULT solo aplican si la variable falta o es inválida.
+ * El cliente no lee env: recibe el precio vía PricingProvider / /api/pricing.
  */
 
 export const DEFAULT_MEMBERSHIP_PRICE_CLP = 4990;
@@ -16,31 +15,25 @@ export type Pricing = {
   resellerPriceClp: number;
 };
 
-function parsePriceClp(raw: string | undefined, fallback: number): number {
+export function parsePriceClp(raw: string | undefined, fallback: number): number {
   const value = Number((raw ?? "").trim());
   if (!Number.isFinite(value) || value <= 0) return fallback;
   return Math.round(value);
 }
 
-export function getMembershipPriceClp(): number {
+/** Solo env (sin DB). Usado como fallback desde settings. */
+export function envMembershipPriceClp(): number {
   return parsePriceClp(
     process.env.MEMBERSHIP_PRICE_CLP,
     DEFAULT_MEMBERSHIP_PRICE_CLP
   );
 }
 
-export function getResellerPriceClp(): number {
+export function envResellerPriceClp(): number {
   return parsePriceClp(
     process.env.RESELLER_PRICE_CLP,
     DEFAULT_RESELLER_PRICE_CLP
   );
-}
-
-export function getPricing(): Pricing {
-  return {
-    membershipPriceClp: getMembershipPriceClp(),
-    resellerPriceClp: getResellerPriceClp(),
-  };
 }
 
 export function formatClp(amount: number): string {
