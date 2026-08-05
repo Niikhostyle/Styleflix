@@ -26,12 +26,38 @@ const fieldStyle = {
 const fieldWrap =
   "mp-field w-full rounded-lg border border-white/10 bg-black/50 px-3";
 
+/** Normaliza RUT chileno para MP (sin puntos; con guión si falta). */
+function normalizeRut(raw: string): string {
+  const cleaned = raw.trim().replace(/\./g, "").replace(/\s/g, "").toUpperCase();
+  if (!cleaned) return "";
+  if (cleaned.includes("-")) return cleaned;
+  if (cleaned.length < 2) return cleaned;
+  return `${cleaned.slice(0, -1)}-${cleaned.slice(-1)}`;
+}
+
+function tokenErrorMessage(err: unknown): string {
+  if (!err) return "No se pudo tokenizar la tarjeta.";
+  if (typeof err === "string") return err;
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "object") {
+    const o = err as {
+      message?: string;
+      cause?: Array<{ description?: string; message?: string }>;
+    };
+    if (o.cause?.[0]?.description) return o.cause[0].description;
+    if (o.cause?.[0]?.message) return o.cause[0].message;
+    if (o.message) return o.message;
+  }
+  return "No se pudo tokenizar la tarjeta. Verifica número, vencimiento, CVV y RUT.";
+}
+
 export default function MembershipCardCheckout({
   onPaid,
   onError,
   onBusy,
 }: Props) {
   const [ready, setReady] = useState(false);
+  const [fieldsReady, setFieldsReady] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [cardholderName, setCardholderName] = useState("");
   const [docNumber, setDocNumber] = useState("");
@@ -62,6 +88,12 @@ export default function MembershipCardCheckout({
       return;
     }
 
+    const rut = normalizeRut(docNumber);
+    if (rut.replace("-", "").length < 8) {
+      onError("RUT incompleto. Ejemplo válido: 12345678-5");
+      return;
+    }
+
     setSubmitting(true);
     onBusy?.(true);
     onError("");
@@ -70,12 +102,12 @@ export default function MembershipCardCheckout({
       const token = await createCardToken({
         cardholderName: cardholderName.trim(),
         identificationType: "RUT",
-        identificationNumber: docNumber.trim(),
+        identificationNumber: rut,
       });
 
       if (!token?.id) {
         onError(
-          "No se pudo validar la tarjeta. Revisa número, vencimiento y CVV."
+          "No se pudo validar la tarjeta. Revisa número, vencimiento y CVV (usa solo tarjetas de prueba de MP Chile)."
         );
         return;
       }
@@ -97,14 +129,15 @@ export default function MembershipCardCheckout({
       });
     } catch (err) {
       console.error("[checkout]", err);
-      onError(
-        "No se pudo tokenizar la tarjeta. Verifica los datos e intenta de nuevo."
-      );
+      onError(tokenErrorMessage(err));
     } finally {
       setSubmitting(false);
       onBusy?.(false);
     }
   }
+
+  const markFieldReady = () =>
+    setFieldsReady((n) => Math.min(3, n + 1));
 
   return (
     <form
@@ -121,6 +154,15 @@ export default function MembershipCardCheckout({
         </p>
       </div>
 
+      <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-neutral-400">
+        Prueba Chile: Mastercard{" "}
+        <span className="text-neutral-200">5416 7526 0258 2580</span> · CVV{" "}
+        <span className="text-neutral-200">123</span> ·{" "}
+        <span className="text-neutral-200">11/30</span> · titular{" "}
+        <span className="text-neutral-200">APRO</span> · RUT{" "}
+        <span className="text-neutral-200">12345678-5</span>
+      </div>
+
       {!ready ? (
         <p className="text-sm text-neutral-400">Cargando formulario…</p>
       ) : (
@@ -131,8 +173,9 @@ export default function MembershipCardCheckout({
             </label>
             <div className={fieldWrap}>
               <CardNumber
-                placeholder="1234 1234 1234 1234"
+                placeholder="5416 7526 0258 2580"
                 style={fieldStyle}
+                onReady={markFieldReady}
               />
             </div>
           </div>
@@ -143,7 +186,12 @@ export default function MembershipCardCheckout({
                 Vencimiento
               </label>
               <div className={fieldWrap}>
-                <ExpirationDate placeholder="MM/AA" style={fieldStyle} />
+                <ExpirationDate
+                  placeholder="MM/AA"
+                  mode="short"
+                  style={fieldStyle}
+                  onReady={markFieldReady}
+                />
               </div>
             </div>
             <div>
@@ -155,6 +203,7 @@ export default function MembershipCardCheckout({
                   placeholder="123"
                   mode="mandatory"
                   style={fieldStyle}
+                  onReady={markFieldReady}
                 />
               </div>
             </div>
@@ -167,7 +216,7 @@ export default function MembershipCardCheckout({
             <input
               value={cardholderName}
               onChange={(e) => setCardholderName(e.target.value)}
-              placeholder="Como aparece en la tarjeta"
+              placeholder="APRO"
               autoComplete="cc-name"
               className="h-[46px] w-full rounded-lg border border-white/10 bg-black/50 px-3 text-white outline-none ring-[#E50914] placeholder:text-neutral-500 focus:ring-2"
             />
@@ -185,12 +234,14 @@ export default function MembershipCardCheckout({
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || fieldsReady < 3}
             className="w-full rounded-lg bg-[#E50914] py-3 text-base font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
           >
             {submitting
               ? "Procesando…"
-              : `Pagar $${MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL")}`}
+              : fieldsReady < 3
+                ? "Cargando campos seguros…"
+                : `Pagar $${MEMBERSHIP_PRICE_CLP.toLocaleString("es-CL")}`}
           </button>
 
           <p className="text-center text-xs text-neutral-500">

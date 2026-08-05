@@ -143,8 +143,15 @@ export async function POST(request: Request) {
 /** Traduce los errores más comunes de Mercado Pago. */
 function friendlyMpError(raw: string): string {
   if (!raw) return "No se pudo iniciar el pago.";
+  if (
+    raw.includes("same user") ||
+    raw.includes("Payer and collector") ||
+    raw.includes("del Vendedor")
+  ) {
+    return "El pagador de prueba es el mismo que el cobrador (Vendedor). En Coolify cambia MERCADOPAGO_TEST_PAYER_USER al TESTUSER del Comprador (Cuentas de prueba → Comprador), no el de «Datos de las credenciales».";
+  }
   if (raw.includes("cardholder.document")) {
-    return "El RUT no es válido. Escríbelo con dígito verificador, por ejemplo 12345678-5.";
+    return "El RUT no es válido. Usa uno con dígito verificador, por ejemplo 12345678-5 (no 123456789).";
   }
   if (raw.includes("without cvv validation")) {
     return "Falta el código de seguridad (CVV) de la tarjeta. Complétalo e intenta de nuevo.";

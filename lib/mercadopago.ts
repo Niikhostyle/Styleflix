@@ -111,6 +111,34 @@ export function resolvePayerEmail(accountEmail: string): string {
   return accountEmail.toLowerCase().trim();
 }
 
+/**
+ * Evita el 400 "Payer and collector cannot be the same user".
+ * El Access Token es del Vendedor; el pagador de prueba debe ser el Comprador.
+ */
+export async function assertPayerNotCollector(payerEmail: string) {
+  const me = await mpFetch<{
+    id: number;
+    email?: string;
+    nickname?: string;
+  }>("/users/me");
+
+  const payer = payerEmail.toLowerCase().trim();
+  const collectorEmail = (me.email || "").toLowerCase().trim();
+  const collectorNick = (me.nickname || "").toUpperCase().trim();
+  const payerAsUser = process.env.MERCADOPAGO_TEST_PAYER_USER?.trim().toUpperCase();
+
+  if (
+    (collectorEmail && collectorEmail === payer) ||
+    (collectorNick && payerAsUser && collectorNick === payerAsUser) ||
+    (collectorNick &&
+      payer === testUserToEmail(collectorNick).toLowerCase())
+  ) {
+    throw new Error(
+      "Payer and collector cannot be the same user: MERCADOPAGO_TEST_PAYER_USER/EMAIL está usando el Vendedor. En Coolify pon el TESTUSER del Comprador (Cuentas de prueba → filtro Comprador), no el de las credenciales del Vendedor."
+    );
+  }
+}
+
 async function mpFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${MP_API}${path}`, {
     ...init,
@@ -149,6 +177,7 @@ export async function createMembershipPreapproval(opts: {
   const amount = membershipAmount();
   const backUrl = `${publicBaseUrl()}/membresia?status=ok`;
   const payerEmail = resolvePayerEmail(opts.payerEmail);
+  await assertPayerNotCollector(payerEmail);
 
   return mpFetch<MpPreapproval>("/preapproval", {
     method: "POST",
@@ -180,6 +209,7 @@ export async function createAuthorizedMembershipPreapproval(opts: {
   const amount = membershipAmount();
   const backUrl = `${publicBaseUrl()}/membresia?status=ok`;
   const payerEmail = resolvePayerEmail(opts.payerEmail);
+  await assertPayerNotCollector(payerEmail);
 
   return mpFetch<MpPreapproval>("/preapproval", {
     method: "POST",
