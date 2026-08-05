@@ -135,14 +135,25 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("[billing/subscribe]", err);
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "No se pudo iniciar el pago.",
-      },
-      { status: 500 }
-    );
+    const raw = err instanceof Error ? err.message : "";
+    return NextResponse.json({ error: friendlyMpError(raw) }, { status: 500 });
   }
+}
+
+/** Traduce los errores más comunes de Mercado Pago. */
+function friendlyMpError(raw: string): string {
+  if (!raw) return "No se pudo iniciar el pago.";
+  if (raw.includes("cardholder.document")) {
+    return "El RUT no es válido. Escríbelo con dígito verificador, por ejemplo 12345678-5.";
+  }
+  if (raw.includes("without cvv validation")) {
+    return "Falta el código de seguridad (CVV) de la tarjeta. Complétalo e intenta de nuevo.";
+  }
+  if (raw.includes("real or test users")) {
+    return "El pagador y el cobrador deben ser ambos de prueba o ambos reales. Revisa MERCADOPAGO_MODE y las credenciales.";
+  }
+  if (raw.includes("Invalid card_token_id") || raw.includes("card_token")) {
+    return "La tarjeta no se pudo validar. Verifica los datos e intenta nuevamente.";
+  }
+  return raw;
 }
