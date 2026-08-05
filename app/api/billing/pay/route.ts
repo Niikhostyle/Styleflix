@@ -21,6 +21,35 @@ type MpPayment = {
   external_reference?: string;
 };
 
+function friendlyStatusDetail(detail: string | undefined): string {
+  switch ((detail || "").toLowerCase()) {
+    case "cc_rejected_high_risk":
+      return "Mercado Pago rechazó el pago por seguridad (alto riesgo). Espera unos minutos, usa otra tarjeta o paga con la redirección a Mercado Pago. No reintentes enseguida con los mismos datos.";
+    case "cc_rejected_insufficient_amount":
+      return "Fondos insuficientes en la tarjeta.";
+    case "cc_rejected_bad_filled_security_code":
+      return "El código de seguridad (CVV) es incorrecto.";
+    case "cc_rejected_bad_filled_date":
+      return "La fecha de vencimiento es incorrecta.";
+    case "cc_rejected_bad_filled_other":
+      return "Revisa los datos de la tarjeta e intenta de nuevo.";
+    case "cc_rejected_call_for_authorize":
+      return "Debes autorizar el pago con tu banco e intentar de nuevo.";
+    case "cc_rejected_duplicated_payment":
+      return "Pago duplicado. Revisa si el cobro ya se hizo antes de reintentar.";
+    case "cc_rejected_blacklist":
+      return "La tarjeta no puede usarse en este comercio. Prueba otro medio de pago.";
+    case "cc_rejected_other_reason":
+      return "El banco rechazó el pago. Prueba otra tarjeta o contacta a tu banco.";
+    case "cc_rejected_max_attempts":
+      return "Demasiados intentos con esta tarjeta. Espera o usa otra.";
+    default:
+      return detail
+        ? `Pago rechazado (${detail}). Prueba otra tarjeta o el pago por redirección.`
+        : "Pago rechazado. Prueba otra tarjeta o el pago por redirección.";
+  }
+}
+
 async function createPayment(body: Record<string, unknown>): Promise<MpPayment> {
   const token = normalizeMpAccessToken(process.env.MERCADOPAGO_ACCESS_TOKEN);
   if (!token) throw new Error("Falta MERCADOPAGO_ACCESS_TOKEN");
@@ -119,19 +148,43 @@ export async function POST(request: Request) {
 
     const amount = await membershipAmount();
     const payerIn = (formData.payer || {}) as Record<string, unknown>;
+    const nameParts = (user.name || "").trim().split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] || undefined;
+    const lastName =
+      nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined;
 
     const payment = await createPayment({
       transaction_amount: amount,
       token,
-      description: "VeoTV Mensual",
+      description: "VeoTV Mensual — acceso 30 días",
+      statement_descriptor: "VEOTV",
       installments: Number(formData.installments) || 1,
       payment_method_id: formData.payment_method_id,
       issuer_id: formData.issuer_id,
       external_reference: user.id,
       binary_mode: true,
+      capture: true,
       payer: {
         email: payerEmail,
+        first_name: firstName,
+        last_name: lastName,
         identification: payerIn.identification,
+      },
+      additional_info: {
+        items: [
+          {
+            id: "veotv-mensual",
+            title: "VeoTV Mensual",
+            description: "Membresía streaming VeoTV 30 días",
+            category_id: "services",
+            quantity: 1,
+            unit_price: amount,
+          },
+        ],
+        payer: {
+          first_name: firstName,
+          last_name: lastName,
+        },
       },
       metadata: {
         user_id: user.id,
@@ -173,11 +226,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: `Pago ${payment.status || "rechazado"}: ${
-          payment.status_detail || "intenta con otra tarjeta de prueba (titular APRO)."
-        }`,
+        error: friendlyStatusDetail(payment.status_detail),
         paymentId: payment.id,
         status: payment.status,
+        statusDetail: payment.status_detail,
       },
       { status: 402 }
     );
