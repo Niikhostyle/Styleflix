@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { issueAuthToken } from "@/lib/auth-tokens";
+import { isMailConfigured, sendEmailVerification } from "@/lib/mail";
 
 const registerSchema = z.object({
   name: z.string().min(2).max(60),
@@ -33,6 +35,8 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hash(parsed.data.password, 10);
+    const mailReady = isMailConfigured();
+
     const user = await prisma.user.create({
       data: {
         name: parsed.data.name.trim(),
@@ -41,11 +45,51 @@ export async function POST(request: Request) {
         role: "USER",
         subscriptionStatus: "NONE",
         planSource: "DIRECT",
+        emailVerified: mailReady ? null : new Date(),
       },
       select: { id: true, email: true, name: true },
     });
 
-    return NextResponse.json({ ok: true, user }, { status: 201 });
+    if (mailReady) {
+      const { raw } = await issueAuthToken({
+        userId: user.id,
+        type: "EMAIL_VERIFY",
+        ttlHours: 24,
+      });
+      const mail = await sendEmailVerification({
+        to: user.email,
+        name: user.name,
+        token: raw,
+      });
+      if (!mail.ok) {
+        await prisma.user.delete({ where: { id: user.id } }).catch(() => null);
+        return NextResponse.json(
+          {
+            error:
+              "No se pudo enviar el correo de confirmación. Intenta de nuevo en unos minutos.",
+          },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json(
+        {
+          ok: true,
+          needsVerification: true,
+          message:
+            "Te enviamos un correo para confirmar tu cuenta. Revisa tu bandeja y spam.",
+        },
+        { status: 201 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        needsVerification: false,
+        message: "Cuenta creada. Ya puedes iniciar sesión.",
+      },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("[register]", err);
     return NextResponse.json(

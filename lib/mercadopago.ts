@@ -115,7 +115,7 @@ async function mpFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-/** Crea suscripción mensual y devuelve URL de checkout. */
+/** Crea suscripción mensual pendiente (checkout redirect legacy). */
 export async function createMembershipPreapproval(opts: {
   userId: string;
   payerEmail: string;
@@ -138,6 +138,38 @@ export async function createMembershipPreapproval(opts: {
       },
       back_url: backUrl,
       status: "pending",
+    }),
+  });
+}
+
+/**
+ * Checkout API: suscripción autorizada en el sitio (sin redirección).
+ * Requiere card_token_id generado con la Public Key (CardPayment / CardForm).
+ */
+export async function createAuthorizedMembershipPreapproval(opts: {
+  userId: string;
+  payerEmail: string;
+  cardTokenId: string;
+}): Promise<MpPreapproval> {
+  const amount = membershipAmount();
+  const backUrl = `${publicBaseUrl()}/membresia?status=ok`;
+  const payerEmail = resolvePayerEmail(opts.payerEmail);
+
+  return mpFetch<MpPreapproval>("/preapproval", {
+    method: "POST",
+    body: JSON.stringify({
+      reason: "VeoTV Mensual",
+      external_reference: opts.userId,
+      payer_email: payerEmail,
+      card_token_id: opts.cardTokenId,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: amount,
+        currency_id: "CLP",
+      },
+      back_url: backUrl,
+      status: "authorized",
     }),
   });
 }

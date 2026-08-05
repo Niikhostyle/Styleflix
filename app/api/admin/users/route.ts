@@ -93,6 +93,7 @@ export async function POST(request: Request) {
         email,
         passwordHash,
         role: parsed.data.role,
+        emailVerified: now,
         ...membershipData,
       },
       select: {

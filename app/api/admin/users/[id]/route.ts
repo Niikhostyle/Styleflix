@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hash } from "bcryptjs";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,7 @@ import {
   markSubscriptionStatus,
 } from "@/lib/membership";
 import { cancelPreapproval } from "@/lib/mercadopago";
+import { sendPasswordChangedNotice } from "@/lib/mail";
 
 const patchSchema = z.object({
   action: z.enum([
@@ -16,8 +18,11 @@ const patchSchema = z.object({
     "revoke",
     "cancel_mp",
     "grant_prepaid",
+    "set_password",
+    "mark_email_verified",
   ]),
   days: z.number().int().min(1).max(365).optional(),
+  password: z.string().min(6).max(72).optional(),
 });
 
 async function requireAdmin() {
@@ -49,6 +54,7 @@ export async function GET(
       cancelledAt: true,
       planSource: true,
       prepaidDays: true,
+      emailVerified: true,
       createdAt: true,
       updatedAt: true,
       payments: {
@@ -95,9 +101,39 @@ export async function PATCH(
     return NextResponse.json({ error: "Acción inválida." }, { status: 400 });
   }
 
-  const { action, days } = parsed.data;
+  const { action, days, password } = parsed.data;
 
   try {
+    if (action === "set_password") {
+      if (!password) {
+        return NextResponse.json(
+          { error: "Indica la nueva contraseña (mín. 6)." },
+          { status: 400 }
+        );
+      }
+      const passwordHash = await hash(password, 10);
+      const updated = await prisma.user.update({
+        where: { id },
+        data: {
+          passwordHash,
+          emailVerified: user.emailVerified ?? new Date(),
+        },
+      });
+      void sendPasswordChangedNotice({
+        to: updated.email,
+        name: updated.name,
+      }).catch(() => null);
+      return NextResponse.json({ ok: true, user: updated });
+    }
+
+    if (action === "mark_email_verified") {
+      const updated = await prisma.user.update({
+        where: { id },
+        data: { emailVerified: new Date() },
+      });
+      return NextResponse.json({ ok: true, user: updated });
+    }
+
     if (action === "activate_manual") {
       const grantDays = days ?? 30;
       const now = new Date();

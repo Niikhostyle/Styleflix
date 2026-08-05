@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { z } from "zod";
@@ -7,6 +7,10 @@ import type { Role, SubscriptionStatus } from "@/lib/access";
 import { hasActiveMembership } from "@/lib/access";
 import { resolveAuthSecret } from "@/lib/auth-secret";
 import { activatePrepaidOnFirstUse } from "@/lib/membership";
+
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = "email_not_verified";
+}
 
 declare module "next-auth" {
   interface User {
@@ -96,7 +100,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
 
-        // Revendedor: primer login activa los días prepagados
+        if (!user.emailVerified) {
+          const pending = await prisma.authToken.findFirst({
+            where: {
+              userId: user.id,
+              type: "EMAIL_VERIFY",
+              usedAt: null,
+              expiresAt: { gt: new Date() },
+            },
+            select: { id: true },
+          });
+          if (pending) {
+            throw new EmailNotVerifiedError();
+          }
+        }
+
         if (user.subscriptionStatus === "PREPAID") {
           const activated = await activatePrepaidOnFirstUse(user.id);
           if (activated) user = activated;

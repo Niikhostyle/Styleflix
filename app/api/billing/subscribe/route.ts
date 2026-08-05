@@ -1,21 +1,35 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import {
   checkoutUrl,
+  createAuthorizedMembershipPreapproval,
   createMembershipPreapproval,
 } from "@/lib/mercadopago";
-import { markSubscriptionStatus } from "@/lib/membership";
+import {
+  activateMembership,
+  markSubscriptionStatus,
+} from "@/lib/membership";
 
-export async function POST() {
+const bodySchema = z.object({
+  cardTokenId: z.string().min(8).optional(),
+  /** Si true y no hay token, usa redirect legacy a MP */
+  redirect: z.boolean().optional(),
+});
+
+export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
   if (session.user.role === "SUPER_ADMIN") {
-    return NextResponse.json({ error: "El admin no necesita pagar." }, { status: 400 });
+    return NextResponse.json(
+      { error: "El admin no necesita pagar." },
+      { status: 400 }
+    );
   }
 
   if (
@@ -25,7 +39,10 @@ export async function POST() {
       currentPeriodEnd: session.user.currentPeriodEnd,
     })
   ) {
-    return NextResponse.json({ error: "Ya tienes membresía activa." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Ya tienes membresía activa." },
+      { status: 400 }
+    );
   }
 
   if (!process.env.MERCADOPAGO_ACCESS_TOKEN?.trim()) {
@@ -35,14 +52,65 @@ export async function POST() {
     );
   }
 
+  const raw = await request.json().catch(() => ({}));
+  const parsed = bodySchema.safeParse(raw);
+  const cardTokenId = parsed.success ? parsed.data.cardTokenId : undefined;
+  const forceRedirect = parsed.success && parsed.data.redirect === true;
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
     });
     if (!user) {
-      return NextResponse.json({ error: "Usuario no encontrado." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Usuario no encontrado." },
+        { status: 404 }
+      );
     }
 
+    // Checkout API (en sitio): token de tarjeta → suscripción authorized
+    if (cardTokenId && !forceRedirect) {
+      const preapproval = await createAuthorizedMembershipPreapproval({
+        userId: user.id,
+        payerEmail: user.email,
+        cardTokenId,
+      });
+
+      const status = (preapproval.status || "").toLowerCase();
+      if (status === "authorized" || status === "active") {
+        await activateMembership({
+          userId: user.id,
+          months: 1,
+          mpPreapprovalId: preapproval.id,
+          payment: {
+            externalId: preapproval.id,
+            status: "subscription_authorized",
+            rawPayload: preapproval as object,
+          },
+        });
+        return NextResponse.json({
+          ok: true,
+          activated: true,
+          preapprovalId: preapproval.id,
+          status: preapproval.status,
+        });
+      }
+
+      await markSubscriptionStatus(user.id, "PENDING", {
+        mpPreapprovalId: preapproval.id,
+      });
+      return NextResponse.json({
+        ok: true,
+        activated: false,
+        pending: true,
+        preapprovalId: preapproval.id,
+        status: preapproval.status,
+        message:
+          "Pago en revisión. En unos segundos pulsa «Actualizar estado».",
+      });
+    }
+
+    // Fallback: redirect a checkout de Mercado Pago
     const preapproval = await createMembershipPreapproval({
       userId: user.id,
       payerEmail: user.email,

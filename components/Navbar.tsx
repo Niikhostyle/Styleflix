@@ -323,6 +323,14 @@ export default function Navbar() {
                       Membresía
                     </Link>
                   )}
+                  <Link
+                    href="/cuenta"
+                    data-tv-focus
+                    className="block px-3 py-2 text-sm hover:bg-white/5"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Mi cuenta
+                  </Link>
                   {session.user.role === "SUPER_ADMIN" && (
                     <Link
                       href="/admin"
@@ -330,7 +338,7 @@ export default function Navbar() {
                       className="block px-3 py-2 text-sm hover:bg-white/5"
                       onClick={() => setMenuOpen(false)}
                     >
-                      Gestionar usuarios
+                      Panel admin
                     </Link>
                   )}
                   <button

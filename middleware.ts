@@ -5,6 +5,9 @@ import { getToken } from "next-auth/jwt";
 function isPublicPath(pathname: string) {
   if (pathname === "/login") return true;
   if (pathname === "/registro") return true;
+  if (pathname === "/recuperar") return true;
+  if (pathname === "/restablecer-clave") return true;
+  if (pathname === "/verificar-email") return true;
   if (pathname === "/descargar") return true;
   if (pathname.startsWith("/downloads/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
@@ -67,7 +70,10 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath(pathname)) {
     if (
-      (pathname === "/login" || pathname === "/registro") &&
+      (pathname === "/login" ||
+        pathname === "/registro" ||
+        pathname === "/recuperar" ||
+        pathname === "/restablecer-clave") &&
       loggedIn
     ) {
       const callback = request.nextUrl.searchParams.get("callbackUrl");

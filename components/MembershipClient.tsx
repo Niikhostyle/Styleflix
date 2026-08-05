@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -8,6 +9,16 @@ import {
   MEMBERSHIP_PRICE_CLP,
   subscriptionLabel,
 } from "@/lib/access";
+
+const MembershipCardCheckout = dynamic(
+  () => import("@/components/MembershipCardCheckout"),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-neutral-400">Cargando checkout…</p>
+    ),
+  }
+);
 
 type Props = {
   status: string;
@@ -28,6 +39,7 @@ export default function MembershipClient({
   const { update } = useSession();
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState(flash || "");
 
@@ -39,13 +51,20 @@ export default function MembershipClient({
         year: "numeric",
       })
     : null;
+  const hasPublicKey = Boolean(
+    process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim()
+  );
 
-  async function startCheckout() {
+  async function startRedirectCheckout() {
     setError("");
     setMessage("");
     setLoading(true);
     try {
-      const res = await fetch("/api/billing/subscribe", { method: "POST" });
+      const res = await fetch("/api/billing/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ redirect: true }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "No se pudo iniciar el pago.");
@@ -57,15 +76,19 @@ export default function MembershipClient({
         return;
       }
       setError("No se recibió el enlace de Mercado Pago.");
-      setLoading(false);
     } catch {
       setError("Error de red al contactar Mercado Pago.");
+    } finally {
       setLoading(false);
     }
   }
 
   async function cancelSub() {
-    if (!confirm("¿Cancelar la renovación automática? Seguirás con acceso hasta el fin del periodo.")) {
+    if (
+      !confirm(
+        "¿Cancelar la renovación automática? Seguirás con acceso hasta el fin del periodo."
+      )
+    ) {
       return;
     }
     setCancelling(true);
@@ -121,11 +144,11 @@ export default function MembershipClient({
       </p>
       <h1 className="mt-3 text-3xl font-black">Membresía mensual</h1>
       <p className="mt-3 text-neutral-300">
-        Acceso completo a películas, series y animes. Cobro automático cada mes
-        con Mercado Pago.
+        Acceso completo a películas, series y animes. Cobro automático cada mes.
+        Pagas en VeoTV con la seguridad de Mercado Pago (sin salir del sitio).
       </p>
 
-      <div className="mt-8 border border-white/15 bg-black/40 p-6">
+      <div className="mt-8 rounded-2xl border border-white/15 bg-gradient-to-br from-white/[0.07] to-transparent p-6">
         <p className="text-sm uppercase tracking-wider text-neutral-400">
           Plan
         </p>
@@ -148,24 +171,20 @@ export default function MembershipClient({
       </div>
 
       {message && (
-        <p className="mt-4 rounded bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">
+        <p className="mt-4 rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">
           {message}
         </p>
       )}
       {error && (
-        <div className="mt-4 rounded bg-red-500/15 px-3 py-2 text-sm text-red-300">
+        <div className="mt-4 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">
           <p>{error}</p>
           {(error.includes("real or test") ||
             error.includes("TEST_PAYER") ||
             error.includes("Modo test")) && (
             <p className="mt-2 text-red-200/90">
-              En modo prueba el cobrador y el pagador deben ser cuentas TEST. En
-              Coolify: token{" "}
-              <code className="text-xs">APP_USR-…</code> (no APP_USER),{" "}
-              <code className="text-xs">MERCADOPAGO_MODE=test</code> y{" "}
+              En modo prueba usa tarjeta de test de MP y{" "}
               <code className="text-xs">MERCADOPAGO_TEST_PAYER_EMAIL</code> del
-              comprador de prueba. En el checkout de MP inicia sesión con ese
-              comprador.
+              comprador de prueba.
             </p>
           )}
         </div>
@@ -173,18 +192,63 @@ export default function MembershipClient({
 
       <div className="mt-6 flex flex-col gap-3">
         {!membershipActive && (
-          <button
-            type="button"
-            onClick={() => void startCheckout()}
-            disabled={loading}
-            className="rounded bg-[#E50914] py-3 text-base font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
-          >
-            {loading
-              ? "Redirigiendo a Mercado Pago…"
-              : status === "PENDING"
-                ? "Continuar pago en Mercado Pago"
-                : "Activar con Mercado Pago"}
-          </button>
+          <>
+            {hasPublicKey ? (
+              <>
+                {!showCheckout ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCheckout(true);
+                      setError("");
+                    }}
+                    className="rounded-lg bg-[#E50914] py-3 text-base font-bold transition hover:bg-[#f6121d]"
+                  >
+                    Activar membresía
+                  </button>
+                ) : (
+                  <MembershipCardCheckout
+                    onBusy={setLoading}
+                    onError={(msg) => setError(msg)}
+                    onPaid={async ({ activated, message: msg }) => {
+                      if (activated) {
+                        setMessage("¡Membresía activada!");
+                        setShowCheckout(false);
+                        await update();
+                        router.refresh();
+                      } else {
+                        setMessage(
+                          msg ||
+                            "Pago recibido. Pulsa «Actualizar estado» en unos segundos."
+                        );
+                        await update();
+                        router.refresh();
+                      }
+                    }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => void startRedirectCheckout()}
+                  disabled={loading}
+                  className="text-sm text-neutral-400 underline hover:text-neutral-200 disabled:opacity-60"
+                >
+                  Preferir pagar en Mercado Pago (redirección)
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void startRedirectCheckout()}
+                disabled={loading}
+                className="rounded-lg bg-[#E50914] py-3 text-base font-bold transition hover:bg-[#f6121d] disabled:opacity-60"
+              >
+                {loading
+                  ? "Redirigiendo a Mercado Pago…"
+                  : "Activar con Mercado Pago"}
+              </button>
+            )}
+          </>
         )}
 
         {membershipActive && status === "ACTIVE" && (
@@ -192,7 +256,7 @@ export default function MembershipClient({
             type="button"
             onClick={() => void cancelSub()}
             disabled={cancelling}
-            className="rounded border border-white/25 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/5 disabled:opacity-60"
+            className="rounded-lg border border-white/25 py-3 text-sm font-semibold text-neutral-200 transition hover:bg-white/5 disabled:opacity-60"
           >
             {cancelling ? "Cancelando…" : "Cancelar renovación automática"}
           </button>

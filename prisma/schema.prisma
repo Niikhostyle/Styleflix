@@ -12,6 +12,8 @@ model User {
   name         String
   email        String          @unique
   passwordHash String
+  /// null = pendiente de confirmar correo (registro público)
+  emailVerified DateTime?
   /// USER | SUPER_ADMIN
   role         String          @default("USER")
 
@@ -31,6 +33,23 @@ model User {
   updatedAt    DateTime        @updatedAt
   watchHistory WatchProgress[]
   payments     Payment[]
+  authTokens   AuthToken[]
+}
+
+/// Tokens de verificación de email y restablecimiento de contraseña
+model AuthToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// EMAIL_VERIFY | PASSWORD_RESET
+  type      String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
 }
 
 model Payment {
