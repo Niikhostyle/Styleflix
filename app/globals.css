@@ -72,6 +72,25 @@ a {
   transform-origin: center center;
 }
 
+/* Secure Fields de Mercado Pago: el iframe se monta en un div anidado */
+.mp-field {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+}
+
+.mp-field > div {
+  height: 100%;
+  width: 100%;
+}
+
+.mp-field iframe {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border: 0;
+}
+
 /* —— Android TV / control remoto —— */
 html.tv-mode {
   scroll-behavior: smooth;

@@ -19,11 +19,12 @@ type Props = {
 const fieldStyle = {
   color: "#f5f5f5",
   "font-size": "16px",
+  height: "44px",
   "placeholder-color": "#7a7a7a",
 };
 
 const fieldWrap =
-  "h-[46px] w-full rounded-lg border border-white/10 bg-black/50 px-3 [&>iframe]:h-full [&>iframe]:w-full";
+  "mp-field w-full rounded-lg border border-white/10 bg-black/50 px-3";
 
 export default function MembershipCardCheckout({
   onPaid,
