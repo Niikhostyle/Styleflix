@@ -146,11 +146,11 @@ export default function MembershipClient({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="text-center font-[family-name:var(--font-display)] text-3xl font-bold">
+    <div className="mx-auto max-w-6xl px-4 py-10 md:py-14">
+      <h1 className="text-center font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight md:text-5xl">
         Elige tu plan
       </h1>
-      <p className="mt-2 text-center text-sm text-white/55">
+      <p className="mx-auto mt-3 max-w-xl text-center text-base text-white/55">
         La membresía solo se activa cuando Mercado Pago confirma el pago.
       </p>
       {message && (

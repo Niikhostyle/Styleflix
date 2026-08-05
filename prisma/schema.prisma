@@ -125,3 +125,28 @@ model AppSetting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+/// Links propios de reproducción por TMDB ID (prioridad sobre Vimeus/Pluto/etc.)
+model StreamOverride {
+  id        String   @id @default(cuid())
+  /// movie | tv
+  mediaType String
+  tmdbId    Int
+  /// null = título completo / todos los episodios
+  season    Int?
+  episode   Int?
+  /// Nombre visible en admin (opcional)
+  title     String?
+  /// URL de embed o reproductor HTTPS
+  embedUrl  String
+  label     String   @default("VeoTV")
+  enabled   Boolean  @default(true)
+  /// Mayor = más prioridad si hay varios
+  priority  Int      @default(10)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mediaType, tmdbId, enabled])
+  @@index([tmdbId])
+}

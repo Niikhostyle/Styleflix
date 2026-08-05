@@ -25,17 +25,16 @@ export default async function OnboardingPlanesPage({
     <OnboardingShell
       step={2}
       title="Elige tu plan"
-      subtitle="Sin compromisos — Cancela cuando quieras — Cambia de plan en cualquier momento"
+      subtitle="Sin compromisos. Cancela cuando quieras. Cambia de plan en cualquier momento."
       backHref="/onboarding/cuenta"
+      wide
     >
       {failed && (
-        <p className="mb-4 text-center text-sm text-red-300">
+        <p className="mb-6 text-center text-sm text-red-300">
           El pago no se completó. Puedes elegir otro plan e intentarlo de nuevo.
         </p>
       )}
-      <div className="md:-mx-4">
-        <PlanPicker />
-      </div>
+      <PlanPicker />
     </OnboardingShell>
   );
 }

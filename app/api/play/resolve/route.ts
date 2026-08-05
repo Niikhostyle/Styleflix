@@ -8,6 +8,7 @@ import {
 } from "@/lib/vimeus";
 import { findPlutoMatch } from "@/lib/pluto";
 import { findArchiveMatch } from "@/lib/sources/archive";
+import { findCustomStream } from "@/lib/sources/custom";
 import { isSourceEnabled } from "@/lib/sources/types";
 import {
   getBestTrailerKey,
@@ -19,6 +20,7 @@ import {
 /**
  * Resuelve la fuente de reproducción en cascada.
  * Requiere membresía activa. Avisa resolución máxima del plan.
+ * Orden: links propios → Vimeus → Pluto → Archive → tráiler.
  */
 export async function GET(request: Request) {
   const session = await auth();
@@ -84,6 +86,22 @@ export async function GET(request: Request) {
   }
 
   try {
+    const custom = await findCustomStream({
+      mediaType: type,
+      tmdbId: tmdb,
+      season: type === "tv" ? season : undefined,
+      episode: type === "tv" ? episode : undefined,
+    });
+    if (custom?.embedUrl) {
+      return NextResponse.json(
+        withPlanMeta({
+          source: "custom",
+          label: custom.label || "VeoTV",
+          embedUrl: custom.embedUrl,
+        })
+      );
+    }
+
     if (isSourceEnabled("vimeus")) {
       let vimeusOk = await vimeusHasTmdbId(type, tmdb, { anime });
       if (!vimeusOk) {

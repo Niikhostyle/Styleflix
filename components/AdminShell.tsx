@@ -8,11 +8,13 @@ import {
   Users,
   UserCircle,
   ArrowLeft,
+  Link2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const nav = [
   { href: "/admin", label: "Usuarios", icon: Users },
+  { href: "/admin/streams", label: "Links propios", icon: Link2 },
   { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
   { href: "/cuenta", label: "Mi cuenta", icon: UserCircle },
 ];
