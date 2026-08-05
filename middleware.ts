@@ -107,6 +107,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    /*
+     * Excluir webhook/IPN de Mercado Pago del middleware por completo
+     * (ni JWT ni redirects) para que la sonda del panel no falle.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|api/billing/webhook|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

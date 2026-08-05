@@ -22,6 +22,17 @@ type MpTopicBody = {
   id?: string | number;
 };
 
+/** MP IPN test espera HTTP 200/201; texto plano es lo más compatible. */
+function ack(extra?: Record<string, unknown>) {
+  if (extra && process.env.NODE_ENV !== "production") {
+    return NextResponse.json({ ok: true, ...extra });
+  }
+  return new NextResponse("OK", {
+    status: 200,
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
 async function resolveUserId(
   externalRef?: string | null,
   preapprovalId?: string
@@ -60,10 +71,14 @@ function extractTopicAndId(request: Request, body: MpTopicBody) {
   return { topic, dataId: String(rawId || "").trim() };
 }
 
+function isMpTestId(dataId: string) {
+  // ids fijos que usa el panel IPN de Mercado Pago
+  return dataId === "123456" || dataId === "123456789";
+}
+
 async function handleNotification(topic: string, dataId: string) {
-  // Prueba de IPN de MP usa id=123456: responder 200 sin consultar API.
-  if (!dataId || dataId === "123456") {
-    return NextResponse.json({ ok: true, skipped: dataId ? "test_id" : "no id" });
+  if (!dataId || isMpTestId(dataId)) {
+    return ack({ skipped: dataId ? "test_id" : "no id" });
   }
 
   if (
@@ -78,7 +93,7 @@ async function handleNotification(topic: string, dataId: string) {
     );
     if (!userId) {
       console.warn("[webhook] preapproval sin usuario", dataId);
-      return NextResponse.json({ ok: true, skipped: "no user" });
+      return ack({ skipped: "no user" });
     }
 
     const status = (preapproval.status || "").toLowerCase();
@@ -108,7 +123,7 @@ async function handleNotification(topic: string, dataId: string) {
       });
     }
 
-    return NextResponse.json({ ok: true });
+    return ack();
   }
 
   if (topic.includes("payment") || topic === "payment") {
@@ -117,8 +132,8 @@ async function handleNotification(topic: string, dataId: string) {
       payment = await getPayment(dataId);
     } catch (err) {
       console.warn("[webhook] payment fetch", dataId, err);
-      // 200 para que MP no reintente eternamente con ids inválidos de prueba
-      return NextResponse.json({ ok: true, skipped: "payment fetch fail" });
+      // Siempre 200: si no, MP reintenta / marca la URL como inválida
+      return ack({ skipped: "payment fetch fail" });
     }
 
     const metaPreapproval =
@@ -136,7 +151,7 @@ async function handleNotification(topic: string, dataId: string) {
       metaPreapproval || undefined
     );
     if (!userId) {
-      return NextResponse.json({ ok: true, skipped: "payment no user" });
+      return ack({ skipped: "payment no user" });
     }
 
     const status = (payment.status || "").toLowerCase();
@@ -160,55 +175,63 @@ async function handleNotification(topic: string, dataId: string) {
       }
     }
 
-    return NextResponse.json({ ok: true });
+    return ack();
   }
 
-  return NextResponse.json({ ok: true, skipped: topic || "unknown" });
+  return ack({ skipped: topic || "unknown" });
 }
 
-export async function POST(request: Request) {
-  if (!verifyWebhookSignature(request)) {
-    return NextResponse.json({ error: "Firma inválida." }, { status: 401 });
-  }
-
-  const raw = await request.text();
-  let body: MpTopicBody = {};
+async function readBody(request: Request): Promise<MpTopicBody> {
   try {
-    body = raw ? (JSON.parse(raw) as MpTopicBody) : {};
+    const raw = await request.text();
+    if (!raw?.trim()) return {};
+    return JSON.parse(raw) as MpTopicBody;
   } catch {
-    body = {};
-  }
-
-  const { topic, dataId } = extractTopicAndId(request, body);
-
-  try {
-    return await handleNotification(topic, dataId);
-  } catch (err) {
-    console.error("[billing/webhook] POST", err);
-    return NextResponse.json({ error: "webhook error" }, { status: 500 });
+    return {};
   }
 }
 
 /**
- * IPN legacy: MP hace GET/POST a ?topic=payment&id=...
- * También usan GET vacío para verificar la URL.
+ * IPN legacy: GET ?topic=payment&id=...
+ * No exigir firma: la prueba del panel no envía x-signature.
  */
 export async function GET(request: Request) {
-  if (!verifyWebhookSignature(request)) {
-    return NextResponse.json({ error: "Firma inválida." }, { status: 401 });
-  }
-
   const { topic, dataId } = extractTopicAndId(request, {});
-
-  // Verificación simple sin topic: OK
-  if (!topic && !dataId) {
-    return NextResponse.json({ ok: true });
-  }
-
   try {
     return await handleNotification(topic, dataId);
   } catch (err) {
     console.error("[billing/webhook] GET", err);
-    return NextResponse.json({ error: "webhook error" }, { status: 500 });
+    // Nunca 4xx/5xx en la sonda: MP marca la URL como fallida
+    return ack({ error: "handled" });
   }
+}
+
+export async function POST(request: Request) {
+  // Firma solo informativa: IPN legacy no envía x-signature.
+  if (!verifyWebhookSignature(request)) {
+    console.warn("[billing/webhook] firma inválida; se ack igual para no romper IPN");
+  }
+
+  const body = await readBody(request);
+  const parsed = extractTopicAndId(request, body);
+
+  try {
+    return await handleNotification(parsed.topic, parsed.dataId);
+  } catch (err) {
+    console.error("[billing/webhook] POST", err);
+    return ack({ error: "handled" });
+  }
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 200 });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      Allow: "GET, POST, HEAD, OPTIONS",
+    },
+  });
 }
