@@ -9,6 +9,7 @@ import {
 import { useSession } from "next-auth/react";
 import { isBackKey } from "@/lib/tv";
 import type { MediaType } from "@/lib/tmdb";
+import { getOrCreateDeviceId } from "@/lib/device-id";
 import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 
@@ -66,9 +67,15 @@ export default function ModalPlayer({
   const [notice, setNotice] = useState("");
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
+  const [lockConflict, setLockConflict] = useState(false);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const pushedRef = useRef(false);
   const closingRef = useRef(false);
+  const lockRef = useRef<{
+    profileId: string;
+    deviceId: string;
+    lockToken: string;
+  } | null>(null);
 
   const currentSeason = season ?? 1;
   const currentEpisode = episode ?? 1;
@@ -140,7 +147,19 @@ export default function ModalPlayer({
       setSourceLabel("");
       setNotice("");
       setResolveError("");
+      setLockConflict(false);
       setResolving(false);
+      // Liberar lock al cerrar
+      const lock = lockRef.current;
+      lockRef.current = null;
+      if (lock) {
+        void fetch("/api/playback/lock", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(lock),
+          keepalive: true,
+        }).catch(() => undefined);
+      }
       return;
     }
 
@@ -152,6 +171,7 @@ export default function ModalPlayer({
     setFrameNonce((n) => n + 1);
     setResolving(true);
     setResolveError("");
+    setLockConflict(false);
     setEmbedPath("");
     setPlayKind("iframe");
     setSourceId(null);
@@ -171,12 +191,48 @@ export default function ModalPlayer({
     }
 
     let cancelled = false;
-    void fetch(`/api/play/resolve?${params}`)
-      .then(async (res) => {
+    const deviceId = getOrCreateDeviceId();
+
+    void (async () => {
+      try {
+        const acq = await fetch("/api/playback/lock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deviceId,
+            titleLabel: title,
+          }),
+        });
+        const acqData = await acq.json().catch(() => ({}));
+        if (cancelled) return;
+
+        if (!acq.ok) {
+          setLockConflict(acq.status === 409);
+          setResolveError(
+            acqData.error ||
+              "No se pudo iniciar la reproducción en este perfil."
+          );
+          setResolving(false);
+          return;
+        }
+
+        const profileId = acqData.profileId as string;
+        const lockToken = acqData.lockToken as string;
+        lockRef.current = { profileId, deviceId, lockToken };
+
+        const res = await fetch(`/api/play/resolve?${params}`, {
+          headers: {
+            "x-veotv-profile-id": profileId,
+            "x-veotv-device-id": deviceId,
+            "x-veotv-playback-token": lockToken,
+          },
+        });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
+
         const url = (data.streamUrl || data.embedUrl || "") as string;
         if (!res.ok || !url) {
+          setLockConflict(res.status === 409);
           setResolveError(
             data.error || "Este título todavía no está disponible."
           );
@@ -205,15 +261,14 @@ export default function ModalPlayer({
               : "VeoTV"
         );
         setNotice(data.notice || "");
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setResolveError("No se pudo resolver la reproducción.");
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setResolving(false);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -230,6 +285,113 @@ export default function ModalPlayer({
     membershipActive,
     isAdmin,
   ]);
+
+  // Heartbeat cada 15s mientras el player está abierto
+  useEffect(() => {
+    if (!open) return;
+    const tick = () => {
+      const lock = lockRef.current;
+      if (!lock) return;
+      void fetch("/api/playback/lock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lock),
+      })
+        .then(async (res) => {
+          if (res.status === 409) {
+            const data = await res.json().catch(() => ({}));
+            setEmbedPath("");
+            setLockConflict(true);
+            setResolveError(
+              data.error ||
+                "Este perfil empezó a usarse en otro dispositivo. Se cerró tu reproducción."
+            );
+            lockRef.current = null;
+          }
+        })
+        .catch(() => undefined);
+    };
+    const id = window.setInterval(tick, 15_000);
+    return () => window.clearInterval(id);
+  }, [open]);
+
+  async function forceTakeover() {
+    setResolving(true);
+    setResolveError("");
+    setLockConflict(false);
+    const deviceId = getOrCreateDeviceId();
+    const acq = await fetch("/api/playback/lock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, titleLabel: title, force: true }),
+    });
+    const acqData = await acq.json().catch(() => ({}));
+    if (!acq.ok) {
+      setResolveError(acqData.error || "No se pudo tomar el perfil.");
+      setResolving(false);
+      return;
+    }
+    lockRef.current = {
+      profileId: acqData.profileId,
+      deviceId,
+      lockToken: acqData.lockToken,
+    };
+    // Re-disparar resolve: cerrar/abrir via frameNonce hack — reload page state
+    setFrameNonce((n) => n + 1);
+    setResolving(false);
+    // Force re-run by toggling — simplest: window reload of player effect via key
+    // Re-fetch resolve manually:
+    const params = new URLSearchParams({
+      tmdb: String(mediaId),
+      type: mediaType,
+      title,
+    });
+    if (year) params.set("year", String(year));
+    if (mediaType === "tv") {
+      params.set("se", String(season ?? 1));
+      params.set("ep", String(episode ?? 1));
+      if (isAnime) params.set("anime", "1");
+    }
+    setResolving(true);
+    try {
+      const res = await fetch(`/api/play/resolve?${params}`, {
+        headers: {
+          "x-veotv-profile-id": acqData.profileId,
+          "x-veotv-device-id": deviceId,
+          "x-veotv-playback-token": acqData.lockToken,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      const url = (data.streamUrl || data.embedUrl || "") as string;
+      if (!res.ok || !url) {
+        setResolveError(data.error || "No disponible.");
+        return;
+      }
+      const kind =
+        data.playKind === "hls"
+          ? "hls"
+          : data.playKind === "video"
+            ? "video"
+            : "iframe";
+      setPlayKind(kind);
+      setEmbedPath(
+        kind === "hls" || kind === "video"
+          ? url
+          : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+      );
+      setSourceId(data.source || null);
+      setSourceLabel(
+        typeof data.label === "string" && data.label
+          ? data.label
+          : typeof data.source === "string"
+            ? data.source
+            : "VeoTV"
+      );
+      setNotice(data.notice || "");
+    } finally {
+      setResolving(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -303,10 +465,27 @@ export default function ModalPlayer({
       Buscando fuente…
     </div>
   ) : resolveError || !embedPath ? (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-      <p className="text-lg font-semibold text-white">
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+      <p className="max-w-lg text-lg font-semibold text-white">
         {resolveError || "Este título todavía no está disponible."}
       </p>
+      {lockConflict && (
+        <div className="max-w-md space-y-3">
+          <p className="text-sm text-white/55">
+            Cada perfil permite <strong className="text-cyan-200">1 sola
+            pantalla</strong>. Si eras tú en otro dispositivo, puedes tomar el
+            control (se corta la otra reproducción).
+          </p>
+          <button
+            type="button"
+            disabled={resolving}
+            onClick={() => void forceTakeover()}
+            className="brand-button rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-60"
+          >
+            Tomar control de este perfil
+          </button>
+        </div>
+      )}
     </div>
   ) : playKind === "hls" ? (
     <HlsVideoPlayer

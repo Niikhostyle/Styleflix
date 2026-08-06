@@ -5,7 +5,7 @@ export default function AdminSeguridadPage() {
   return (
     <AdminShell
       title="Seguridad"
-      subtitle="Escaneos, scrapers, fallos de auth y bloqueo de IPs."
+      subtitle="Métricas en vivo, IPs activas, últimas conexiones, escaneos y bloqueos."
     >
       <AdminSecurityClient />
     </AdminShell>

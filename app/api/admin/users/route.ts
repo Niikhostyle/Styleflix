@@ -4,6 +4,11 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getResellerPriceClp } from "@/lib/settings";
+import {
+  canViewerSeeAdminUser,
+  getOwnerAdminId,
+  isOwnerAdminSession,
+} from "@/lib/owner-admin";
 
 const createUserSchema = z.object({
   name: z.string().min(2).max(60),
@@ -29,7 +34,8 @@ async function requireAdmin() {
 }
 
 export async function POST(request: Request) {
-  if (!(await requireAdmin())) {
+  const session = await requireAdmin();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
@@ -44,6 +50,14 @@ export async function POST(request: Request) {
             "Datos inválidos. Revisa nombre, email y contraseña (mín. 6).",
         },
         { status: 400 }
+      );
+    }
+
+    const viewerIsOwner = isOwnerAdminSession(session);
+    if (parsed.data.role === "SUPER_ADMIN" && !viewerIsOwner) {
+      return NextResponse.json(
+        { error: "Solo el dueño puede crear otros administradores." },
+        { status: 403 }
       );
     }
 
@@ -62,6 +76,7 @@ export async function POST(request: Request) {
     const resellerPrepaid = Boolean(parsed.data.resellerPrepaid);
     const prepaidDays = parsed.data.prepaidDays ?? 30;
     const grantDays = parsed.data.grantDays ?? 0;
+    const adminId = session.user.id;
 
     let membershipData: Record<string, unknown> = {
       planSource: "DIRECT",
@@ -94,6 +109,7 @@ export async function POST(request: Request) {
         passwordHash,
         role: parsed.data.role,
         emailVerified: now,
+        grantedByUserId: adminId,
         ...membershipData,
       },
       select: {
@@ -105,6 +121,7 @@ export async function POST(request: Request) {
         currentPeriodEnd: true,
         planSource: true,
         prepaidDays: true,
+        grantedByUserId: true,
         createdAt: true,
       },
     });
@@ -117,7 +134,23 @@ export async function POST(request: Request) {
           currency: "CLP",
           status: "reseller_prepaid",
           paidAt: now,
-          rawPayload: { prepaidDays, by: "admin", onCreate: true },
+          rawPayload: {
+            prepaidDays,
+            by: "admin",
+            adminId,
+            onCreate: true,
+          },
+        },
+      });
+    } else if (grantDays > 0) {
+      await prisma.payment.create({
+        data: {
+          userId: user.id,
+          amount: 0,
+          currency: "CLP",
+          status: "manual_grant",
+          paidAt: now,
+          rawPayload: { grantDays, by: "admin", adminId, onCreate: true },
         },
       });
     }
@@ -132,12 +165,15 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!(await requireAdmin())) {
+  const session = await requireAdmin();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get("filter") || "all";
+  const viewerIsOwner = isOwnerAdminSession(session);
+  const ownerId = await getOwnerAdminId();
 
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
@@ -153,13 +189,22 @@ export async function GET(request: Request) {
       cancelledAt: true,
       planSource: true,
       prepaidDays: true,
+      grantedByUserId: true,
       createdAt: true,
       _count: { select: { payments: true } },
     },
   });
 
+  const visible = users.filter((u) =>
+    canViewerSeeAdminUser({
+      viewerIsOwner,
+      ownerId,
+      target: u,
+    })
+  );
+
   const now = Date.now();
-  const filtered = users.filter((u) => {
+  const filtered = visible.filter((u) => {
     const active =
       u.role === "SUPER_ADMIN" ||
       ((u.subscriptionStatus === "ACTIVE" ||
@@ -194,8 +239,8 @@ export async function GET(request: Request) {
   });
 
   const stats = {
-    total: users.filter((u) => u.role !== "SUPER_ADMIN").length,
-    active: users.filter((u) => {
+    total: visible.filter((u) => u.role !== "SUPER_ADMIN").length,
+    active: visible.filter((u) => {
       if (u.role === "SUPER_ADMIN") return false;
       return (
         (u.subscriptionStatus === "ACTIVE" ||
@@ -204,15 +249,19 @@ export async function GET(request: Request) {
         u.currentPeriodEnd.getTime() > now
       );
     }).length,
-    none: users.filter(
+    none: visible.filter(
       (u) =>
         u.role !== "SUPER_ADMIN" &&
         (u.subscriptionStatus === "NONE" ||
           (!u.currentPeriodEnd && u.subscriptionStatus !== "PREPAID"))
     ).length,
-    pastDue: users.filter((u) => u.subscriptionStatus === "PAST_DUE").length,
-    prepaid: users.filter((u) => u.subscriptionStatus === "PREPAID").length,
+    pastDue: visible.filter((u) => u.subscriptionStatus === "PAST_DUE").length,
+    prepaid: visible.filter((u) => u.subscriptionStatus === "PREPAID").length,
   };
 
-  return NextResponse.json({ users: filtered, stats });
+  return NextResponse.json({
+    users: filtered,
+    stats,
+    viewerIsOwner,
+  });
 }

@@ -10,6 +10,12 @@ import {
 } from "@/lib/membership";
 import { cancelPreapproval } from "@/lib/mercadopago";
 import { sendPasswordChangedNotice } from "@/lib/mail";
+import {
+  canViewerSeeAdminUser,
+  getOwnerAdminId,
+  isOwnerAdminEmail,
+  isOwnerAdminSession,
+} from "@/lib/owner-admin";
 
 const patchSchema = z.object({
   action: z.enum([
@@ -33,15 +39,47 @@ async function requireAdmin() {
   return session;
 }
 
+async function loadVisibleTarget(
+  session: NonNullable<Awaited<ReturnType<typeof requireAdmin>>>,
+  id: string
+) {
+  const viewerIsOwner = isOwnerAdminSession(session);
+  const ownerId = await getOwnerAdminId();
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return { error: "not_found" as const };
+
+  if (
+    !canViewerSeeAdminUser({
+      viewerIsOwner,
+      ownerId,
+      target: {
+        id: user.id,
+        email: user.email,
+        grantedByUserId: user.grantedByUserId,
+      },
+    })
+  ) {
+    return { error: "not_found" as const };
+  }
+
+  return { user, viewerIsOwner, ownerId };
+}
+
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAdmin())) {
+  const session = await requireAdmin();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
   const { id } = await context.params;
+  const access = await loadVisibleTarget(session, id);
+  if ("error" in access) {
+    return NextResponse.json({ error: "No encontrado." }, { status: 404 });
+  }
+
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
@@ -56,6 +94,7 @@ export async function GET(
       cancelledAt: true,
       planSource: true,
       prepaidDays: true,
+      grantedByUserId: true,
       emailVerified: true,
       createdAt: true,
       updatedAt: true,
@@ -80,7 +119,10 @@ export async function GET(
     return NextResponse.json({ error: "No encontrado." }, { status: 404 });
   }
 
-  return NextResponse.json({ user });
+  return NextResponse.json({
+    user,
+    viewerIsOwner: access.viewerIsOwner,
+  });
 }
 
 export async function PATCH(
@@ -93,10 +135,13 @@ export async function PATCH(
   }
 
   const { id } = await context.params;
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
+  const access = await loadVisibleTarget(session, id);
+  if ("error" in access) {
     return NextResponse.json({ error: "No encontrado." }, { status: 404 });
   }
+
+  const { user, viewerIsOwner } = access;
+  const adminId = session.user.id!;
 
   const body = await request.json().catch(() => ({}));
   const parsed = patchSchema.safeParse(body);
@@ -111,6 +156,18 @@ export async function PATCH(
       if (!role) {
         return NextResponse.json(
           { error: "Indica el rol (USER o SUPER_ADMIN)." },
+          { status: 400 }
+        );
+      }
+      if (!viewerIsOwner) {
+        return NextResponse.json(
+          { error: "Solo el dueño puede cambiar roles de administrador." },
+          { status: 403 }
+        );
+      }
+      if (isOwnerAdminEmail(user.email) && role !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "No se puede quitar el rol del dueño de la app." },
           { status: 400 }
         );
       }
@@ -156,6 +213,9 @@ export async function PATCH(
           { status: 400 }
         );
       }
+      if (isOwnerAdminEmail(user.email) && !viewerIsOwner) {
+        return NextResponse.json({ error: "No encontrado." }, { status: 404 });
+      }
       const passwordHash = await hash(password, 10);
       const updated = await prisma.user.update({
         where: { id },
@@ -193,6 +253,9 @@ export async function PATCH(
           cancelledAt: null,
           prepaidDays: null,
           planSource: user.planSource === "RESELLER" ? "RESELLER" : "DIRECT",
+          grantedByUserId: viewerIsOwner
+            ? adminId
+            : user.grantedByUserId ?? adminId,
         },
       });
       await prisma.payment.create({
@@ -202,13 +265,21 @@ export async function PATCH(
           currency: "CLP",
           status: "manual_grant",
           paidAt: now,
-          rawPayload: { grantDays, by: "admin" },
+          rawPayload: { grantDays, by: "admin", adminId },
         },
       });
       return NextResponse.json({ ok: true, user: updated });
     }
 
     if (action === "grant_prepaid") {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          grantedByUserId: viewerIsOwner
+            ? adminId
+            : user.grantedByUserId ?? adminId,
+        },
+      });
       const updated = await grantPrepaidReseller({
         userId: id,
         days: days ?? 30,
@@ -217,13 +288,21 @@ export async function PATCH(
     }
 
     if (action === "extend_30") {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          grantedByUserId: viewerIsOwner
+            ? adminId
+            : user.grantedByUserId ?? adminId,
+        },
+      });
       const updated = await activateMembership({
         userId: id,
         months: 1,
         payment: {
           status: "manual_extend",
           amount: 0,
-          rawPayload: { by: "admin", action: "extend_30" },
+          rawPayload: { by: "admin", action: "extend_30", adminId },
         },
       });
       return NextResponse.json({ ok: true, user: updated });

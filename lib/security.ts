@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { getPlatformMetrics, pruneOldPresence } from "@/lib/presence";
 
 export type SecurityEventType =
   | "SCAN"
@@ -206,11 +207,24 @@ export async function maybeAutoBlockFromAuthFails(ip: string) {
 
 export async function getSecurityDashboard(hours = 24) {
   const since = new Date(Date.now() - hours * 3600_000);
-  const [events, blocked, byType, bySeverity, topIps] = await Promise.all([
+  void pruneOldPresence(45);
+
+  const [
+    events,
+    eventsTotal,
+    blocked,
+    byType,
+    bySeverity,
+    topIps,
+    metrics,
+  ] = await Promise.all([
     prisma.securityEvent.findMany({
       where: { createdAt: { gte: since } },
       orderBy: { createdAt: "desc" },
       take: 100,
+    }),
+    prisma.securityEvent.count({
+      where: { createdAt: { gte: since } },
     }),
     prisma.blockedIp.findMany({ orderBy: { updatedAt: "desc" }, take: 100 }),
     prisma.securityEvent.groupBy({
@@ -233,13 +247,14 @@ export async function getSecurityDashboard(hours = 24) {
       orderBy: { _count: { ip: "desc" } },
       take: 15,
     }),
+    getPlatformMetrics(hours),
   ]);
 
   return {
     since: since.toISOString(),
     hours,
     totals: {
-      events: events.length,
+      events: eventsTotal,
       blocked: blocked.length,
       scans: byType.find((t) => t.type === "SCAN")?._count._all || 0,
       scrapes: byType.find((t) => t.type === "SCRAPE")?._count._all || 0,
@@ -255,5 +270,6 @@ export async function getSecurityDashboard(hours = 24) {
       .map((r) => ({ ip: r.ip!, count: r._count._all })),
     events,
     blocked,
+    metrics,
   };
 }

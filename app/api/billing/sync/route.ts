@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
-import { syncMembershipFromMercadoPago } from "@/lib/membership";
+import { prisma } from "@/lib/prisma";
+import {
+  repairPlanEntitlements,
+  syncMembershipFromMercadoPago,
+} from "@/lib/membership";
 
 export const dynamic = "force-dynamic";
 
@@ -30,18 +34,45 @@ export async function POST(request: Request) {
     });
   }
 
+  const userId = session.user.id;
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      role: true,
+      subscriptionStatus: true,
+      currentPeriodEnd: true,
+      planTier: true,
+      planPeriod: true,
+      planMaxProfiles: true,
+      planMaxResolution: true,
+      planFeatures: true,
+    },
+  });
+
   if (
     hasActiveMembership({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
+      role: dbUser?.role || session.user.role,
+      subscriptionStatus:
+        dbUser?.subscriptionStatus || session.user.subscriptionStatus,
+      currentPeriodEnd:
+        dbUser?.currentPeriodEnd?.toISOString() ||
+        session.user.currentPeriodEnd,
     })
   ) {
+    // Ya activo: reparar perfiles/features si faltan (pagos viejos o sync incompleto)
+    let u = dbUser;
+    if (!u?.planMaxProfiles || !u?.planTier) {
+      u = (await repairPlanEntitlements(userId)) as typeof dbUser;
+    }
     return NextResponse.json({
       ok: true,
       activated: true,
       alreadyActive: true,
       message: "Ya tienes membresía activa.",
+      planTier: u?.planTier ?? null,
+      planPeriod: u?.planPeriod ?? null,
+      planMaxProfiles: u?.planMaxProfiles ?? null,
+      planMaxResolution: u?.planMaxResolution ?? null,
     });
   }
 
@@ -51,7 +82,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await syncMembershipFromMercadoPago({
-      userId: session.user.id,
+      userId,
       paymentId,
     });
 
@@ -72,6 +103,10 @@ export async function POST(request: Request) {
       activated: true,
       alreadyActive: Boolean(result.alreadyActive),
       paymentId: result.paymentId,
+      planTier: result.planTier ?? null,
+      planPeriod: result.planPeriod ?? null,
+      planMaxProfiles: result.planMaxProfiles ?? null,
+      planMaxResolution: result.planMaxResolution ?? null,
       message: result.alreadyActive
         ? "Pago ya registrado. Membresía activa."
         : "¡Pago confirmado! Membresía activada.",

@@ -5,6 +5,8 @@ import { SessionProvider } from "next-auth/react";
 import TvRemoteProvider from "@/components/TvRemoteProvider";
 import BraveTipToast from "@/components/BraveTipToast";
 import DemoBanner from "@/components/DemoBanner";
+import PresenceHeartbeat from "@/components/PresenceHeartbeat";
+import ProfileGate from "@/components/ProfileGate";
 import PricingProvider from "@/components/PricingProvider";
 import type { Pricing } from "@/lib/pricing";
 
@@ -46,7 +48,8 @@ export default function Providers({
         <NgrokFetchPatch>
           <TvRemoteProvider>
             <DemoBanner />
-            {children}
+            <PresenceHeartbeat />
+            <ProfileGate>{children}</ProfileGate>
             <BraveTipToast />
           </TvRemoteProvider>
         </NgrokFetchPatch>

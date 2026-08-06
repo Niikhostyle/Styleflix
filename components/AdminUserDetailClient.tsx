@@ -43,15 +43,18 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [roleDraft, setRoleDraft] = useState<"USER" | "SUPER_ADMIN">("USER");
+  const [viewerIsOwner, setViewerIsOwner] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/users/${userId}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(data.error || "No se pudo cargar.");
+      setUser(null);
       return;
     }
     setUser(data.user);
+    setViewerIsOwner(Boolean(data.viewerIsOwner));
     setRoleDraft(
       data.user?.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"
     );
@@ -117,28 +120,39 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
           <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-neutral-400">Rol:</span>
-              <select
-                value={roleDraft}
-                disabled={busy}
-                onChange={(e) =>
-                  setRoleDraft(e.target.value as "USER" | "SUPER_ADMIN")
-                }
-                className="rounded-lg border border-white/15 bg-black/60 px-3 py-1.5 text-sm outline-none focus:border-teal-300/50"
-              >
-                <option value="USER">USER</option>
-                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-              </select>
-              <button
-                type="button"
-                disabled={busy || roleDraft === user.role}
-                onClick={() => void runAction("set_role", { role: roleDraft })}
-                className="brand-button rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
-              >
-                Guardar rol
-              </button>
-              {roleDraft !== user.role && (
-                <span className="text-xs text-amber-200/80">
-                  El usuario debe volver a iniciar sesión para aplicar el rol.
+              {viewerIsOwner ? (
+                <>
+                  <select
+                    value={roleDraft}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setRoleDraft(e.target.value as "USER" | "SUPER_ADMIN")
+                    }
+                    className="rounded-lg border border-white/15 bg-black/60 px-3 py-1.5 text-sm outline-none focus:border-teal-300/50"
+                  >
+                    <option value="USER">USER</option>
+                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  </select>
+                  <button
+                    type="button"
+                    disabled={busy || roleDraft === user.role}
+                    onClick={() =>
+                      void runAction("set_role", { role: roleDraft })
+                    }
+                    className="brand-button rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                  >
+                    Guardar rol
+                  </button>
+                  {roleDraft !== user.role && (
+                    <span className="text-xs text-amber-200/80">
+                      El usuario debe volver a iniciar sesión para aplicar el
+                      rol.
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="font-medium text-white">
+                  {user.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"}
                 </span>
               )}
             </div>

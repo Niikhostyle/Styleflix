@@ -98,17 +98,46 @@ async function handleNotification(topic: string, dataId: string) {
 
     const status = (preapproval.status || "").toLowerCase();
     if (status === "authorized" || status === "active") {
-      await activateMembership({
-        userId,
-        months: 1,
-        mpPreapprovalId: preapproval.id,
-        payment: {
-          externalId: preapproval.id,
-          status: "subscription_authorized",
-          amount: await membershipAmount(),
-          rawPayload: preapproval as object,
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          planTier: true,
+          planPeriod: true,
+          subscriptionStatus: true,
+          currentPeriodEnd: true,
         },
       });
+      // Si ya hay membresía activa por Checkout Pro (payment), solo guardar id
+      const alreadyLive =
+        user?.subscriptionStatus === "ACTIVE" &&
+        user.currentPeriodEnd &&
+        user.currentPeriodEnd.getTime() > Date.now();
+      if (alreadyLive) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { mpPreapprovalId: preapproval.id },
+        });
+      } else {
+        const { getPlansCatalog } = await import("@/lib/settings");
+        const { monthsForPeriod, isPlanPeriod } = await import("@/lib/plans");
+        const catalog = await getPlansCatalog();
+        const period = isPlanPeriod(user?.planPeriod)
+          ? user!.planPeriod!
+          : "monthly";
+        await activateMembership({
+          userId,
+          months: monthsForPeriod(catalog, period, 1),
+          planTier: user?.planTier,
+          planPeriod: period,
+          mpPreapprovalId: preapproval.id,
+          payment: {
+            externalId: `preapproval:${preapproval.id}`,
+            status: "subscription_authorized",
+            amount: await membershipAmount(),
+            rawPayload: preapproval as object,
+          },
+        });
+      }
     } else if (status === "paused") {
       await markSubscriptionStatus(userId, "PAST_DUE", {
         mpPreapprovalId: preapproval.id,

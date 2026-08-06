@@ -12,6 +12,7 @@ import { enrichWithTmdb, getVimeusAvailability, getVimeusAnimes, getVimeusMovies
 import { getTmdbAnimeRows, getTmdbMovieRows, getTmdbSeriesRows } from "@/lib/sources/tmdbSource";
 import { getJikanAnimeRows } from "@/lib/sources/jikan";
 import { getAnimeAv1Rows, getAnimeAv1Items } from "@/lib/sources/animeav1";
+import { getMangaEsItems, getMangaEsRows } from "@/lib/sources/manga";
 import { getPlutoMovies, getPlutoSeries } from "@/lib/sources/plutoSource";
 import { getArchiveRows } from "@/lib/sources/archive";
 import { withTimeout } from "@/lib/sources/match";
@@ -251,6 +252,25 @@ async function loadAnimeAv1Items(): Promise<CatalogItem[]> {
   return withTimeout(getAnimeAv1Items(), SLOW_TIMEOUT_MS, [], "animeav1:items");
 }
 
+async function loadMangaEsItems() {
+  if (!enabledSources().includes("mangadex")) return [];
+  return withTimeout(getMangaEsItems(), SLOW_TIMEOUT_MS, [], "mangadex:items");
+}
+
+async function loadMangaEsRows() {
+  if (!enabledSources().includes("mangadex")) return [];
+  return withTimeout(getMangaEsRows(), SLOW_TIMEOUT_MS, [], "mangadex:rows");
+}
+
+export async function getMangaCatalog(): Promise<CatalogPage> {
+  const mangaRows = await loadMangaEsRows();
+  return {
+    featured: mangaRows[0]?.items?.slice(0, 8) || [],
+    rows: finishRows(mangaRows),
+    activeSources: mangaRows.length ? (["mangadex"] as SourceId[]) : [],
+  };
+}
+
 export async function getAnimeCatalog(): Promise<CatalogPage> {
   const [av1Rows, tmdbRows, jikanRows] = await Promise.all([
     loadAnimeAv1Rows(),
@@ -295,6 +315,7 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     vimeusMovies,
     vimeusSeries,
     animeAv1Items,
+    mangaEsItems,
     tmdbMovieRows,
     tmdbSeriesRows,
     tmdbAnimeRows,
@@ -306,6 +327,7 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     loadVimeus("movies", [1, 2]),
     loadVimeus("series", [1, 2]),
     loadAnimeAv1Items(),
+    loadMangaEsItems(),
     loadTmdbRows("movies", [1]),
     loadTmdbRows("series", [1]),
     loadTmdbRows("anime", [1]),
@@ -324,6 +346,11 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
       title: "Animes para ver ya",
       mediaType: "tv",
       items: animeAv1Items,
+    },
+    {
+      title: "Mangas en español",
+      mediaType: "tv",
+      items: mangaEsItems,
     },
     { title: "Películas destacadas", mediaType: "movie", items: plutoMovies },
     { title: "Series destacadas", mediaType: "tv", items: plutoSeries },

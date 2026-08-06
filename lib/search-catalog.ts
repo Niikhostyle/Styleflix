@@ -1,10 +1,12 @@
 /**
  * Búsqueda unificada VeoTV.
- * Animes → siempre AnimeAV1 (/anime/[slug]).
+ * Animes → AnimeAV1 (/anime/[slug]).
+ * Mangas ES → MangaDex (/manga/[slug]).
  * Películas/series → TMDB, excluyendo género Animation (16).
  */
 
 import { searchAnime } from "animeav1-api";
+import { getMangaEsCatalog } from "@/lib/manga-es";
 import { isSourceEnabled } from "@/lib/sources/types";
 import {
   getDisplayTitle,
@@ -17,7 +19,7 @@ const TMDB_ANIMATION_GENRE = 16;
 
 export type SearchHit = {
   key: string;
-  kind: "anime" | "movie" | "tv";
+  kind: "anime" | "manga" | "movie" | "tv";
   title: string;
   year: string | null;
   poster: string | null;
@@ -65,12 +67,40 @@ async function searchAnimeHits(query: string): Promise<SearchHit[]> {
   }
 }
 
+async function searchMangaHits(query: string): Promise<SearchHit[]> {
+  if (!isSourceEnabled("mangadex")) return [];
+  try {
+    const q = query.toLowerCase().trim();
+    const catalog = await getMangaEsCatalog(80);
+    const hits: SearchHit[] = [];
+    for (const m of catalog) {
+      const title = m.title.toLowerCase();
+      const es = (m.titleEs || "").toLowerCase();
+      if (!title.includes(q) && !es.includes(q)) continue;
+      hits.push({
+        key: `manga-${m.slug}`,
+        kind: "manga",
+        title: m.title,
+        year: m.year ? String(m.year) : null,
+        poster: m.poster,
+        href: `/manga/${m.slug}`,
+        label: "Manga",
+      });
+      if (hits.length >= 12) break;
+    }
+    return hits;
+  } catch (err) {
+    console.error("[search] manga", err);
+    return [];
+  }
+}
+
 async function searchTmdbHits(query: string): Promise<SearchHit[]> {
   try {
     const items = await searchMulti(query);
     const hits: SearchHit[] = [];
     for (const item of items) {
-      if (isTmdbAnimation(item)) continue; // animes solo vía módulo AnimeAV1
+      if (isTmdbAnimation(item)) continue;
       const type = item.media_type === "tv" ? "tv" : "movie";
       const title = getDisplayTitle(item);
       if (!title) continue;
@@ -84,9 +114,9 @@ async function searchTmdbHits(query: string): Promise<SearchHit[]> {
           ? `https://image.tmdb.org/t/p/w185${item.poster_path}`
           : null,
         href: `/titulo/${type}/${item.id}`,
-        label: type === "movie" ? "Película" : "Serie",
+        label: type === "tv" ? "Serie" : "Película",
       });
-      if (hits.length >= 24) break;
+      if (hits.length >= 20) break;
     }
     return hits;
   } catch (err) {
@@ -95,15 +125,16 @@ async function searchTmdbHits(query: string): Promise<SearchHit[]> {
   }
 }
 
-/** Animes primero; luego películas/series no-animación. */
+/** Animes + mangas primero; luego películas/series. */
 export async function searchCatalog(query: string): Promise<SearchHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
 
-  const [anime, tmdb] = await Promise.all([
+  const [anime, manga, tmdb] = await Promise.all([
     searchAnimeHits(q),
+    searchMangaHits(q),
     searchTmdbHits(q),
   ]);
 
-  return [...anime, ...tmdb].slice(0, 36);
+  return [...anime, ...manga, ...tmdb].slice(0, 40);
 }

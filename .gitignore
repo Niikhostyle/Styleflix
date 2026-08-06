@@ -68,3 +68,6 @@ prisma/dev.db-journal
 **/captures/
 styleflix-capacitor/.env*
 android-tv/local.properties
+
+# Caché local de mangas (regenerar con npm run mangas:scrape)
+/data/mangas-es/

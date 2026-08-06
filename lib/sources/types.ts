@@ -6,7 +6,8 @@ export type SourceId =
   | "jikan"
   | "pluto"
   | "archive"
-  | "animeav1";
+  | "animeav1"
+  | "mangadex";
 
 export const ALL_SOURCES: SourceId[] = [
   "vimeus",
@@ -15,6 +16,7 @@ export const ALL_SOURCES: SourceId[] = [
   "pluto",
   "archive",
   "animeav1",
+  "mangadex",
 ];
 
 export const SOURCE_LABELS: Record<SourceId, string> = {
@@ -24,6 +26,7 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   pluto: "Pluto TV",
   archive: "Archive.org",
   animeav1: "VeoTV",
+  mangadex: "Mangas ES",
 };
 
 /**
@@ -37,6 +40,9 @@ export type CatalogItem = MediaItem & {
   playable?: boolean;
   /** Slug en AnimeAV1 (catálogo /anime/[slug]). */
   animeAv1Slug?: string;
+  /** Slug manga ES (/manga/[slug]). */
+  mangaSlug?: string;
+  mangaDexId?: string;
 };
 
 export type CatalogRow = {
@@ -65,6 +71,7 @@ export function enabledSources(): SourceId[] {
       return Boolean(process.env.NEXT_PUBLIC_TMDB_API_KEY);
     }
     if (id === "animeav1") return true;
+    if (id === "mangadex") return true;
     return true;
   });
 }

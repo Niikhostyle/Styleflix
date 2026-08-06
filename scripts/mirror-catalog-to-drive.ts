@@ -45,6 +45,10 @@ type CatalogEntry = {
   seasonsHint: number | null;
   season?: number | null;
   episode?: number | null;
+  popularity?: number;
+  voteAverage?: number;
+  voteCount?: number;
+  rankScore?: number;
 };
 
 type Progress = {
@@ -95,6 +99,15 @@ function arg(name: string, fallback?: string): string | undefined {
 
 function hasFlag(name: string) {
   return process.argv.includes(`--${name}`);
+}
+
+function entryLabel(entry: CatalogEntry): string {
+  const y = entry.year != null ? ` (${entry.year})` : "";
+  const ep =
+    entry.season != null && entry.episode != null
+      ? ` · S${String(entry.season).padStart(2, "0")}E${String(entry.episode).padStart(2, "0")}`
+      : "";
+  return `${entry.title}${y}${ep}`;
 }
 
 function log(...args: unknown[]) {
@@ -172,7 +185,8 @@ async function downloadFile(
   url: string,
   dest: string,
   minBytes = 1024,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  label?: string
 ) {
   ensureDir(dirname(dest));
   if (existsSync(dest) && statSync(dest).size >= minBytes) return "skip";
@@ -202,12 +216,12 @@ async function downloadFile(
   );
   let written = startAt;
   let lastLog = Date.now();
-  const destName = dest.split(/[/\\]/).pop() || dest;
+  const tag = label || dest.split(/[/\\]/).pop() || dest;
   nodeStream.on("data", (chunk: Buffer | string) => {
     written += typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
     if (Date.now() - lastLog > 15_000) {
       lastLog = Date.now();
-      log(`bajando ${destName}: ${(written / 1e6).toFixed(0)} MB`);
+      log(`bajando «${tag}»: ${(written / 1e6).toFixed(0)} MB`);
     }
   });
   await pipeline(
@@ -330,6 +344,194 @@ async function listAllVimeus(
   }
 
   return out;
+}
+
+type TmdbMovieHit = {
+  id: number;
+  title?: string;
+  original_title?: string;
+  release_date?: string;
+  poster_path?: string | null;
+  popularity?: number;
+  vote_average?: number;
+  vote_count?: number;
+};
+
+function tmdbApiKey(): string {
+  const key =
+    process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.TMDB_API_KEY || "";
+  if (!key) throw new Error("Falta NEXT_PUBLIC_TMDB_API_KEY");
+  return key;
+}
+
+async function fetchTmdbList(
+  path: string,
+  page: number
+): Promise<TmdbMovieHit[]> {
+  const key = tmdbApiKey();
+  const sep = path.includes("?") ? "&" : "?";
+  const url = `https://api.themoviedb.org/3${path}${sep}api_key=${key}&language=es-ES&page=${page}`;
+  const data = (await fetchJson(url)) as { results?: TmdbMovieHit[] };
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+function rankScoreOf(m: {
+  year: number | null;
+  popularity: number;
+  voteAverage: number;
+  voteCount: number;
+  unreleased?: boolean;
+}): number {
+  if (m.unreleased) return m.popularity * 0.2; // al final: aún no en cartelera/Vimeus
+  const year = m.year ?? 1990;
+  const yearBoost = Math.max(0, year - 1995) * 18;
+  const critic =
+    m.voteCount >= 200 ? m.voteAverage * Math.log10(m.voteCount + 10) * 12 : 0;
+  return m.popularity * 3 + critic + yearBoost;
+}
+
+/**
+ * Cartelera conocida vía TMDB: 2026→atrás, populares, top críticas y trending.
+ * Luego se intenta bajar por tmdbId en Vimeus (mismo player).
+ */
+async function listCarteleraMovies(): Promise<CatalogEntry[]> {
+  const viewKey = process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY || "";
+  const yearTo = Number(arg("year-to", "2026")) || 2026;
+  const yearFrom = Number(arg("year-from", "2000")) || 2000;
+  const pagesPopular = Number(arg("tmdb-pages", "12")) || 12;
+  const pagesPerYear = Number(arg("year-pages", "3")) || 3;
+
+  const byId = new Map<
+    number,
+    {
+      tmdbId: number;
+      title: string;
+      year: number | null;
+      posterUrl: string | null;
+      popularity: number;
+      voteAverage: number;
+      voteCount: number;
+      unreleased: boolean;
+    }
+  >();
+
+  const addHits = (hits: TmdbMovieHit[], tag: string) => {
+    let n = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    for (const m of hits) {
+      const id = Number(m.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const release = m.release_date || "";
+      const year = release ? Number(release.slice(0, 4)) || null : null;
+      if (year != null && (year > yearTo || year < yearFrom)) continue;
+      // Priorizar estrenadas (cartelera real); futuras al final vía score bajo
+      const unreleased = Boolean(release && release > today);
+      const title = String(m.title || m.original_title || `tmdb-${id}`).trim();
+      const popularity = Number(m.popularity) || 0;
+      const voteAverage = Number(m.vote_average) || 0;
+      const voteCount = Number(m.vote_count) || 0;
+      // Evitar rarezas sin votos salvo que sean muy populares/recientes
+      if (!unreleased && voteCount < 40 && popularity < 40) continue;
+      const prev = byId.get(id);
+      if (
+        !prev ||
+        popularity > prev.popularity ||
+        voteCount > prev.voteCount
+      ) {
+        byId.set(id, {
+          tmdbId: id,
+          title,
+          year,
+          posterUrl: tmdbPoster(m.poster_path),
+          popularity: Math.max(popularity, prev?.popularity || 0),
+          voteAverage: voteAverage || prev?.voteAverage || 0,
+          voteCount: Math.max(voteCount, prev?.voteCount || 0),
+          unreleased,
+        });
+      }
+      n++;
+    }
+    if (n) log(`TMDB ${tag}: +${n} (únicas ${byId.size})`);
+  };
+
+  log(
+    `cartelera TMDB ${yearTo}→${yearFrom} (populares + críticas + trending)`
+  );
+
+  for (let page = 1; page <= pagesPopular; page++) {
+    addHits(await fetchTmdbList("/movie/popular", page), `popular p${page}`);
+    await sleep(120);
+  }
+  for (let page = 1; page <= Math.min(pagesPopular, 10); page++) {
+    addHits(await fetchTmdbList("/movie/top_rated", page), `top_rated p${page}`);
+    await sleep(120);
+  }
+  for (let page = 1; page <= 5; page++) {
+    addHits(
+      await fetchTmdbList("/movie/now_playing", page),
+      `now_playing p${page}`
+    );
+    await sleep(120);
+  }
+  for (let page = 1; page <= 5; page++) {
+    addHits(
+      await fetchTmdbList("/trending/movie/week", page),
+      `trending p${page}`
+    );
+    await sleep(120);
+  }
+
+  for (let year = yearTo; year >= yearFrom; year--) {
+    for (let page = 1; page <= pagesPerYear; page++) {
+      addHits(
+        await fetchTmdbList(
+          `/discover/movie?primary_release_year=${year}&sort_by=popularity.desc&include_adult=false`,
+          page
+        ),
+        `año ${year} popular p${page}`
+      );
+      await sleep(100);
+    }
+    for (let page = 1; page <= Math.min(2, pagesPerYear); page++) {
+      addHits(
+        await fetchTmdbList(
+          `/discover/movie?primary_release_year=${year}&sort_by=vote_average.desc&vote_count.gte=300&include_adult=false`,
+          page
+        ),
+        `año ${year} críticas p${page}`
+      );
+      await sleep(100);
+    }
+  }
+
+  const entries: CatalogEntry[] = [...byId.values()]
+    .map((m) => {
+      const rankScore = rankScoreOf(m);
+      return {
+        key: `peliculas-vimeus-${m.tmdbId}`,
+        category: "peliculas" as const,
+        source: "vimeus" as const,
+        mediaType: "movie" as const,
+        tmdbId: m.tmdbId,
+        title: m.title,
+        year: m.year,
+        posterUrl: m.posterUrl,
+        embedUrl: viewKey
+          ? playerEmbedUrl("peliculas", m.tmdbId, viewKey)
+          : null,
+        seasonsHint: null,
+        popularity: m.popularity,
+        voteAverage: m.voteAverage,
+        voteCount: m.voteCount,
+        rankScore,
+      };
+    })
+    .sort((a, b) => (b.rankScore || 0) - (a.rankScore || 0));
+
+  log(
+    `cartelera lista: ${entries.length} películas (1ª: ${entries[0] ? entryLabel(entries[0]) : "—"})`
+  );
+  return entries;
 }
 
 /** Lee embeds[] del player Vimeus (script#data). */
@@ -513,13 +715,14 @@ async function downloadViaVimeusPlayer(
     const page = embedToDownloadPage(bestEmbed);
     if (!page) continue;
     try {
-      log(`vimeos dl page ${entry.key} → ${page}`);
+      log(`vimeos dl page «${entryLabel(entry)}» → ${page}`);
       const { directUrl, fileName, referer } =
         await resolveVimeosDirectUrl(page);
       writeFileSync(
         `${destFile}.source.json`,
         JSON.stringify(
           {
+            title: entry.title,
             bestEmbed,
             page,
             directUrl,
@@ -532,15 +735,15 @@ async function downloadViaVimeusPlayer(
         )
       );
       log(
-        `vimeos directo ${entry.key} → ${directUrl.slice(0, 90)}…` +
+        `vimeos directo «${entryLabel(entry)}» → ${directUrl.slice(0, 90)}…` +
           (existsSync(`${destFile}.part`)
             ? ` (reanuda ${(statSync(`${destFile}.part`).size / 1e6).toFixed(0)} MB)`
             : "")
       );
-      return downloadFile(directUrl, destFile, 500_000, { Referer: referer });
+      return downloadFile(directUrl, destFile, 500_000, { Referer: referer }, entryLabel(entry));
     } catch (err) {
       lastErr = err;
-      log(`vimeos intento falló ${page}`, String(err));
+      log(`vimeos intento falló «${entryLabel(entry)}» ${page}`, String(err));
       await sleep(2000);
     }
   }
@@ -648,10 +851,16 @@ async function processEntry(
 
   if (entry.posterUrl && entry.episode == null) {
     try {
-      const r = await downloadFile(entry.posterUrl, join(dir, "poster.jpg"), 500);
+      const r = await downloadFile(
+        entry.posterUrl,
+        join(dir, "poster.jpg"),
+        500,
+        {},
+        `poster · ${entryLabel(entry)}`
+      );
       if (r === "ok") progress.stats.posters++;
     } catch (err) {
-      log(`poster fail ${entry.key}`, String(err));
+      log(`poster fail «${entryLabel(entry)}»`, String(err));
     }
   }
 
@@ -662,16 +871,24 @@ async function processEntry(
 
   const dest = join(dir, videoFileName(entry));
 
+  log(`▶ DESCARGANDO «${entryLabel(entry)}» [tmdb ${entry.tmdbId}]`);
   try {
     const r = await downloadViaVimeusPlayer(entry, dest);
     if (r === "ok") progress.stats.videos++;
-    log(`OK video ${entry.key} (${(statSync(dest).size / 1e9).toFixed(2)} GB)`);
+    if (r === "skip") {
+      log(`ya existía «${entryLabel(entry)}»`);
+      progress.stats.skipped++;
+    } else {
+      log(
+        `✓ OK «${entryLabel(entry)}» (${(statSync(dest).size / 1e9).toFixed(2)} GB)`
+      );
+    }
     if (!done.has(entry.key)) progress.doneKeys.push(entry.key);
     delete progress.failed[entry.key];
   } catch (err) {
     progress.failed[entry.key] = String(err);
     progress.stats.errors++;
-    log(`video fail ${entry.key}`, String(err));
+    log(`✗ FAIL «${entryLabel(entry)}»`, String(err));
   }
 
   saveProgress(progressPath, progress);
@@ -724,6 +941,8 @@ async function main() {
   );
 
   const tmdbOnly = Number(arg("tmdb", "0")) || 0;
+  const cartelera =
+    hasFlag("cartelera") || (onlyMovies && !hasFlag("all-vimeus"));
   let entries: CatalogEntry[] = [];
 
   if (tmdbOnly > 0) {
@@ -747,6 +966,11 @@ async function main() {
       },
     ];
     log(`modo --tmdb ${tmdbOnly} (${category})`);
+  } else if (cartelera) {
+    entries = await listCarteleraMovies();
+    log(
+      `modo cartelera: ${entries.length} títulos ordenados por popularidad/críticas/año`
+    );
   } else {
     const [movies, series, animes] = await Promise.all([
       listAllVimeus("movies", "peliculas"),
@@ -777,6 +1001,7 @@ async function main() {
       {
         at: new Date().toISOString(),
         outRoot,
+        mode: cartelera ? "cartelera" : tmdbOnly ? "tmdb" : "vimeus-listing",
         counts: {
           total: entries.length,
           peliculas: entries.filter((e) => e.category === "peliculas").length,
@@ -784,12 +1009,16 @@ async function main() {
           anime: entries.filter((e) => e.category === "anime").length,
           vimeus: entries.filter((e) => e.source === "vimeus").length,
         },
+        top10: entries.slice(0, 10).map((e) => entryLabel(e)),
       },
       null,
       2
     )
   );
   log(`inventario títulos: ${entries.length}`);
+  if (entries.length) {
+    log(`próximas: ${entries.slice(0, 5).map(entryLabel).join(" · ")}`);
+  }
 
   if (catalogOnly) {
     saveProgress(progressPath, progress);
@@ -822,11 +1051,9 @@ async function main() {
   let n = 0;
   await mapPool(work, concurrency, async (entry) => {
     n++;
-    if (n % 5 === 0 || entry.source === "vimeus") {
-      log(
-        `item ${n}/${work.length} · videos=${progress.stats.videos} err=${progress.stats.errors} · ${entry.key}`
-      );
-    }
+    log(
+      `cola ${n}/${work.length} · videos=${progress.stats.videos} err=${progress.stats.errors} · «${entryLabel(entry)}»`
+    );
     await processEntry(outRoot, entry, progress, { downloadVideo, postersOnly }, progressPath);
     await sleep(800);
   });

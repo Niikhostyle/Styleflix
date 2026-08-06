@@ -34,9 +34,9 @@ export const DEFAULT_PLANS_CATALOG: PlansCatalog = {
     {
       id: "standard",
       name: "Estándar",
-      maxProfiles: 1,
+      maxProfiles: 2,
       maxResolution: 720,
-      features: { canRequest: false, requestQuota: 0, canDownload: false },
+      features: { canRequest: false, requestQuota: 0, canDownload: true },
       priceMonthlyClp: 2990,
     },
     {
@@ -44,16 +44,16 @@ export const DEFAULT_PLANS_CATALOG: PlansCatalog = {
       name: "Premium",
       maxProfiles: 3,
       maxResolution: 1080,
-      features: { canRequest: true, requestQuota: 1, canDownload: true },
-      priceMonthlyClp: 4990,
+      features: { canRequest: true, requestQuota: 10, canDownload: true },
+      priceMonthlyClp: 3990,
     },
     {
       id: "plus",
       name: "Plus",
       maxProfiles: 5,
       maxResolution: 1080,
-      features: { canRequest: true, requestQuota: 2, canDownload: true },
-      priceMonthlyClp: 6990,
+      features: { canRequest: true, requestQuota: 10, canDownload: true },
+      priceMonthlyClp: 4990,
     },
   ],
   periodDiscounts: {
@@ -192,4 +192,25 @@ export function planEntitlementSnapshot(
     planMaxResolution: t.maxResolution,
     planFeatures: t.features,
   };
+}
+
+/** Meses reales del periodo vendido (fuente de verdad del catálogo). */
+export function monthsForPeriod(
+  catalog: PlansCatalog,
+  period: PlanPeriod | string | null | undefined,
+  fallbackMonths?: number | null
+): number {
+  if (isPlanPeriod(period)) {
+    const m = catalog.periodMonths[period];
+    if (m && m >= 1) return m;
+  }
+  const n = Number(fallbackMonths);
+  if (Number.isFinite(n) && n >= 1) return Math.round(n);
+  return 1;
+}
+
+export function periodFromMonths(months: number): PlanPeriod {
+  if (months >= 12) return "annual";
+  if (months >= 6) return "semiannual";
+  return "monthly";
 }

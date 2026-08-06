@@ -20,20 +20,24 @@ function isPublicPath(pathname: string) {
   if (pathname === "/api/play/animeav1-hls") return true;
   if (pathname === "/api/play/animeav1-embed") return true;
   if (pathname.startsWith("/onboarding")) return true;
+  if (pathname === "/perfiles") return true;
   return false;
 }
 
 /** Rutas que exigen sesión pero no membresía/demo (pago / cuenta). */
 function isMembershipExempt(pathname: string) {
   if (pathname.startsWith("/onboarding")) return true;
+  if (pathname === "/perfiles") return true;
   if (pathname.startsWith("/membresia")) return true;
   if (pathname.startsWith("/cuenta")) return true;
   if (pathname.startsWith("/admin")) return true;
   if (pathname.startsWith("/api/billing")) return true;
   if (pathname.startsWith("/api/account")) return true;
   if (pathname.startsWith("/api/admin")) return true;
+  if (pathname.startsWith("/api/playback")) return true;
   if (pathname === "/api/requests") return true;
   if (pathname === "/api/pricing") return true;
+  if (pathname === "/api/presence/heartbeat") return true;
   return false;
 }
 
@@ -85,8 +89,9 @@ function hasAccess(
 ): boolean {
   if (!token) return false;
   if (token.role === "SUPER_ADMIN") return true;
-  if (token.membershipActive || token.catalogAccess) return true;
-  if (token.demoActive) return true;
+  // No confiar en demoActive/catalogAccess stale del JWT: la demo se vence
+  // por timestamp aunque el token aún diga demoActive=true.
+  if (token.membershipActive) return true;
   const exp = token.demoExpiresAt as string | null | undefined;
   if (exp && new Date(exp).getTime() > Date.now()) return true;
   return false;

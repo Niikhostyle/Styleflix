@@ -9,7 +9,7 @@ import BrandMark from "@/components/BrandMark";
 
 type SearchHit = {
   key: string;
-  kind: "anime" | "movie" | "tv";
+  kind: "anime" | "manga" | "movie" | "tv";
   title: string;
   year: string | null;
   poster: string | null;
@@ -22,6 +22,7 @@ const links = [
   { href: "/series", label: "Series" },
   { href: "/peliculas", label: "Películas" },
   { href: "/animes", label: "Animes" },
+  { href: "/mangas", label: "Mangas" },
 ];
 
 export default function Navbar() {
@@ -251,7 +252,7 @@ export default function Navbar() {
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Series, películas, animes…"
+                  placeholder="Series, películas, animes, mangas…"
                   className="w-[240px] bg-transparent text-sm text-white outline-none placeholder:text-slate-500 lg:w-[300px]"
                   aria-label="Buscar títulos"
                 />
@@ -340,6 +341,14 @@ export default function Navbar() {
                       Membresía
                     </Link>
                   )}
+                  <Link
+                    href="/perfiles"
+                    data-tv-focus
+                    className="block rounded-xl px-3 py-2.5 text-sm hover:bg-white/[0.06]"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Cambiar perfil
+                  </Link>
                   <Link
                     href="/cuenta"
                     data-tv-focus

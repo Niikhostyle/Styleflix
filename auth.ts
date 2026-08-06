@@ -171,6 +171,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (activated) user = activated;
         }
 
+        // Marca última conexión al login (IP real se completa en heartbeat)
+        await prisma.user
+          .update({
+            where: { id: user.id },
+            data: { lastSeenAt: new Date() },
+          })
+          .catch(() => null);
+
         const membership = membershipFromUser(user);
         return {
           id: user.id,
@@ -206,6 +214,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           demoActive?: boolean;
           catalogAccess?: boolean;
           membershipActive?: boolean;
+          planTier?: string | null;
+          planMaxProfiles?: number | null;
+          planMaxResolution?: number | null;
         };
         if (s.demoExpiresAt !== undefined) {
           token.demoExpiresAt = s.demoExpiresAt;
@@ -226,6 +237,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
         if (typeof s.membershipActive === "boolean") {
           token.membershipActive = s.membershipActive;
+        }
+        if (s.planTier !== undefined) token.planTier = s.planTier;
+        if (s.planMaxProfiles !== undefined) {
+          token.planMaxProfiles = s.planMaxProfiles;
+        }
+        if (s.planMaxResolution !== undefined) {
+          token.planMaxResolution = s.planMaxResolution;
         }
       }
 

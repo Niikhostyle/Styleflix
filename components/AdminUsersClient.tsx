@@ -58,6 +58,7 @@ export default function AdminUsersClient() {
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
+  const [viewerIsOwner, setViewerIsOwner] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoadingList(true);
@@ -66,6 +67,7 @@ export default function AdminUsersClient() {
       const data = await res.json();
       setUsers(data.users ?? []);
       setStats(data.stats ?? null);
+      setViewerIsOwner(Boolean(data.viewerIsOwner));
     } catch {
       setUsers([]);
     } finally {
@@ -90,7 +92,7 @@ export default function AdminUsersClient() {
         name,
         email,
         password,
-        role,
+        role: viewerIsOwner ? role : "USER",
         resellerPrepaid: resellerPrepaid || undefined,
         prepaidDays: resellerPrepaid ? prepaidDays : undefined,
         grantDays:
@@ -197,16 +199,22 @@ export default function AdminUsersClient() {
             placeholder="Contraseña"
             className="rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-300/50 focus:ring-2 focus:ring-teal-300/15"
           />
-          <select
-            value={role}
-            onChange={(e) =>
-              setRole(e.target.value as "USER" | "SUPER_ADMIN")
-            }
-            className="rounded-lg border border-white/15 bg-black/60 px-3 py-2"
-          >
-            <option value="USER">USER</option>
-            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-          </select>
+          {viewerIsOwner ? (
+            <select
+              value={role}
+              onChange={(e) =>
+                setRole(e.target.value as "USER" | "SUPER_ADMIN")
+              }
+              className="rounded-lg border border-white/15 bg-black/60 px-3 py-2"
+            >
+              <option value="USER">USER</option>
+              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+            </select>
+          ) : (
+            <div className="rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-neutral-400">
+              Rol: USER
+            </div>
+          )}
         </div>
 
         <label className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
@@ -307,23 +315,39 @@ export default function AdminUsersClient() {
                     <p className="text-xs text-neutral-400">{u.email}</p>
                   </td>
                   <td className="px-3 py-3">
-                    <select
-                      value={u.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"}
-                      onChange={(e) => {
-                        const next = e.target.value as "USER" | "SUPER_ADMIN";
-                        if (next === u.role) return;
-                        void changeRole(u.id, next);
-                      }}
-                      className={`rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-xs outline-none focus:border-teal-300/50 ${
-                        u.role === "SUPER_ADMIN"
-                          ? "text-teal-200"
-                          : "text-neutral-300"
-                      }`}
-                      title="Cambiar rol"
-                    >
-                      <option value="USER">USER</option>
-                      <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                    </select>
+                    {viewerIsOwner ? (
+                      <select
+                        value={
+                          u.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"
+                        }
+                        onChange={(e) => {
+                          const next = e.target.value as
+                            | "USER"
+                            | "SUPER_ADMIN";
+                          if (next === u.role) return;
+                          void changeRole(u.id, next);
+                        }}
+                        className={`rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-xs outline-none focus:border-teal-300/50 ${
+                          u.role === "SUPER_ADMIN"
+                            ? "text-teal-200"
+                            : "text-neutral-300"
+                        }`}
+                        title="Cambiar rol"
+                      >
+                        <option value="USER">USER</option>
+                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                      </select>
+                    ) : (
+                      <span
+                        className={
+                          u.role === "SUPER_ADMIN"
+                            ? "text-teal-200"
+                            : "text-neutral-300"
+                        }
+                      >
+                        {u.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-neutral-300">
                     {planSourceLabel(u.planSource)}

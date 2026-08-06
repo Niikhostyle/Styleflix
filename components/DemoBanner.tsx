@@ -1,39 +1,66 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Clock } from "lucide-react";
 
 /** Barra superior cuando la sesión es demo (sin membresía paga). */
 export default function DemoBanner() {
   const { data: session, update } = useSession();
+  const pathname = usePathname();
   const expiresAt = session?.user?.demoExpiresAt;
   const isMember = Boolean(session?.user?.membershipActive);
   const demoActive = Boolean(session?.user?.demoActive);
+  const handledExpireRef = useRef(false);
 
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!demoActive || isMember || !expiresAt) return;
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, [demoActive, isMember, expiresAt]);
 
   const remainingMs = useMemo(() => {
     if (!expiresAt) return 0;
     return Math.max(0, new Date(expiresAt).getTime() - now);
   }, [expiresAt, now]);
 
-  useEffect(() => {
-    if (!demoActive || isMember) return;
-    if (remainingMs > 0) return;
-    void update().then(() => {
-      window.location.replace("/onboarding/planes?demo=expired");
-    });
-  }, [remainingMs, demoActive, isMember, update]);
+  const showBanner = demoActive && !isMember && remainingMs > 0;
 
-  if (!demoActive || isMember || remainingMs <= 0) return null;
+  useEffect(() => {
+    if (!showBanner) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [showBanner]);
+
+  // Al vencer: actualizar JWT una sola vez. Si ya estamos en planes, no recargar
+  // (el reload infinito abortaba /api/pricing → "No se pudieron cargar los planes").
+  useEffect(() => {
+    if (isMember) return;
+    if (!demoActive || !expiresAt) return;
+    if (remainingMs > 0) return;
+    if (handledExpireRef.current) return;
+    handledExpireRef.current = true;
+
+    const alreadyOnPlanes = pathname.startsWith("/onboarding/planes");
+
+    void (async () => {
+      try {
+        await Promise.race([
+          update({
+            demoActive: false,
+            catalogAccess: false,
+            demoExpiresAt: expiresAt,
+          }),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
+      } catch {
+        /* ignore */
+      }
+      if (!alreadyOnPlanes) {
+        window.location.replace("/onboarding/planes?demo=expired");
+      }
+    })();
+  }, [remainingMs, demoActive, expiresAt, isMember, update, pathname]);
+
+  if (!showBanner) return null;
 
   const totalSec = Math.ceil(remainingMs / 1000);
   const m = Math.floor(totalSec / 60);

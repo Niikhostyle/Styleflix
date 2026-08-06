@@ -143,6 +143,10 @@ export async function POST(request: Request) {
         subscriptionStatus: "PENDING",
         planTier,
         planPeriod,
+        // Snapshot anticipado: si el webhook llega sin metadata, igual hay tier
+        planMaxProfiles: tier.maxProfiles,
+        planMaxResolution: tier.maxResolution,
+        planFeatures: tier.features,
       },
     });
     await markSubscriptionStatus(user.id, "PENDING");

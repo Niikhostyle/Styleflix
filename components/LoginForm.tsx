@@ -47,7 +47,7 @@ export default function LoginForm({
     const t = window.setTimeout(async () => {
       const session = await getSession();
       if (session?.user?.catalogAccess || session?.user?.membershipActive) {
-        window.location.replace(safeCallback(callbackUrl));
+        window.location.replace("/perfiles");
         return;
       }
       if (session?.user?.demoExpiresAt) {
@@ -62,7 +62,11 @@ export default function LoginForm({
   async function afterAuth() {
     const session = await getSession();
     if (session?.user?.catalogAccess || session?.user?.membershipActive) {
-      window.location.assign(safeCallback(callbackUrl));
+      const dest =
+        safeCallback(callbackUrl) === "/"
+          ? "/perfiles"
+          : `/perfiles?next=${encodeURIComponent(safeCallback(callbackUrl))}`;
+      window.location.assign(dest);
       return;
     }
     if (session?.user?.demoExpiresAt) {

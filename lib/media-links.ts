@@ -13,12 +13,14 @@ export function mediaImageUrl(
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-/** Href de ficha: AnimeAV1 nativo o título TMDB. */
+/** Href de ficha: Manga ES, AnimeAV1 nativo o título TMDB. */
 export function catalogItemHref(item: {
   id: number;
   media_type?: string | null;
   animeAv1Slug?: string | null;
+  mangaSlug?: string | null;
 }): string {
+  if (item.mangaSlug) return `/manga/${encodeURIComponent(item.mangaSlug)}`;
   if (item.animeAv1Slug) return `/anime/${encodeURIComponent(item.animeAv1Slug)}`;
   const type = item.media_type === "movie" ? "movie" : "tv";
   return `/titulo/${type}/${item.id}`;

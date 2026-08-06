@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { Trash2 } from "lucide-react";
 
 type ProfileRow = {
   id: string;
@@ -58,6 +60,29 @@ export default function ProfilesManager() {
     }
   }
 
+  async function removeProfile(id: string) {
+    if (!confirm("¿Eliminar este perfil?")) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/account/profiles", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo eliminar.");
+        return;
+      }
+      await load();
+    } catch {
+      setError("Error de red.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const canAdd = profiles.length < maxProfiles;
 
   return (
@@ -69,15 +94,30 @@ export default function ProfilesManager() {
         {session?.user?.planMaxResolution || "—"}p
         {session?.user?.planCanDownload ? " · descargas" : ""}
       </p>
+      <p className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-xs text-cyan-100/85">
+        Regla anti-abuso: <strong>1 persona por perfil en simultáneo</strong>.
+        Si alguien más usa el mismo perfil, la otra reproducción se bloquea.
+      </p>
       <ul className="mt-4 flex flex-wrap gap-3">
         {profiles.map((p) => (
           <li
             key={p.id}
-            className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm"
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm"
           >
             <span className="font-semibold">{p.name}</span>
             {p.isKids && (
-              <span className="ml-2 text-xs text-amber-300">Kids</span>
+              <span className="text-xs text-amber-300">Kids</span>
+            )}
+            {profiles.length > 1 && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void removeProfile(p.id)}
+                className="ml-1 rounded-md p-1 text-white/35 hover:bg-white/10 hover:text-red-300"
+                title="Eliminar"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             )}
           </li>
         ))}
@@ -107,6 +147,11 @@ export default function ProfilesManager() {
           </a>
         </p>
       )}
+      <p className="mt-4 text-sm">
+        <Link href="/perfiles" className="text-teal-300 underline">
+          Cambiar perfil activo
+        </Link>
+      </p>
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
       {msg && <p className="mt-2 text-sm text-emerald-300">{msg}</p>}
     </section>

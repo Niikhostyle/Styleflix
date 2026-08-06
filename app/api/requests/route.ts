@@ -24,24 +24,55 @@ export async function POST(request: Request) {
   // Entitlement desde DB (el JWT puede estar desfasado tras cambiar de plan)
   const dbUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true, planFeatures: true },
+    select: {
+      role: true,
+      planFeatures: true,
+      currentPeriodEnd: true,
+    },
   });
   const features =
     dbUser?.planFeatures &&
     typeof dbUser.planFeatures === "object" &&
     !Array.isArray(dbUser.planFeatures)
-      ? (dbUser.planFeatures as { canRequest?: boolean })
+      ? (dbUser.planFeatures as {
+          canRequest?: boolean;
+          requestQuota?: number;
+        })
       : null;
   const canRequest =
     dbUser?.role === "SUPER_ADMIN" ||
     session.user.role === "SUPER_ADMIN" ||
-    Boolean(features?.canRequest) ||
-    Boolean(session.user.planCanRequest);
+    Boolean(features?.canRequest);
   if (!canRequest) {
     return NextResponse.json(
       { error: "Tu plan no permite solicitar títulos. Actualiza a Premium o Plus." },
       { status: 403 }
     );
+  }
+
+  const quota = Math.max(0, Number(features?.requestQuota) || 0);
+  if (quota > 0 && dbUser?.role !== "SUPER_ADMIN") {
+    const periodStart =
+      dbUser?.currentPeriodEnd &&
+      dbUser.currentPeriodEnd.getTime() > Date.now()
+        ? new Date(
+            dbUser.currentPeriodEnd.getTime() - 30 * 24 * 3600_000
+          )
+        : new Date(Date.now() - 30 * 24 * 3600_000);
+    const used = await prisma.titleRequest.count({
+      where: {
+        userId: session.user.id,
+        createdAt: { gte: periodStart },
+      },
+    });
+    if (used >= quota) {
+      return NextResponse.json(
+        {
+          error: `Tu plan permite hasta ${quota} solicitud${quota === 1 ? "" : "es"} por periodo. Ya usaste el cupo.`,
+        },
+        { status: 403 }
+      );
+    }
   }
 
   const raw = await request.json().catch(() => null);

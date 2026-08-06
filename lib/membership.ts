@@ -12,11 +12,65 @@ import type { Prisma } from "@prisma/client";
 import {
   isPlanPeriod,
   isPlanTier,
+  monthsForPeriod,
+  periodFromMonths,
   planEntitlementSnapshot,
   type PlanPeriod,
   type PlanTier,
 } from "@/lib/plans";
 import { ensurePrimaryProfile } from "@/lib/profiles";
+
+function resolveTier(
+  preferred: string | null | undefined,
+  fallback: string | null | undefined
+): PlanTier {
+  if (isPlanTier(preferred)) return preferred;
+  if (isPlanTier(fallback)) return fallback;
+  // Último recurso: premium (manual/admin). El pago debe traer tier explícito.
+  return "premium";
+}
+
+function resolvePeriod(
+  preferred: string | null | undefined,
+  fallback: string | null | undefined,
+  months: number
+): PlanPeriod {
+  if (isPlanPeriod(preferred)) return preferred;
+  if (isPlanPeriod(fallback)) return fallback;
+  return periodFromMonths(months);
+}
+
+/** Reaplica perfiles/resolución/features del plan activo (sin tocar fechas). */
+export async function repairPlanEntitlements(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+  if (!isPlanTier(user.planTier)) return user;
+
+  const catalog = await getPlansCatalog();
+  const entitlements = planEntitlementSnapshot(catalog, user.planTier);
+  const period = isPlanPeriod(user.planPeriod)
+    ? user.planPeriod
+    : "monthly";
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      planTier: entitlements.planTier,
+      planPeriod: period,
+      planMaxProfiles: entitlements.planMaxProfiles,
+      planMaxResolution: entitlements.planMaxResolution,
+      planFeatures: entitlements.planFeatures,
+    },
+  });
+
+  await ensurePrimaryProfile({
+    userId,
+    name: user.name,
+    maxProfiles: entitlements.planMaxProfiles,
+  });
+
+  return updated;
+}
 
 export async function activateMembership(opts: {
   userId: string;
@@ -33,29 +87,26 @@ export async function activateMembership(opts: {
     paidAt?: Date | null;
   };
 }) {
-  const months = opts.months ?? 1;
   const now = new Date();
   const user = await prisma.user.findUnique({ where: { id: opts.userId } });
   if (!user) return null;
 
   const catalog = await getPlansCatalog();
-  const tier = isPlanTier(opts.planTier)
-    ? opts.planTier
-    : isPlanTier(user.planTier)
-      ? user.planTier
-      : "premium";
-  const period = isPlanPeriod(opts.planPeriod)
-    ? opts.planPeriod
-    : isPlanPeriod(user.planPeriod)
-      ? user.planPeriod
-      : months >= 12
-        ? "annual"
-        : months >= 6
-          ? "semiannual"
-          : "monthly";
+  const tier = resolveTier(opts.planTier, user.planTier);
+  const period = resolvePeriod(opts.planPeriod, user.planPeriod, opts.months ?? 1);
+  // Meses del catálogo según periodo vendido (evita activar 1 mes en plan anual)
+  const months = monthsForPeriod(catalog, period, opts.months);
   const entitlements = planEntitlementSnapshot(catalog, tier);
 
-  // Idempotencia: si este pago MP ya activó, no duplicar ni extender de nuevo.
+  const entitlementData = {
+    planTier: entitlements.planTier,
+    planPeriod: period,
+    planMaxProfiles: entitlements.planMaxProfiles,
+    planMaxResolution: entitlements.planMaxResolution,
+    planFeatures: entitlements.planFeatures,
+  };
+
+  // Idempotencia: si este pago MP ya activó, no duplicar meses; sí reparar entitlements.
   if (opts.payment?.externalId) {
     const existing = await prisma.payment.findFirst({
       where: {
@@ -69,7 +120,23 @@ export async function activateMembership(opts: {
         user.currentPeriodEnd &&
         user.currentPeriodEnd > now
       ) {
-        return user;
+        const fixed = await prisma.user.update({
+          where: { id: opts.userId },
+          data: {
+            ...entitlementData,
+            cancelledAt: null,
+            prepaidDays: null,
+            ...(opts.mpPreapprovalId
+              ? { mpPreapprovalId: opts.mpPreapprovalId }
+              : {}),
+          },
+        });
+        await ensurePrimaryProfile({
+          userId: opts.userId,
+          name: user.name,
+          maxProfiles: entitlements.planMaxProfiles,
+        });
+        return fixed;
       }
       const reactivated = await prisma.user.update({
         where: { id: opts.userId },
@@ -80,11 +147,7 @@ export async function activateMembership(opts: {
           cancelledAt: null,
           planSource: user.planSource || "DIRECT",
           prepaidDays: null,
-          planTier: entitlements.planTier,
-          planPeriod: period,
-          planMaxProfiles: entitlements.planMaxProfiles,
-          planMaxResolution: entitlements.planMaxResolution,
-          planFeatures: entitlements.planFeatures,
+          ...entitlementData,
           ...(opts.mpPreapprovalId
             ? { mpPreapprovalId: opts.mpPreapprovalId }
             : {}),
@@ -114,11 +177,7 @@ export async function activateMembership(opts: {
       cancelledAt: null,
       planSource: user.planSource || "DIRECT",
       prepaidDays: null,
-      planTier: entitlements.planTier,
-      planPeriod: period,
-      planMaxProfiles: entitlements.planMaxProfiles,
-      planMaxResolution: entitlements.planMaxResolution,
-      planFeatures: entitlements.planFeatures,
+      ...entitlementData,
       ...(opts.mpPreapprovalId
         ? { mpPreapprovalId: opts.mpPreapprovalId }
         : {}),
@@ -156,7 +215,15 @@ export async function activateFromMercadoPagoPayment(opts: {
   userId: string;
   payment: MpPaymentDetail;
 }): Promise<
-  | { activated: true; paymentId: string; alreadyActive?: boolean }
+  | {
+      activated: true;
+      paymentId: string;
+      alreadyActive?: boolean;
+      planTier?: string | null;
+      planPeriod?: string | null;
+      planMaxProfiles?: number | null;
+      planMaxResolution?: number | null;
+    }
   | { activated: false; reason: string; status?: string }
 > {
   const check = await assertApprovedMembershipPayment({
@@ -176,7 +243,7 @@ export async function activateFromMercadoPagoPayment(opts: {
     where: { externalId, status: "approved" },
   });
 
-  await activateMembership({
+  const updated = await activateMembership({
     userId: opts.userId,
     months: check.months,
     planTier: check.planTier,
@@ -197,6 +264,10 @@ export async function activateFromMercadoPagoPayment(opts: {
     activated: true,
     paymentId: externalId,
     alreadyActive: Boolean(existing),
+    planTier: updated?.planTier ?? check.planTier ?? null,
+    planPeriod: updated?.planPeriod ?? check.planPeriod ?? null,
+    planMaxProfiles: updated?.planMaxProfiles ?? null,
+    planMaxResolution: updated?.planMaxResolution ?? null,
   };
 }
 
@@ -205,7 +276,15 @@ export async function syncMembershipFromMercadoPago(opts: {
   userId: string;
   paymentId?: string | null;
 }): Promise<
-  | { activated: true; paymentId: string; alreadyActive?: boolean }
+  | {
+      activated: true;
+      paymentId: string;
+      alreadyActive?: boolean;
+      planTier?: string | null;
+      planPeriod?: string | null;
+      planMaxProfiles?: number | null;
+      planMaxResolution?: number | null;
+    }
   | { activated: false; reason: string; status?: string }
 > {
   let payment: MpPaymentDetail | null = null;
@@ -222,6 +301,7 @@ export async function syncMembershipFromMercadoPago(opts: {
     }
   } else {
     try {
+      // search a menudo trae metadata incompleta → re-fetch por id
       payment = await findLatestApprovedPaymentForUser(opts.userId);
     } catch (err) {
       console.warn("[sync] search payments", err);
@@ -259,7 +339,8 @@ export async function activatePrepaidOnFirstUse(userId: string) {
   const now = new Date();
   const currentPeriodEnd = addDays(now, days);
   const catalog = await getPlansCatalog();
-  const entitlements = planEntitlementSnapshot(catalog, "premium");
+  const tier = isPlanTier(user.planTier) ? user.planTier : "premium";
+  const entitlements = planEntitlementSnapshot(catalog, tier);
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -302,9 +383,13 @@ export async function activatePrepaidOnFirstUse(userId: string) {
 export async function grantPrepaidReseller(opts: {
   userId: string;
   days: number;
+  planTier?: PlanTier | string | null;
 }) {
   const days = Math.max(1, Math.min(365, opts.days));
   const now = new Date();
+  const tier = isPlanTier(opts.planTier) ? opts.planTier : "premium";
+  const catalog = await getPlansCatalog();
+  const entitlements = planEntitlementSnapshot(catalog, tier);
 
   const updated = await prisma.user.update({
     where: { id: opts.userId },
@@ -315,6 +400,11 @@ export async function grantPrepaidReseller(opts: {
       currentPeriodEnd: null,
       membershipStartedAt: null,
       cancelledAt: null,
+      planTier: entitlements.planTier,
+      planPeriod: "monthly",
+      planMaxProfiles: entitlements.planMaxProfiles,
+      planMaxResolution: entitlements.planMaxResolution,
+      planFeatures: entitlements.planFeatures,
     },
   });
 
@@ -325,7 +415,7 @@ export async function grantPrepaidReseller(opts: {
       currency: "CLP",
       status: "reseller_prepaid",
       paidAt: now,
-      rawPayload: { prepaidDays: days, by: "admin" },
+      rawPayload: { prepaidDays: days, by: "admin", planTier: tier },
     },
   });
 

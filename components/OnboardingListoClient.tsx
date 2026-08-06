@@ -41,8 +41,14 @@ export default function OnboardingListoClient() {
           return;
         }
         setMessage(data.message || "¡Membresía activada!");
-        await update();
-        window.setTimeout(() => router.replace("/"), 1200);
+        await update({
+          membershipActive: true,
+          catalogAccess: true,
+          planTier: data.planTier ?? undefined,
+          planMaxProfiles: data.planMaxProfiles ?? undefined,
+          planMaxResolution: data.planMaxResolution ?? undefined,
+        });
+        window.setTimeout(() => router.replace("/perfiles"), 1200);
       } catch {
         setError("No se pudo verificar el pago.");
         setMessage("");

@@ -22,6 +22,9 @@ cd "C:\Users\NICOLAS FIGUEROA\Documents\styleflix\netflix-clone"
 # Inventario
 npm run mirror:catalog -- --out "G:\Mi unidad\veotv"
 
+# Cartelera conocida (recomendado)
+npm run mirror:download -- --out "G:\Mi unidad\veotv" --only-movies --cartelera --concurrency 1
+
 # Prueba 1 película
 npm run mirror:download -- --out "G:\Mi unidad\veotv" --only-movies --limit 1 --concurrency 1
 
@@ -36,7 +39,11 @@ Flags útiles:
 | `--tmdb 1081003` | Solo ese título (rápido para probar) |
 | `--title Supergirl` | Nombre de carpeta con `--tmdb` |
 | `--category peliculas` | Con `--tmdb`: peliculas\|series\|anime |
-| `--only-movies` | Solo películas (sin series/anime) |
+| `--only-movies` | Solo películas; por defecto modo **cartelera** TMDB |
+| `--cartelera` | Explícito: populares / críticas / 2026→atrás |
+| `--all-vimeus` | Inventario crudo Vimeus (alfabético, incluye raros) |
+| `--year-from 2000` | Año mínimo cartelera |
+| `--year-to 2026` | Año máximo cartelera |
 | `--no-episodes` | No expandir SxxExx (solo ficha) |
 | `--limit N` | Primeros N títulos del inventario |
 | `--dl-wait-ms 5500` | Espera antes del POST de descarga |

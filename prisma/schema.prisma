@@ -42,6 +42,16 @@ model User {
   /// Fin de la demo de catálogo (30 min, una vez por cuenta)
   demoExpiresAt      DateTime?
 
+  /// Última actividad en la plataforma (heartbeat / login)
+  lastSeenAt         DateTime?
+  lastIp             String?
+
+  /// SUPER_ADMIN que creó / otorgó acceso (privacidad: grants del dueño ocultos al resto)
+  grantedByUserId    String?
+  grantedBy          User?     @relation("UserGrants", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+  grantedUsers       User[]    @relation("UserGrants")
+  presenceSessions   PresenceSession[]
+
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   watchHistory WatchProgress[]
@@ -49,6 +59,9 @@ model User {
   authTokens   AuthToken[]
   profiles     Profile[]
   titleRequests TitleRequest[]
+
+  @@index([grantedByUserId])
+  @@index([lastSeenAt])
 }
 
 /// Perfiles de visionado (límite según plan)
@@ -62,8 +75,30 @@ model Profile {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  playbackLock ProfilePlaybackLock?
 
   @@index([userId, sortOrder])
+}
+
+/// 1 reproducción simultánea por perfil (anti-abuso estricto)
+model ProfilePlaybackLock {
+  id            String   @id @default(cuid())
+  profileId     String   @unique
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  userId        String
+  /// UUID del dispositivo (localStorage)
+  deviceId      String
+  /// Token opaco que el cliente debe enviar en heartbeats / play
+  lockToken     String
+  titleLabel    String?
+  ip            String?
+  userAgent     String?
+  acquiredAt    DateTime @default(now())
+  lastHeartbeat DateTime @default(now())
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([lastHeartbeat])
 }
 
 /// Tokens de verificación de email y restablecimiento de contraseña
@@ -209,4 +244,24 @@ model BlockedIp {
   updatedAt DateTime @updatedAt
 
   @@index([expiresAt])
+}
+
+/// Sesiones / presencia en vivo (métricas de seguridad y actividad)
+model PresenceSession {
+  id         String   @id @default(cuid())
+  /// Clave estable userId|ip|uaHash (o guest|ip)
+  sessionKey String   @unique
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip         String
+  userAgent  String?
+  path       String?
+  country    String?
+  hits       Int      @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@index([lastSeenAt])
+  @@index([userId, lastSeenAt])
+  @@index([ip, lastSeenAt])
 }

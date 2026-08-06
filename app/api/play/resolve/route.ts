@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasCatalogAccess } from "@/lib/access";
+import { prisma } from "@/lib/prisma";
 import {
   getVimeusEmbedUrl,
   vimeusEmbedHasSources,
@@ -13,6 +14,11 @@ import { findArchiveMatch } from "@/lib/sources/archive";
 import { findCustomStream } from "@/lib/sources/custom";
 import { extractGoogleDriveFileId, isGoogleDriveUrl } from "@/lib/embed-url";
 import { isSourceEnabled } from "@/lib/sources/types";
+import {
+  assertPlaybackLock,
+  playbackHeadersFromRequest,
+} from "@/lib/playback-lock";
+import { getSelectedProfileId } from "@/lib/profiles";
 import {
   getBestTrailerKey,
   getMediaDetails,
@@ -43,7 +49,33 @@ export async function GET(request: Request) {
     );
   }
 
-  const maxRes = session.user.planMaxResolution || 1080;
+  const hdrs = playbackHeadersFromRequest(request);
+  const cookieProfile = await getSelectedProfileId();
+  const lockCheck = await assertPlaybackLock({
+    userId: session.user.id,
+    profileId: hdrs.profileId || cookieProfile,
+    deviceId: hdrs.deviceId,
+    lockToken: hdrs.lockToken,
+    bypass: session.user.role === "SUPER_ADMIN" && !hdrs.lockToken,
+  });
+  if (!lockCheck.ok) {
+    return NextResponse.json(
+      { error: lockCheck.error, code: "PLAYBACK_LOCK" },
+      { status: lockCheck.status }
+    );
+  }
+
+  // Resolución desde DB (no JWT stale): Estándar = 720, etc.
+  const dbPlan = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { planMaxResolution: true, planTier: true, role: true },
+  });
+  const maxRes =
+    dbPlan?.role === "SUPER_ADMIN"
+      ? 1080
+      : dbPlan?.planMaxResolution ||
+        session.user.planMaxResolution ||
+        (dbPlan?.planTier === "standard" ? 720 : 1080);
   const resNotice =
     maxRes <= 720 ? "Tu plan Estándar reproduce hasta 720p." : undefined;
 

@@ -16,6 +16,7 @@
 import { createHmac } from "crypto";
 import { getMembershipPriceClp } from "@/lib/settings";
 import { MP_MIN_AMOUNT_CLP } from "@/lib/pricing";
+import { prisma } from "@/lib/prisma";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -351,12 +352,20 @@ export async function findLatestApprovedPaymentForUser(
   const approved = (data.results || []).find(
     (p) => (p.status || "").toLowerCase() === "approved"
   );
-  return approved || null;
+  if (!approved?.id) return null;
+
+  // El search a menudo omite metadata (plan_tier/months) → reconsultar el pago
+  try {
+    return await getPayment(approved.id);
+  } catch {
+    return approved;
+  }
 }
 
 /**
  * Valida que un pago de MP corresponde a este usuario y está aprobado.
  * Acepta cobro en moneda local (metadata.amount_clp) o CLP legacy.
+ * Si falta metadata, usa planTier/planPeriod PENDING del usuario + catálogo.
  */
 export async function assertApprovedMembershipPayment(opts: {
   payment: MpPaymentDetail;
@@ -394,14 +403,36 @@ export async function assertApprovedMembershipPayment(opts: {
   const meta = (opts.payment.metadata || {}) as Record<string, unknown>;
   const amountClpMeta = Number(meta.amount_clp);
   const monthsMeta = Number(meta.months);
-  const months =
-    Number.isFinite(monthsMeta) && monthsMeta >= 1 ? Math.round(monthsMeta) : 1;
   const currency = String(
     opts.payment.currency_id || meta.charge_currency || "CLP"
   ).toUpperCase();
 
+  // Fallback: plan elegido al crear la preferencia (User PENDING)
+  const user = await prisma.user.findUnique({
+    where: { id: opts.userId },
+    select: { planTier: true, planPeriod: true },
+  });
+  const { getPlansCatalog } = await import("@/lib/settings");
+  const { isPlanPeriod, isPlanTier, monthsForPeriod } = await import(
+    "@/lib/plans"
+  );
+  const catalog = await getPlansCatalog();
+
+  const planTierRaw = meta.plan_tier
+    ? String(meta.plan_tier)
+    : user?.planTier || undefined;
+  const planPeriodRaw = meta.plan_period
+    ? String(meta.plan_period)
+    : user?.planPeriod || undefined;
+  const planTier = isPlanTier(planTierRaw) ? planTierRaw : undefined;
+  const planPeriod = isPlanPeriod(planPeriodRaw) ? planPeriodRaw : undefined;
+  const months = monthsForPeriod(
+    catalog,
+    planPeriod,
+    Number.isFinite(monthsMeta) && monthsMeta >= 1 ? monthsMeta : null
+  );
+
   if (Number.isFinite(amountClpMeta) && amountClpMeta > 0) {
-    // Cobro multi-moneda: confiar en metadata del preference + monto > 0
     if (amount + 0.01 < amountClpMeta * 0.01 && currency === "CLP") {
       return {
         ok: false,
@@ -412,8 +443,8 @@ export async function assertApprovedMembershipPayment(opts: {
       ok: true,
       amount,
       currency,
-      planTier: meta.plan_tier ? String(meta.plan_tier) : undefined,
-      planPeriod: meta.plan_period ? String(meta.plan_period) : undefined,
+      planTier,
+      planPeriod,
       months,
       amountClp: amountClpMeta,
     };
@@ -431,8 +462,8 @@ export async function assertApprovedMembershipPayment(opts: {
     ok: true,
     amount,
     currency,
-    planTier: meta.plan_tier ? String(meta.plan_tier) : undefined,
-    planPeriod: meta.plan_period ? String(meta.plan_period) : undefined,
+    planTier,
+    planPeriod,
     months,
     amountClp: currency === "CLP" ? amount : undefined,
   };

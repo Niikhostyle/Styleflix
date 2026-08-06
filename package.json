@@ -11,6 +11,8 @@
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
     "sources:check": "npx tsx scripts/check-sources.ts",
+    "mangas:scrape": "npx tsx scripts/scrape-mangas-es.ts",
+    "mangas:scrape:full": "npx tsx scripts/scrape-mangas-es.ts --with-chapters --limit=40",
     "mirror:catalog": "npx tsx scripts/mirror-catalog-to-drive.ts --catalog-only",
     "mirror:download": "npx tsx scripts/mirror-catalog-to-drive.ts",
     "db:setup": "prisma db push && npx tsx prisma/seed.ts",

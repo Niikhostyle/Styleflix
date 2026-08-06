@@ -67,21 +67,47 @@ export default function PlanPicker({
   const [busyTier, setBusyTier] = useState<PlanTier | null>(null);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoadingTier(true);
+    setError("");
     try {
-      const res = await fetch("/api/pricing", { cache: "no-store" });
-      const json = await res.json();
-      setData(json);
-    } catch {
-      setError("No se pudieron cargar los planes.");
+      let lastErr = "";
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (signal?.aborted) return;
+        try {
+          const res = await fetch("/api/pricing", {
+            cache: "no-store",
+            signal,
+          });
+          if (!res.ok) {
+            lastErr = "No se pudieron cargar los planes.";
+            continue;
+          }
+          const json = (await res.json()) as PricingPayload;
+          if (!Array.isArray(json.plans) || json.plans.length === 0) {
+            lastErr = "No se pudieron cargar los planes.";
+            continue;
+          }
+          setData(json);
+          setError("");
+          return;
+        } catch (err) {
+          if (signal?.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+            return;
+          }
+          lastErr = "No se pudieron cargar los planes.";
+        }
+      }
+      setError(lastErr || "No se pudieron cargar los planes.");
     } finally {
-      setLoadingTier(false);
+      if (!signal?.aborted) setLoadingTier(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    const ac = new AbortController();
+    void load(ac.signal);
+    return () => ac.abort();
   }, [load]);
 
   const offers = useMemo(() => {
@@ -182,6 +208,19 @@ export default function PlanPicker({
               className="h-[28rem] animate-pulse rounded-3xl border border-white/10 bg-white/[0.04]"
             />
           ))}
+        </div>
+      ) : offers.length === 0 ? (
+        <div className="mt-10 text-center">
+          <p className="text-sm text-red-300">
+            {error || "No se pudieron cargar los planes."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:border-teal-300/40"
+          >
+            Reintentar
+          </button>
         </div>
       ) : (
         <div className="mt-10 grid gap-5 lg:grid-cols-3 lg:gap-6">
@@ -321,7 +360,7 @@ export default function PlanPicker({
         </div>
       )}
 
-      {error && (
+      {error && offers.length > 0 && (
         <p className="mt-6 text-center text-sm text-red-300">{error}</p>
       )}
     </div>
