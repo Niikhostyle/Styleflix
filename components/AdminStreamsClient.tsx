@@ -349,9 +349,14 @@ export default function AdminStreamsClient() {
             onChange={(e) =>
               setForm((f) => ({ ...f, embedUrl: e.target.value }))
             }
-            placeholder="https://…"
+            placeholder="https://drive.google.com/file/d/…/preview"
             className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-teal-300/50"
           />
+          <p className="text-[11px] leading-relaxed text-white/40">
+            Google Drive: pega el link compartido (open/view). Se convierte solo a{" "}
+            <span className="text-cyan-200/80">/preview</span>. El archivo debe
+            estar en “Cualquiera con el enlace”.
+          </p>
         </label>
 
         <div className="grid gap-4 md:grid-cols-3">

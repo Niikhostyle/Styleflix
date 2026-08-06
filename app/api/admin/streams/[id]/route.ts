@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeEmbedUrl } from "@/lib/embed-url";
 
 async function requireAdmin() {
   const session = await auth();
@@ -86,7 +87,9 @@ export async function PATCH(
       ...(data.title !== undefined
         ? { title: data.title?.trim() || null }
         : {}),
-      ...(data.embedUrl != null ? { embedUrl: data.embedUrl.trim() } : {}),
+      ...(data.embedUrl != null
+        ? { embedUrl: normalizeEmbedUrl(data.embedUrl) }
+        : {}),
       ...(data.label != null
         ? { label: data.label.trim().slice(0, 60) }
         : {}),

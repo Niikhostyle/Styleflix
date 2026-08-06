@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeEmbedUrl } from "@/lib/embed-url";
 
 async function requireAdmin() {
   const session = await auth();
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
       season,
       episode,
       title: data.title?.trim() || null,
-      embedUrl: data.embedUrl.trim(),
+      embedUrl: normalizeEmbedUrl(data.embedUrl),
       label: (data.label || "VeoTV").trim().slice(0, 60),
       enabled: data.enabled ?? true,
       priority: data.priority ?? 10,

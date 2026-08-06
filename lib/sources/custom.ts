@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeEmbedUrl } from "@/lib/embed-url";
 
 export type CustomStreamMatch = {
   id: string;
@@ -33,7 +34,7 @@ export async function findCustomStream(opts: {
 
   const map = (r: (typeof rows)[number]): CustomStreamMatch => ({
     id: r.id,
-    embedUrl: r.embedUrl,
+    embedUrl: normalizeEmbedUrl(r.embedUrl),
     label: r.label || "VeoTV",
     title: r.title,
     season: r.season,
