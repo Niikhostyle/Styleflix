@@ -20,9 +20,11 @@ const patchSchema = z.object({
     "grant_prepaid",
     "set_password",
     "mark_email_verified",
+    "set_role",
   ]),
   days: z.number().int().min(1).max(365).optional(),
   password: z.string().min(6).max(72).optional(),
+  role: z.enum(["USER", "SUPER_ADMIN"]).optional(),
 });
 
 async function requireAdmin() {
@@ -85,7 +87,8 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAdmin())) {
+  const session = await requireAdmin();
+  if (!session) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
@@ -101,9 +104,51 @@ export async function PATCH(
     return NextResponse.json({ error: "Acción inválida." }, { status: 400 });
   }
 
-  const { action, days, password } = parsed.data;
+  const { action, days, password, role } = parsed.data;
 
   try {
+    if (action === "set_role") {
+      if (!role) {
+        return NextResponse.json(
+          { error: "Indica el rol (USER o SUPER_ADMIN)." },
+          { status: 400 }
+        );
+      }
+      if (role === user.role) {
+        return NextResponse.json({ ok: true, user });
+      }
+      if (session.user.id === id && role !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "No puedes quitarte tu propio rol de administrador." },
+          { status: 400 }
+        );
+      }
+      if (user.role === "SUPER_ADMIN" && role === "USER") {
+        const adminCount = await prisma.user.count({
+          where: { role: "SUPER_ADMIN" },
+        });
+        if (adminCount <= 1) {
+          return NextResponse.json(
+            { error: "Debe quedar al menos un SUPER_ADMIN." },
+            { status: 400 }
+          );
+        }
+      }
+      const updated = await prisma.user.update({
+        where: { id },
+        data: { role },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          subscriptionStatus: true,
+          currentPeriodEnd: true,
+        },
+      });
+      return NextResponse.json({ ok: true, user: updated });
+    }
+
     if (action === "set_password") {
       if (!password) {
         return NextResponse.json(

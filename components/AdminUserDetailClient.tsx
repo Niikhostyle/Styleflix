@@ -42,6 +42,7 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  const [roleDraft, setRoleDraft] = useState<"USER" | "SUPER_ADMIN">("USER");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/users/${userId}`);
@@ -51,6 +52,9 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
       return;
     }
     setUser(data.user);
+    setRoleDraft(
+      data.user?.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"
+    );
   }, [userId]);
 
   useEffect(() => {
@@ -59,7 +63,7 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
 
   async function runAction(
     action: string,
-    extra?: { days?: number; password?: string }
+    extra?: { days?: number; password?: string; role?: "USER" | "SUPER_ADMIN" }
   ) {
     setBusy(true);
     setError("");
@@ -111,9 +115,33 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
       ) : (
         <>
           <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm">
-            <p>
-              <span className="text-neutral-400">Rol:</span> {user.role}
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-neutral-400">Rol:</span>
+              <select
+                value={roleDraft}
+                disabled={busy}
+                onChange={(e) =>
+                  setRoleDraft(e.target.value as "USER" | "SUPER_ADMIN")
+                }
+                className="rounded-lg border border-white/15 bg-black/60 px-3 py-1.5 text-sm outline-none focus:border-teal-300/50"
+              >
+                <option value="USER">USER</option>
+                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+              </select>
+              <button
+                type="button"
+                disabled={busy || roleDraft === user.role}
+                onClick={() => void runAction("set_role", { role: roleDraft })}
+                className="brand-button rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+              >
+                Guardar rol
+              </button>
+              {roleDraft !== user.role && (
+                <span className="text-xs text-amber-200/80">
+                  El usuario debe volver a iniciar sesión para aplicar el rol.
+                </span>
+              )}
+            </div>
             <p>
               <span className="text-neutral-400">Correo verificado:</span>{" "}
               {user.emailVerified ? fmt(user.emailVerified) : "Pendiente"}

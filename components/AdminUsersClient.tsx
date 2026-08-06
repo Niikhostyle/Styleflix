@@ -120,6 +120,23 @@ export default function AdminUsersClient() {
     void loadUsers();
   }
 
+  async function changeRole(userId: string, nextRole: "USER" | "SUPER_ADMIN") {
+    setError("");
+    setOk("");
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "set_role", role: nextRole }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo cambiar el rol.");
+      return;
+    }
+    setOk(`Rol actualizado a ${nextRole}. El usuario debe reiniciar sesión.`);
+    void loadUsers();
+  }
+
   function formatDate(iso: string | null) {
     if (!iso) return "—";
     return new Date(iso).toLocaleDateString("es-CL");
@@ -290,15 +307,23 @@ export default function AdminUsersClient() {
                     <p className="text-xs text-neutral-400">{u.email}</p>
                   </td>
                   <td className="px-3 py-3">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs ${
+                    <select
+                      value={u.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "USER"}
+                      onChange={(e) => {
+                        const next = e.target.value as "USER" | "SUPER_ADMIN";
+                        if (next === u.role) return;
+                        void changeRole(u.id, next);
+                      }}
+                      className={`rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-xs outline-none focus:border-teal-300/50 ${
                         u.role === "SUPER_ADMIN"
-                          ? "bg-teal-300/15 text-teal-200"
-                          : "bg-white/10 text-neutral-300"
+                          ? "text-teal-200"
+                          : "text-neutral-300"
                       }`}
+                      title="Cambiar rol"
                     >
-                      {u.role}
-                    </span>
+                      <option value="USER">USER</option>
+                      <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                    </select>
                   </td>
                   <td className="px-3 py-3 text-neutral-300">
                     {planSourceLabel(u.planSource)}
