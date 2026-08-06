@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { SessionProvider } from "next-auth/react";
 import TvRemoteProvider from "@/components/TvRemoteProvider";
 import BraveTipToast from "@/components/BraveTipToast";
+import DemoBanner from "@/components/DemoBanner";
 import PricingProvider from "@/components/PricingProvider";
 import type { Pricing } from "@/lib/pricing";
 
@@ -44,6 +45,7 @@ export default function Providers({
       <PricingProvider value={pricing}>
         <NgrokFetchPatch>
           <TvRemoteProvider>
+            <DemoBanner />
             {children}
             <BraveTipToast />
           </TvRemoteProvider>

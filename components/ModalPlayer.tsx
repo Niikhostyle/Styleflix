@@ -52,7 +52,9 @@ export default function ModalPlayer({
   isAnime = false,
 }: ModalPlayerProps) {
   const { data: session } = useSession();
-  const membershipActive = Boolean(session?.user?.membershipActive);
+  const membershipActive = Boolean(
+    session?.user?.catalogAccess || session?.user?.membershipActive
+  );
   const isAdmin = session?.user?.role === "SUPER_ADMIN";
 
   const [frameNonce, setFrameNonce] = useState(0);

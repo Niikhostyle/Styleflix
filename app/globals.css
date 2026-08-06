@@ -3,23 +3,26 @@
 /**
  * Paleta VeoTV
  * — Fondo navy profundo
- * — Marca / CTA: teal
+ * — Marca TV: cyan → lavanda (logo)
  * — Acento secundario: violeta suave
  * — Rojo solo para errores / destructivo
  */
 :root {
   --background: #06080f;
   --foreground: #f2f5fa;
-  --brand: #2dd4bf;
-  --brand-strong: #14b8a6;
+  --brand: #76ead7;
+  --brand-strong: #5eead4;
   --brand-ink: #07111d;
-  --accent: #a78bfa;
-  --accent-strong: #8b5cf6;
+  --accent: #c299ff;
+  --accent-strong: #a78bfa;
   --surface: #0c1220;
   --surface-strong: #121a2c;
   --muted: #8b9bb3;
   --line: rgba(148, 163, 184, 0.14);
   --danger: #f87171;
+  --tv-from: #76ead7;
+  --tv-via: #a1c4fd;
+  --tv-to: #c299ff;
 }
 
 @theme inline {
@@ -104,8 +107,15 @@ select {
 
 .brand-button {
   color: var(--brand-ink);
-  background: linear-gradient(90deg, #2dd4bf, #5eead4);
-  box-shadow: 0 12px 34px rgba(45, 212, 191, 0.28);
+  background: linear-gradient(
+    90deg,
+    var(--tv-from) 0%,
+    var(--tv-via) 48%,
+    var(--tv-to) 100%
+  );
+  box-shadow:
+    0 12px 34px rgba(118, 234, 215, 0.22),
+    0 8px 24px rgba(194, 153, 255, 0.18);
 }
 
 .brand-button:hover {
@@ -115,13 +125,21 @@ select {
 
 .brand-button-ghost {
   color: #fff;
-  border: 1px solid rgba(45, 212, 191, 0.35);
-  background: rgba(45, 212, 191, 0.08);
+  border: 1px solid color-mix(in srgb, var(--tv-to) 40%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--tv-from) 12%, transparent),
+    color-mix(in srgb, var(--tv-to) 14%, transparent)
+  );
 }
 
 .brand-button-ghost:hover {
-  background: rgba(45, 212, 191, 0.16);
-  border-color: rgba(45, 212, 191, 0.55);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--tv-from) 20%, transparent),
+    color-mix(in srgb, var(--tv-to) 22%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--tv-via) 55%, transparent);
 }
 
 .focus-ring:focus-visible {

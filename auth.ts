@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { Role, SubscriptionStatus } from "@/lib/access";
-import { hasActiveMembership } from "@/lib/access";
+import { hasActiveDemo, hasActiveMembership, hasCatalogAccess } from "@/lib/access";
 import { resolveAuthSecret } from "@/lib/auth-secret";
 import { activatePrepaidOnFirstUse } from "@/lib/membership";
 
@@ -18,6 +18,9 @@ declare module "next-auth" {
     subscriptionStatus: SubscriptionStatus;
     currentPeriodEnd: string | null;
     membershipActive: boolean;
+    demoExpiresAt: string | null;
+    demoActive: boolean;
+    catalogAccess: boolean;
     planTier: string | null;
     planMaxProfiles: number | null;
     planMaxResolution: number | null;
@@ -34,6 +37,9 @@ declare module "next-auth" {
       subscriptionStatus: SubscriptionStatus;
       currentPeriodEnd: string | null;
       membershipActive: boolean;
+      demoExpiresAt: string | null;
+      demoActive: boolean;
+      catalogAccess: boolean;
       planTier: string | null;
       planMaxProfiles: number | null;
       planMaxResolution: number | null;
@@ -50,6 +56,9 @@ declare module "next-auth/jwt" {
     subscriptionStatus: SubscriptionStatus;
     currentPeriodEnd: string | null;
     membershipActive: boolean;
+    demoExpiresAt: string | null;
+    demoActive: boolean;
+    catalogAccess: boolean;
     planTier: string | null;
     planMaxProfiles: number | null;
     planMaxResolution: number | null;
@@ -74,6 +83,7 @@ function membershipFromUser(user: {
   role: string;
   subscriptionStatus: string;
   currentPeriodEnd: Date | null;
+  demoExpiresAt?: Date | null;
   planTier?: string | null;
   planMaxProfiles?: number | null;
   planMaxResolution?: number | null;
@@ -82,6 +92,9 @@ function membershipFromUser(user: {
   const subscriptionStatus = user.subscriptionStatus as SubscriptionStatus;
   const currentPeriodEnd = user.currentPeriodEnd
     ? user.currentPeriodEnd.toISOString()
+    : null;
+  const demoExpiresAt = user.demoExpiresAt
+    ? user.demoExpiresAt.toISOString()
     : null;
   const features =
     user.planFeatures &&
@@ -92,15 +105,20 @@ function membershipFromUser(user: {
           canDownload?: boolean;
         })
       : {};
+  const fields = {
+    role: user.role,
+    subscriptionStatus,
+    currentPeriodEnd: user.currentPeriodEnd,
+    demoExpiresAt: user.demoExpiresAt ?? null,
+  };
   return {
     role: user.role as Role,
     subscriptionStatus,
     currentPeriodEnd,
-    membershipActive: hasActiveMembership({
-      role: user.role,
-      subscriptionStatus,
-      currentPeriodEnd: user.currentPeriodEnd,
-    }),
+    membershipActive: hasActiveMembership(fields),
+    demoExpiresAt,
+    demoActive: hasActiveDemo(fields),
+    catalogAccess: hasCatalogAccess(fields),
     planTier: user.planTier ?? null,
     planMaxProfiles: user.planMaxProfiles ?? null,
     planMaxResolution: user.planMaxResolution ?? null,
@@ -171,6 +189,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.subscriptionStatus = user.subscriptionStatus;
         token.currentPeriodEnd = user.currentPeriodEnd;
         token.membershipActive = user.membershipActive;
+        token.demoExpiresAt = user.demoExpiresAt;
+        token.demoActive = user.demoActive;
+        token.catalogAccess = user.catalogAccess;
         token.planTier = user.planTier;
         token.planMaxProfiles = user.planMaxProfiles;
         token.planMaxResolution = user.planMaxResolution;
@@ -188,6 +209,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: true,
             subscriptionStatus: true,
             currentPeriodEnd: true,
+            demoExpiresAt: true,
             planTier: true,
             planMaxProfiles: true,
             planMaxResolution: true,
@@ -205,6 +227,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               email: activated.email,
               subscriptionStatus: activated.subscriptionStatus,
               currentPeriodEnd: activated.currentPeriodEnd,
+              demoExpiresAt: activated.demoExpiresAt,
               planTier: activated.planTier,
               planMaxProfiles: activated.planMaxProfiles,
               planMaxResolution: activated.planMaxResolution,
@@ -221,6 +244,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.subscriptionStatus = membership.subscriptionStatus;
           token.currentPeriodEnd = membership.currentPeriodEnd;
           token.membershipActive = membership.membershipActive;
+          token.demoExpiresAt = membership.demoExpiresAt;
+          token.demoActive = membership.demoActive;
+          token.catalogAccess = membership.catalogAccess;
           token.planTier = membership.planTier;
           token.planMaxProfiles = membership.planMaxProfiles;
           token.planMaxResolution = membership.planMaxResolution;
@@ -240,6 +266,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.currentPeriodEnd =
           (token.currentPeriodEnd as string | null) ?? null;
         session.user.membershipActive = Boolean(token.membershipActive);
+        session.user.demoExpiresAt =
+          (token.demoExpiresAt as string | null) ?? null;
+        session.user.demoActive = Boolean(token.demoActive);
+        session.user.catalogAccess = Boolean(token.catalogAccess);
         session.user.planTier = (token.planTier as string | null) ?? null;
         session.user.planMaxProfiles =
           (token.planMaxProfiles as number | null) ?? null;

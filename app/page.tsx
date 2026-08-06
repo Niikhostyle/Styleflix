@@ -15,8 +15,12 @@ async function HomeShell() {
     return <LandingHero posterUrls={posterUrls} />;
   }
 
-  if (!session.user.membershipActive) {
-    redirect("/onboarding/planes");
+  if (!session.user.catalogAccess && !session.user.membershipActive) {
+    redirect(
+      session.user.demoExpiresAt
+        ? "/onboarding/planes?demo=expired"
+        : "/onboarding/bienvenida"
+    );
   }
 
   const { featured, rows, activeSources } = await getHomeCatalog();

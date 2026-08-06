@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasActiveMembership } from "@/lib/access";
+import { hasCatalogAccess } from "@/lib/access";
 import {
   animeAv1ZillaHash,
   fetchZillaUpstream,
@@ -33,11 +33,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "No autorizado." }, { status: 401 });
     }
     if (
-      !hasActiveMembership({
+      !hasCatalogAccess({
         role: session.user.role,
         subscriptionStatus: session.user.subscriptionStatus,
         currentPeriodEnd: session.user.currentPeriodEnd,
-      })
+      demoExpiresAt: session.user.demoExpiresAt,
+    })
     ) {
       return NextResponse.json(
         { error: "Membresía requerida." },

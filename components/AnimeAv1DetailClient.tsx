@@ -55,7 +55,9 @@ export default function AnimeAv1DetailClient({
 }) {
   const { data: session, status } = useSession();
   const canPlay = Boolean(
-    session?.user?.membershipActive || session?.user?.role === "SUPER_ADMIN"
+    session?.user?.catalogAccess ||
+      session?.user?.membershipActive ||
+      session?.user?.role === "SUPER_ADMIN"
   );
 
   const [episode, setEpisode] = useState(1);

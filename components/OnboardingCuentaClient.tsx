@@ -55,7 +55,7 @@ export default function OnboardingCuentaClient() {
         setLoading(false);
         return;
       }
-      router.replace("/onboarding/planes");
+      router.replace("/onboarding/bienvenida");
     } catch {
       setError("Error de red.");
       setLoading(false);

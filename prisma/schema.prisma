@@ -39,6 +39,9 @@ model User {
   /// { canRequest, requestQuota, canDownload }
   planFeatures       Json?
 
+  /// Fin de la demo de catálogo (30 min, una vez por cuenta)
+  demoExpiresAt      DateTime?
+
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   watchHistory WatchProgress[]
@@ -170,4 +173,40 @@ model TitleRequest {
 
   @@unique([userId, mediaType, tmdbId])
   @@index([status, createdAt])
+}
+
+/// Eventos de seguridad (escaneo, scraping, auth, rate limit, etc.)
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  /// SCAN | SCRAPE | AUTH_FAIL | RATE_LIMIT | BLOCK | UNBLOCK | SUSPICIOUS | INFO
+  type      String
+  severity  String   @default("low") // low | medium | high | critical
+  ip        String?
+  path      String?
+  method    String?
+  userAgent String?
+  userId    String?
+  detail    String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([ip, createdAt])
+  @@index([severity, createdAt])
+}
+
+/// IPs bloqueadas manualmente o por auto-defensa
+model BlockedIp {
+  id        String   @id @default(cuid())
+  ip        String   @unique
+  reason    String?
+  /// MANUAL | AUTO_SCAN | AUTO_AUTH | AUTO_RATE
+  source    String   @default("MANUAL")
+  hits      Int      @default(0)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
 }

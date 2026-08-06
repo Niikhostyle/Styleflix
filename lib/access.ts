@@ -15,7 +15,11 @@ export type MembershipFields = {
   role?: string | null;
   subscriptionStatus?: string | null;
   currentPeriodEnd?: Date | string | null;
+  demoExpiresAt?: Date | string | null;
 };
+
+/** Minutos de demo de catálogo tras crear cuenta (opcional). */
+export const DEMO_CATALOG_MINUTES = 30;
 
 /** SUPER_ADMIN siempre pasa. USER necesita ACTIVE/CANCELLED y periodo vigente. */
 export function hasActiveMembership(user: MembershipFields | null | undefined): boolean {
@@ -33,6 +37,31 @@ export function hasActiveMembership(user: MembershipFields | null | undefined): 
       ? user.currentPeriodEnd
       : new Date(user.currentPeriodEnd);
   return end.getTime() > Date.now();
+}
+
+/** Demo de catálogo vigente (una vez por cuenta). */
+export function hasActiveDemo(user: MembershipFields | null | undefined): boolean {
+  if (!user?.demoExpiresAt) return false;
+  if (user.role === "SUPER_ADMIN") return true;
+  const end =
+    user.demoExpiresAt instanceof Date
+      ? user.demoExpiresAt
+      : new Date(user.demoExpiresAt);
+  return end.getTime() > Date.now();
+}
+
+/** Puede ver/reproducir catálogo: membresía o demo. */
+export function hasCatalogAccess(user: MembershipFields | null | undefined): boolean {
+  return hasActiveMembership(user) || hasActiveDemo(user);
+}
+
+export function demoMsRemaining(user: MembershipFields | null | undefined): number {
+  if (!hasActiveDemo(user) || !user?.demoExpiresAt) return 0;
+  const end =
+    user.demoExpiresAt instanceof Date
+      ? user.demoExpiresAt
+      : new Date(user.demoExpiresAt);
+  return Math.max(0, end.getTime() - Date.now());
 }
 
 export function addMonths(from: Date, months = 1): Date {

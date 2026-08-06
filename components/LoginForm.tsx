@@ -46,20 +46,30 @@ export default function LoginForm({
     if (status !== "authenticated") return;
     const t = window.setTimeout(async () => {
       const session = await getSession();
-      const dest = session?.user?.membershipActive
-        ? safeCallback(callbackUrl)
-        : "/onboarding/planes";
-      window.location.replace(dest);
+      if (session?.user?.catalogAccess || session?.user?.membershipActive) {
+        window.location.replace(safeCallback(callbackUrl));
+        return;
+      }
+      if (session?.user?.demoExpiresAt) {
+        window.location.replace("/onboarding/planes?demo=expired");
+        return;
+      }
+      window.location.replace("/onboarding/bienvenida");
     }, 50);
     return () => window.clearTimeout(t);
   }, [status, callbackUrl]);
 
   async function afterAuth() {
     const session = await getSession();
-    const dest = session?.user?.membershipActive
-      ? safeCallback(callbackUrl)
-      : "/onboarding/planes";
-    window.location.assign(dest);
+    if (session?.user?.catalogAccess || session?.user?.membershipActive) {
+      window.location.assign(safeCallback(callbackUrl));
+      return;
+    }
+    if (session?.user?.demoExpiresAt) {
+      window.location.assign("/onboarding/planes?demo=expired");
+      return;
+    }
+    window.location.assign("/onboarding/bienvenida");
   }
 
   async function onLogin(e: FormEvent) {
@@ -77,6 +87,14 @@ export default function LoginForm({
       });
       if (res?.error) {
         const code = (res as { code?: string }).code || "";
+        void fetch("/api/auth/login-fail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            reason: code || "login_error",
+          }),
+        }).catch(() => undefined);
         if (
           code === "email_not_verified" ||
           String(res.error).includes("email_not_verified")

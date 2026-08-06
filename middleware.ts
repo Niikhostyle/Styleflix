@@ -15,6 +15,7 @@ function isPublicPath(pathname: string) {
   if (pathname === "/api/billing/webhook") return true;
   if (pathname === "/api/pricing") return true;
   if (pathname === "/api/settings/preview") return true;
+  if (pathname === "/api/internal/security-ingest") return true;
   // HLS Zilla: auth por token firmado (si middleware redirige a /login, hls.js rompe)
   if (pathname === "/api/play/animeav1-hls") return true;
   if (pathname === "/api/play/animeav1-embed") return true;
@@ -22,7 +23,7 @@ function isPublicPath(pathname: string) {
   return false;
 }
 
-/** Rutas que exigen sesión pero no membresía (pago / cuenta). */
+/** Rutas que exigen sesión pero no membresía/demo (pago / cuenta). */
 function isMembershipExempt(pathname: string) {
   if (pathname.startsWith("/onboarding")) return true;
   if (pathname.startsWith("/membresia")) return true;
@@ -79,22 +80,79 @@ function isLoggedIn(
   return Boolean(token) || hasSessionCookie(request);
 }
 
+function hasAccess(
+  token: Awaited<ReturnType<typeof readToken>>
+): boolean {
+  if (!token) return false;
+  if (token.role === "SUPER_ADMIN") return true;
+  if (token.membershipActive || token.catalogAccess) return true;
+  if (token.demoActive) return true;
+  const exp = token.demoExpiresAt as string | null | undefined;
+  if (exp && new Date(exp).getTime() > Date.now()) return true;
+  return false;
+}
+
+function destinationWithoutAccess(
+  token: Awaited<ReturnType<typeof readToken>>
+): string {
+  const exp = token?.demoExpiresAt as string | null | undefined;
+  if (exp) return "/onboarding/planes?demo=expired";
+  return "/onboarding/bienvenida";
+}
+
+function clientIp(request: NextRequest): string {
+  return (
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
+const SCAN_PATH_RE =
+  /(?:wp-admin|wp-login|xmlrpc\.php|\.env|phpmyadmin|adminer|\.git\/|actuator|composer\.json|vendor\/phpunit|cgi-bin|shell\.php)/i;
+
 /**
- * Paywall duro: catálogo requiere sesión + membresía activa.
- * Landing `/` pública; sin plan → onboarding.
+ * Paywall: catálogo requiere sesión + (membresía o demo activa).
+ * Landing `/` pública; sin acceso → onboarding.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const ip = clientIp(request);
+
+  // Señal de escaneo → ingest (no bloquea el request aquí)
+  if (SCAN_PATH_RE.test(pathname)) {
+    const origin = request.nextUrl.origin;
+    const secret =
+      process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
+    void fetch(`${origin}/api/internal/security-ingest`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-veotv-ingest": secret.slice(0, 32),
+      },
+      body: JSON.stringify({
+        type: "SCAN",
+        severity: "high",
+        ip,
+        path: pathname,
+        method: request.method,
+        userAgent: request.headers.get("user-agent"),
+        detail: `Escaneo detectado: ${pathname}`,
+      }),
+    }).catch(() => undefined);
+    return new NextResponse("Forbidden", { status: 403 });
+  }
 
   const token = await readToken(request);
   const loggedIn = isLoggedIn(token, request);
-  const membershipActive = Boolean(
-    token?.membershipActive || token?.role === "SUPER_ADMIN"
-  );
+  const catalogAccess = hasAccess(token);
 
   if (pathname === "/") {
-    if (loggedIn && !membershipActive) {
-      return NextResponse.redirect(new URL("/onboarding/planes", request.url));
+    if (loggedIn && !catalogAccess) {
+      return NextResponse.redirect(
+        new URL(destinationWithoutAccess(token), request.url)
+      );
     }
     return NextResponse.next();
   }
@@ -107,14 +165,21 @@ export async function middleware(request: NextRequest) {
         pathname === "/restablecer-clave") &&
       loggedIn
     ) {
-      const dest = membershipActive ? "/" : "/onboarding/planes";
+      const dest = catalogAccess ? "/" : destinationWithoutAccess(token);
       const callback = request.nextUrl.searchParams.get("callbackUrl");
       const safe =
         callback && callback.startsWith("/") && !callback.startsWith("//")
           ? callback
           : dest;
-      if (!membershipActive && !safe.startsWith("/onboarding") && safe !== "/membresia" && !safe.startsWith("/cuenta")) {
-        return NextResponse.redirect(new URL("/onboarding/planes", request.url));
+      if (
+        !catalogAccess &&
+        !safe.startsWith("/onboarding") &&
+        safe !== "/membresia" &&
+        !safe.startsWith("/cuenta")
+      ) {
+        return NextResponse.redirect(
+          new URL(destinationWithoutAccess(token), request.url)
+        );
       }
       return NextResponse.redirect(new URL(safe, request.url));
     }
@@ -135,8 +200,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (!membershipActive && !isMembershipExempt(pathname)) {
-    return NextResponse.redirect(new URL("/onboarding/planes", request.url));
+  if (!catalogAccess && !isMembershipExempt(pathname)) {
+    return NextResponse.redirect(
+      new URL(destinationWithoutAccess(token), request.url)
+    );
   }
 
   return NextResponse.next();

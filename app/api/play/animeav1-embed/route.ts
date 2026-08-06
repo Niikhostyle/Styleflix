@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasActiveMembership } from "@/lib/access";
+import { hasCatalogAccess } from "@/lib/access";
 import { animeAv1M3u8Url } from "@/lib/animeav1";
 import {
   signAnimeAv1StreamToken,
@@ -29,11 +29,12 @@ export async function GET(request: Request) {
     const session = await auth();
     if (
       !session?.user?.id ||
-      !hasActiveMembership({
+      !hasCatalogAccess({
         role: session.user.role,
         subscriptionStatus: session.user.subscriptionStatus,
         currentPeriodEnd: session.user.currentPeriodEnd,
-      })
+      demoExpiresAt: session.user.demoExpiresAt,
+    })
     ) {
       return new NextResponse("No autorizado", { status: 401 });
     }
