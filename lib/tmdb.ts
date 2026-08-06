@@ -423,31 +423,58 @@ export async function getSimilarMedia(type: MediaType, id: number) {
   return type === "movie" ? getSimilarMovies(id) : getSimilarSeries(id);
 }
 
-/** Búsqueda multi (películas + series) */
+/** Búsqueda multi (películas + series), hasta 2 páginas TMDB. */
 export async function searchMulti(query: string): Promise<MediaItem[]> {
   const q = query.trim();
   if (!q) return [];
   assertApiKey();
 
-  const res = await fetch(
-    buildUrl("/search/multi", `&query=${encodeURIComponent(q)}&include_adult=false`),
-    { next: { revalidate: 600 } }
+  const pages = await Promise.all(
+    [1, 2].map(async (page) => {
+      const res = await fetch(
+        buildUrl(
+          "/search/multi",
+          `&query=${encodeURIComponent(q)}&include_adult=false&page=${page}`
+        ),
+        { next: { revalidate: 600 } }
+      );
+      if (!res.ok) return [] as MediaItem[];
+      const data: TMDBListResponse = await res.json();
+      return (data.results ?? [])
+        .filter(
+          (item) => item.media_type === "movie" || item.media_type === "tv"
+        )
+        .map((item) => ({
+          ...item,
+          media_type: item.media_type as MediaType,
+        }));
+    })
   );
 
-  if (!res.ok) {
-    throw new Error(`Error en búsqueda TMDB: ${res.status}`);
+  const seen = new Set<string>();
+  const out: MediaItem[] = [];
+  for (const item of pages.flat()) {
+    const key = `${item.media_type}-${item.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
   }
+  return out;
+}
 
-  const data: TMDBListResponse = await res.json();
-  return (data.results ?? [])
-    .filter(
-      (item) =>
-        item.media_type === "movie" || item.media_type === "tv"
-    )
-    .map((item) => ({
-      ...item,
-      media_type: item.media_type as MediaType,
-    }));
+/** Recomendaciones oficiales TMDB a partir de un título. */
+export function getRecommendedMovies(id: number) {
+  return fetchList(`/movie/${id}/recommendations`, "movie");
+}
+
+export function getRecommendedSeries(id: number) {
+  return fetchList(`/tv/${id}/recommendations`, "tv");
+}
+
+export async function getRecommendedMedia(type: MediaType, id: number) {
+  return type === "movie"
+    ? getRecommendedMovies(id)
+    : getRecommendedSeries(id);
 }
 
 /**

@@ -308,8 +308,7 @@ export async function getAnimeCatalog(): Promise<CatalogPage> {
 }
 
 /**
- * Home: una selección de cada fuente en lugar del catálogo completo, para no
- * pagar el costo de todas las filas en la portada.
+ * Home: prioriza populares, más vistas y estrenos; luego reproducibles y géneros.
  */
 export async function getHomeCatalog(): Promise<CatalogPage> {
   const [
@@ -324,6 +323,7 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     plutoSeries,
     archiveRows,
     jikanRows,
+    mostViewedRow,
   ] = await Promise.all([
     loadVimeus("movies", [1, 2]),
     loadVimeus("series", [1, 2]),
@@ -336,6 +336,7 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     loadPluto("series"),
     loadArchiveRows(),
     loadJikanRows(),
+    loadMostViewedRow(),
   ]);
 
   const playableRows: LoadedRow[] = [
@@ -360,23 +361,80 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
 
   const available = buildAvailabilityIndex(await loadAvailability(), playableRows);
 
-  const discoveryRows = applyAvailability(
+  // Populares + tendencias + estrenos primero (índices 0–4 / 0–3 tras reorder TMDB)
+  const highlightDiscovery = applyAvailability(
     [
-      ...tmdbMovieRows.slice(0, 4),
-      ...tmdbSeriesRows.slice(0, 3),
-      ...jikanRows.slice(0, 2),
+      ...tmdbMovieRows.slice(0, 5),
+      ...tmdbSeriesRows.slice(0, 4),
       ...tmdbAnimeRows.slice(0, 2),
     ],
     available
   );
 
-  const allRows = [...playableRows, ...discoveryRows];
+  const extraDiscovery = applyAvailability(
+    [...jikanRows.slice(0, 2)],
+    available
+  );
+
+  const mostViewed = mostViewedRow
+    ? applyAvailability([mostViewedRow], available)
+    : [];
+
+  const allRows = [
+    ...mostViewed,
+    ...highlightDiscovery,
+    ...playableRows,
+    ...extraDiscovery,
+  ];
 
   return {
-    featured: await pickFeatured(playableRows.length ? playableRows : allRows),
+    featured: await pickFeatured(
+      highlightDiscovery.length ? highlightDiscovery : playableRows.length ? playableRows : allRows
+    ),
     rows: finishRows(allRows),
     activeSources: collectSources(allRows),
   };
+}
+
+/** Agrega lo más visto en VeoTV a partir del historial global. */
+async function loadMostViewedRow(): Promise<LoadedRow | null> {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const grouped = await prisma.watchProgress.groupBy({
+      by: ["mediaType", "tmdbId"],
+      _count: { _all: true },
+      _max: { title: true, posterPath: true },
+      orderBy: { _count: { tmdbId: "desc" } },
+      take: 28,
+    });
+
+    if (!grouped.length) return null;
+
+    const items: CatalogItem[] = grouped.map((row) => {
+      const mediaType = (row.mediaType === "tv" ? "tv" : "movie") as MediaType;
+      return {
+        id: row.tmdbId,
+        title: row._max.title || "Sin título",
+        name: row._max.title || "Sin título",
+        overview: "",
+        poster_path: row._max.posterPath || null,
+        backdrop_path: null,
+        media_type: mediaType,
+        vote_average: Math.min(10, 5 + row._count._all * 0.4),
+        sources: ["tmdb"] as SourceId[],
+        playable: false,
+      };
+    });
+
+    return {
+      title: "Más vistas en VeoTV",
+      mediaType: "movie",
+      items,
+    };
+  } catch (err) {
+    console.error("[catalog] más vistas", err);
+    return null;
+  }
 }
 
 function posterUrl(path: string): string {

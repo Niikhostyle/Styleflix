@@ -16,9 +16,9 @@ type RowDef = {
 const MOVIE_ROWS: RowDef[] = [
   { title: "Tendencias en películas", endpoint: "/trending/movie/week", mediaType: "movie" },
   { title: "Películas populares", endpoint: "/movie/popular", mediaType: "movie" },
-  { title: "En cartelera", endpoint: "/movie/now_playing", mediaType: "movie" },
-  { title: "Mejor valoradas", endpoint: "/movie/top_rated", mediaType: "movie" },
+  { title: "Estrenos en cartelera", endpoint: "/movie/now_playing", mediaType: "movie" },
   { title: "Próximos estrenos", endpoint: "/movie/upcoming", mediaType: "movie" },
+  { title: "Mejor valoradas", endpoint: "/movie/top_rated", mediaType: "movie" },
   { title: "Acción", endpoint: "/discover/movie?with_genres=28", mediaType: "movie" },
   { title: "Comedia", endpoint: "/discover/movie?with_genres=35", mediaType: "movie" },
   { title: "Terror", endpoint: "/discover/movie?with_genres=27", mediaType: "movie" },
@@ -31,6 +31,7 @@ const MOVIE_ROWS: RowDef[] = [
 const SERIES_ROWS: RowDef[] = [
   { title: "Tendencias en series", endpoint: "/trending/tv/week", mediaType: "tv" },
   { title: "Series populares", endpoint: "/tv/popular", mediaType: "tv" },
+  { title: "Estrenos en TV", endpoint: "/tv/on_the_air", mediaType: "tv" },
   { title: "Se emiten hoy", endpoint: "/tv/airing_today", mediaType: "tv" },
   { title: "Series mejor valoradas", endpoint: "/tv/top_rated", mediaType: "tv" },
   { title: "Drama", endpoint: "/discover/tv?with_genres=18", mediaType: "tv" },

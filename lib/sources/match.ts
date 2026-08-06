@@ -33,10 +33,14 @@ export function scoreTitleMatch(
   ) {
     score += 60;
   } else {
-    const words = queryNorm.split(" ").filter((w) => w.length > 2);
+    // Incluye números cortos (secuelas: "5", "2") además de palabras >2.
+    const words = queryNorm
+      .split(" ")
+      .filter((w) => w.length > 2 || /^\d+$/.test(w));
     const hits = words.filter((w) => candidateNorm.includes(w)).length;
     if (hits === 0) return -1;
     score += hits * 12;
+    if (words.length >= 2 && hits === words.length) score += 20;
   }
 
   const { candidateYear, queryYear } = opts ?? {};

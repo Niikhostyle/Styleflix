@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const items = await searchCatalog(q);
-    return NextResponse.json({ items: items.slice(0, 28) });
+    return NextResponse.json({ items: items.slice(0, 40) });
   } catch {
     return NextResponse.json(
       { error: "No se pudo buscar", items: [] },
