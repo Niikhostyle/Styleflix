@@ -404,13 +404,15 @@ async function loadMostViewedRow(): Promise<LoadedRow | null> {
       by: ["mediaType", "tmdbId"],
       _count: { _all: true },
       _max: { title: true, posterPath: true },
-      orderBy: { _count: { tmdbId: "desc" } },
-      take: 28,
     });
 
     if (!grouped.length) return null;
 
-    const items: CatalogItem[] = grouped.map((row) => {
+    const ranked = [...grouped]
+      .sort((a, b) => b._count._all - a._count._all)
+      .slice(0, 28);
+
+    const items: CatalogItem[] = ranked.map((row) => {
       const mediaType = (row.mediaType === "tv" ? "tv" : "movie") as MediaType;
       return {
         id: row.tmdbId,
