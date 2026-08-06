@@ -22,7 +22,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 const DEFAULT_OUT = "G:\\Mi unidad\\veotv";
@@ -50,18 +50,20 @@ type LocalCandidate = {
 };
 
 function loadEnv() {
-  for (const file of [".env.local", ".env"]) {
+  // .env.local gana siempre sobre .env (Prisma puede haber precargado .env)
+  for (const file of [".env", ".env.local"]) {
     let raw: string;
     try {
       raw = readFileSync(resolve(process.cwd(), file), "utf8");
     } catch {
       continue;
     }
+    const preferLocal = file.endsWith(".env.local");
     for (const line of raw.split(/\r?\n/)) {
       const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/i);
       if (!match) continue;
       const [, key, valueRaw] = match;
-      if (process.env[key]) continue;
+      if (process.env[key] && !preferLocal) continue;
       process.env[key] = valueRaw.trim().replace(/^["']|["']$/g, "");
     }
   }
@@ -248,6 +250,7 @@ function parseTmdbFromPath(path: string): {
 }
 
 function isVideo(f: DriveFile): boolean {
+  if (/\.part$/i.test(f.name)) return false; // descarga incompleta
   if (VIDEO_EXT.test(f.name)) return true;
   return (f.mimeType || "").startsWith("video/");
 }
@@ -290,6 +293,20 @@ async function upsertOverride(
   dryRun: boolean
 ) {
   const embedUrl = `https://drive.google.com/file/d/${c.fileId}/preview`;
+
+  if (dryRun) {
+    log(
+      "dry-run",
+      "UPSERT",
+      c.mediaType,
+      c.tmdbId,
+      c.season != null ? `S${c.season}E${c.episode}` : "movie",
+      c.title,
+      c.fileId
+    );
+    return "create";
+  }
+
   const whereSeason = c.season;
   const whereEpisode = c.episode;
 
@@ -302,19 +319,6 @@ async function upsertOverride(
       notes: { startsWith: "auto:drive" },
     },
   });
-
-  if (dryRun) {
-    log(
-      "dry-run",
-      existing ? "UPDATE" : "CREATE",
-      c.mediaType,
-      c.tmdbId,
-      c.season != null ? `S${c.season}E${c.episode}` : "",
-      c.title,
-      c.fileId
-    );
-    return existing ? "update" : "create";
-  }
 
   if (existing) {
     await prisma.streamOverride.update({
@@ -392,30 +396,99 @@ Cuando esté listo:
 }
 
 async function main() {
-  const needed = [
-    "DATABASE_URL",
+  const dryRun = hasFlag("dry-run");
+  const doShare = hasFlag("share");
+  const exportPath = arg("export");
+  const importPath = arg("import");
+  const onlyMovies = hasFlag("only-movies");
+  const onlySeries = hasFlag("only-series");
+  const onlyAnime = hasFlag("only-anime");
+  const limit = Number(arg("limit", "0") || "0");
+  const outRoot = arg("out", DEFAULT_OUT) || DEFAULT_OUT;
+  // dry-run / --export: solo Drive. --import: solo DB. normal: Drive+DB.
+
+  if (importPath) {
+    const needed = ["DATABASE_URL"];
+    const missing = missingEnv(needed);
+    if (missing.length) {
+      printChecklist(missing);
+      process.exit(1);
+    }
+    const raw = readFileSync(resolve(importPath), "utf8");
+    const payload = JSON.parse(raw) as {
+      items: Array<{
+        mediaType: "movie" | "tv";
+        tmdbId: number;
+        title: string;
+        season: number | null;
+        episode: number | null;
+        fileId: string;
+        drivePath?: string;
+        category?: LocalCandidate["category"];
+      }>;
+    };
+    const prisma = new PrismaClient();
+    const stats = { create: 0, update: 0, shared: 0, errors: 0 };
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      for (const item of payload.items || []) {
+        const c: LocalCandidate = {
+          mediaType: item.mediaType,
+          category: item.category || (item.mediaType === "movie" ? "peliculas" : "series"),
+          tmdbId: item.tmdbId,
+          title: item.title,
+          season: item.season,
+          episode: item.episode,
+          fileId: item.fileId,
+          fileName: item.fileId,
+          drivePath: item.drivePath || "",
+        };
+        try {
+          const op = await upsertOverride(prisma, c, false);
+          if (op === "create") stats.create++;
+          else stats.update++;
+          log(op, `tmdb-${c.tmdbId}`, c.title);
+        } catch (e) {
+          stats.errors++;
+          log("ERROR", c.title, String(e));
+        }
+      }
+    } catch (e) {
+      console.error(`
+No se puede conectar a DATABASE_URL desde esta PC.
+
+El host interno de Coolify (ej. xxx:5432) no es alcanzable desde fuera.
+Opciones:
+  1) En Coolify → Postgres → exponer puerto / usar URL pública y ponerla en DATABASE_URL
+  2) Correr el import DENTRO del contenedor app:
+       node -e ... o copiar el JSON y usar mirror:register -- --import archivo.json
+`);
+      console.error(e);
+      process.exit(1);
+    } finally {
+      await prisma.$disconnect();
+    }
+    log("import listo", stats);
+    return;
+  }
+
+  const driveNeeded = [
     "GOOGLE_DRIVE_FOLDER_ID",
     "GOOGLE_DRIVE_CLIENT_ID",
     "GOOGLE_DRIVE_CLIENT_SECRET",
     "GOOGLE_DRIVE_REFRESH_TOKEN",
   ];
-  const missing = missingEnv(needed);
+  const dbNeeded = dryRun || exportPath ? [] : ["DATABASE_URL"];
+  const missing = missingEnv([...driveNeeded, ...dbNeeded]);
   if (missing.length) {
     printChecklist(missing);
     process.exit(1);
   }
 
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID!.trim();
-  const dryRun = hasFlag("dry-run");
-  const doShare = hasFlag("share");
-  const onlyMovies = hasFlag("only-movies");
-  const onlySeries = hasFlag("only-series");
-  const onlyAnime = hasFlag("only-anime");
-  const limit = Number(arg("limit", "0") || "0");
-  const outRoot = arg("out", DEFAULT_OUT) || DEFAULT_OUT;
 
   log("folder", folderId);
-  log("dry-run", dryRun, "share", doShare);
+  log("dry-run", dryRun, "share", doShare, "export", exportPath || "-");
 
   const token = await getAccessToken();
   log("Drive token OK — listando carpeta veotv…");
@@ -443,8 +516,69 @@ Estructura esperada (la del mirror:download):
     process.exit(2);
   }
 
-  const prisma = new PrismaClient();
+  const exportPayload = {
+    updatedAt: new Date().toISOString(),
+    count: candidates.length,
+    items: candidates.map((c) => ({
+      mediaType: c.mediaType,
+      category: c.category,
+      tmdbId: c.tmdbId,
+      title: c.title,
+      season: c.season,
+      episode: c.episode,
+      fileId: c.fileId,
+      drivePath: c.drivePath,
+      embedUrl: `https://drive.google.com/file/d/${c.fileId}/preview`,
+    })),
+  };
+
+  if (exportPath) {
+    const abs = resolve(exportPath);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, JSON.stringify(exportPayload, null, 2));
+    log("exportado", abs, candidates.length, "items");
+  }
+
+  // Siempre guardar copia local si hay G:
+  try {
+    if (existsSync(outRoot)) {
+      const stateDir = join(outRoot, "_state");
+      mkdirSync(stateDir, { recursive: true });
+      writeFileSync(
+        join(stateDir, "pending-overrides.json"),
+        JSON.stringify(exportPayload, null, 2)
+      );
+      log("también en", join(outRoot, "_state", "pending-overrides.json"));
+    }
+  } catch {
+    /* ignore */
+  }
+
   const stats = { create: 0, update: 0, shared: 0, errors: 0 };
+  let prisma: PrismaClient | null = null;
+
+  if (!dryRun && !exportPath) {
+    prisma = new PrismaClient();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (e) {
+      await prisma.$disconnect().catch(() => undefined);
+      console.error(`
+Drive OK, pero DATABASE_URL no es alcanzable desde tu PC
+(host interno Coolify tipo sk88s…:5432).
+
+Hacé esto:
+  A) Export + import en el servidor:
+       npm run mirror:register -- --share --export data/drive-overrides.json
+       # copiá el JSON al contenedor app y:
+       npm run mirror:register -- --import data/drive-overrides.json
+
+  B) O poné en .env.local una DATABASE_URL pública (Postgres de Coolify con puerto expuesto).
+`);
+      console.error(String(e));
+      process.exit(1);
+    }
+  }
 
   try {
     for (const c of candidates) {
@@ -453,14 +587,26 @@ Estructura esperada (la del mirror:download):
           await shareAnyone(c.fileId, token);
           stats.shared++;
         }
-        const op = await upsertOverride(prisma, c, dryRun);
+        if (dryRun) {
+          await upsertOverride(null as unknown as PrismaClient, c, true);
+          stats.create++;
+          continue;
+        }
+        if (exportPath && !prisma) {
+          // solo export/share, sin DB
+          continue;
+        }
+        if (!prisma) continue;
+        const op = await upsertOverride(prisma, c, false);
         if (op === "create") stats.create++;
         else stats.update++;
         log(
           op,
           c.category,
           `tmdb-${c.tmdbId}`,
-          c.season != null ? `S${String(c.season).padStart(2, "0")}E${String(c.episode).padStart(2, "0")}` : "movie",
+          c.season != null
+            ? `S${String(c.season).padStart(2, "0")}E${String(c.episode).padStart(2, "0")}`
+            : "movie",
           c.title
         );
       } catch (e) {
@@ -469,45 +615,19 @@ Estructura esperada (la del mirror:download):
       }
     }
   } finally {
-    await prisma.$disconnect();
-  }
-
-  // Estado local opcional (si G: está montado)
-  try {
-    if (!dryRun && existsSync(outRoot)) {
-      const stateDir = join(outRoot, "_state");
-      mkdirSync(stateDir, { recursive: true });
-      writeFileSync(
-        join(stateDir, "registered.json"),
-        JSON.stringify(
-          {
-            updatedAt: new Date().toISOString(),
-            stats,
-            items: candidates.map((c) => ({
-              tmdbId: c.tmdbId,
-              mediaType: c.mediaType,
-              season: c.season,
-              episode: c.episode,
-              fileId: c.fileId,
-              path: c.drivePath,
-            })),
-          },
-          null,
-          2
-        )
-      );
-    }
-  } catch {
-    /* ignore */
+    if (prisma) await prisma.$disconnect();
   }
 
   log("listo", stats);
   if (dryRun) {
-    log("Era dry-run: no se escribió en la DB. Sacá --dry-run para aplicar.");
+    log("Era dry-run: no se escribió en la DB ni se compartió.");
+    log("Siguiente (DB interna Coolify):");
+    log('  npm run mirror:register -- --share --export data/drive-overrides.json');
+    log("  Luego importá ese JSON desde el contenedor app o con DATABASE_URL pública.");
   }
-  if (!doShare && !dryRun) {
+  if (!doShare && !dryRun && !exportPath) {
     log(
-      "Tip: volvé a correr con --share para publicar “cualquiera con el enlace” (necesario para GOOGLE_DRIVE_API_KEY en Coolify)."
+      "Tip: usá --share para publicar “cualquiera con el enlace” (necesario para GOOGLE_DRIVE_API_KEY en Coolify)."
     );
   }
 }

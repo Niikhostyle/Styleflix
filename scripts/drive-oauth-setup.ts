@@ -18,7 +18,7 @@ import { resolve } from "node:path";
 import { exec } from "node:child_process";
 
 const PORT = 53682;
-const REDIRECT = `http://127.0.0.1:${PORT}/oauth2callback`;
+const REDIRECT = `http://localhost:${PORT}/oauth2callback`;
 const SCOPES = [
   "https://www.googleapis.com/auth/drive",
 ].join(" ");
