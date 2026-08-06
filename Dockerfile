@@ -1,5 +1,8 @@
 # Coolify / VPS sin BuildKit — no usa --mount=type=cache (Nixpacks falla ahí).
-FROM node:22-bookworm-slim AS deps
+# Mirror público de la imagen oficial (evita TLS timeout a registry-1.docker.io).
+ARG NODE_IMAGE=public.ecr.aws/docker/library/node:22-bookworm-slim
+
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -8,7 +11,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci
 
-FROM node:22-bookworm-slim AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -27,7 +30,7 @@ ENV NEXT_PUBLIC_TMDB_API_KEY=$NEXT_PUBLIC_TMDB_API_KEY \
 
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
