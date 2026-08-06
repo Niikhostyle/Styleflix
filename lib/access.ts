@@ -20,7 +20,7 @@ export type MembershipFields = {
   demoExpiresAt?: Date | string | null;
 };
 
-/** Minutos de demo de catálogo tras crear cuenta (opcional). */
+/** Minutos de demo de catálogo — fallback; usar getDemoCatalogMinutes() en runtime. */
 export const DEMO_CATALOG_MINUTES = 30;
 
 /** SUPER_ADMIN siempre pasa. USER necesita ACTIVE/CANCELLED y periodo vigente. */

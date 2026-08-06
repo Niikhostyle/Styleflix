@@ -22,6 +22,12 @@ export default function AdminSettingsClient() {
   const [error, setError] = useState("");
   const [downloadsEnabled, setDownloadsEnabled] = useState(false);
   const [downloadsBusy, setDownloadsBusy] = useState(false);
+  const [demoMinutes, setDemoMinutes] = useState(30);
+  const [demoAmount, setDemoAmount] = useState(30);
+  const [demoUnit, setDemoUnit] = useState<"minutes" | "hours" | "days">(
+    "minutes"
+  );
+  const [demoBusy, setDemoBusy] = useState(false);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -41,6 +47,20 @@ export default function AdminSettingsClient() {
       }
       if (typeof data.downloadsEnabled === "boolean") {
         setDownloadsEnabled(data.downloadsEnabled);
+      }
+      if (typeof data.demoCatalogMinutes === "number") {
+        const m = data.demoCatalogMinutes;
+        setDemoMinutes(m);
+        if (m > 0 && m % (24 * 60) === 0) {
+          setDemoAmount(m / (24 * 60));
+          setDemoUnit("days");
+        } else if (m > 0 && m % 60 === 0) {
+          setDemoAmount(m / 60);
+          setDemoUnit("hours");
+        } else {
+          setDemoAmount(m);
+          setDemoUnit("minutes");
+        }
       }
     } catch {
       setError("No se pudieron cargar los ajustes.");
@@ -121,6 +141,57 @@ export default function AdminSettingsClient() {
     }
   }
 
+  function draftToMinutes(): number {
+    const n = Math.max(0, Number(demoAmount) || 0);
+    if (demoUnit === "days") return Math.round(n * 24 * 60);
+    if (demoUnit === "hours") return Math.round(n * 60);
+    return Math.round(n);
+  }
+
+  function formatDemoLabel(m: number): string {
+    if (m <= 0) return "desactivada";
+    if (m % (24 * 60) === 0) {
+      const d = m / (24 * 60);
+      return `${d} día${d === 1 ? "" : "s"}`;
+    }
+    if (m % 60 === 0) return `${m / 60} h`;
+    return `${m} min`;
+  }
+
+  async function saveDemo() {
+    const minutes = draftToMinutes();
+    if (minutes > 30 * 24 * 60) {
+      setError("Máximo 30 días de demo.");
+      return;
+    }
+    setDemoBusy(true);
+    setMsg("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ demoCatalogMinutes: minutes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo guardar la demo.");
+        return;
+      }
+      const m = Number(data.demoCatalogMinutes) || 0;
+      setDemoMinutes(m);
+      setMsg(
+        m <= 0
+          ? "Demo desactivada. Los nuevos usuarios no podrán probar gratis."
+          : `Demo configurada: ${formatDemoLabel(m)}.`
+      );
+    } catch {
+      setError("Error de red.");
+    } finally {
+      setDemoBusy(false);
+    }
+  }
+
   return (
     <AdminShell
       title="Ajustes"
@@ -130,9 +201,12 @@ export default function AdminSettingsClient() {
         <div>
           <h2 className="text-lg font-bold">Apps Android (/descargar)</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Activalo cuando subas los APK a{" "}
-            <code className="text-slate-300">/public/downloads/</code>. Mientras
-            esté off, la página muestra “próximamente” y se ocultan los links.
+            Activa o desactiva la página{" "}
+            <a href="/descargar" className="text-teal-300 underline">
+              /descargar
+            </a>{" "}
+            y los links del login/footer. Subí los APK a{" "}
+            <code className="text-slate-300">/public/downloads/</code>.
           </p>
           <p className="mt-2 text-xs text-slate-500">
             Estado actual:{" "}
@@ -161,6 +235,80 @@ export default function AdminSettingsClient() {
               ? "Desactivar descargas"
               : "Activar descargas"}
         </button>
+      </div>
+
+      <div className="surface-panel mb-6 space-y-4 rounded-3xl p-6 md:p-7">
+        <div>
+          <h2 className="text-lg font-bold">Demo de catálogo</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Duración de la prueba gratis al crear cuenta (una sola vez por
+            usuario). Poné <strong className="text-slate-300">0</strong> para
+            desactivar la demo.
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Vigente:{" "}
+            <span className="text-teal-200">
+              {formatDemoLabel(demoMinutes)}
+            </span>
+            {demoMinutes > 0 ? ` (${demoMinutes} min)` : null}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block text-sm text-slate-300">
+            Cantidad
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={demoAmount}
+              onChange={(e) => setDemoAmount(Number(e.target.value) || 0)}
+              className="mt-1 w-28 rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-400/40"
+            />
+          </label>
+          <label className="block text-sm text-slate-300">
+            Unidad
+            <select
+              value={demoUnit}
+              onChange={(e) =>
+                setDemoUnit(e.target.value as "minutes" | "hours" | "days")
+              }
+              className="mt-1 block rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 outline-none focus:border-teal-400/40"
+            >
+              <option value="minutes">Minutos</option>
+              <option value="hours">Horas</option>
+              <option value="days">Días</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={demoBusy}
+            onClick={() => void saveDemo()}
+            className="brand-button rounded-xl px-5 py-2.5 text-sm font-bold disabled:opacity-60"
+          >
+            {demoBusy ? "Guardando…" : "Guardar demo"}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          {[
+            { label: "30 min", amount: 30, unit: "minutes" as const },
+            { label: "1 h", amount: 1, unit: "hours" as const },
+            { label: "2 h", amount: 2, unit: "hours" as const },
+            { label: "1 día", amount: 1, unit: "days" as const },
+            { label: "Off", amount: 0, unit: "minutes" as const },
+          ].map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => {
+                setDemoAmount(p.amount);
+                setDemoUnit(p.unit);
+              }}
+              className="rounded-lg border border-white/10 px-2.5 py-1 text-white/55 hover:border-teal-300/40 hover:text-teal-100"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <form onSubmit={save} className="space-y-6">

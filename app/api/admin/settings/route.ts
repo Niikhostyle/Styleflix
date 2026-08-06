@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import {
+  getDemoCatalogMinutes,
   getDownloadsEnabled,
   getPlansCatalog,
   getPricing,
+  setDemoCatalogMinutes,
   setDownloadsEnabled,
   setPlansCatalog,
   setResellerPriceClp,
@@ -22,17 +24,20 @@ export async function GET() {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
-  const [pricing, catalog, downloadsEnabled] = await Promise.all([
-    getPricing(),
-    getPlansCatalog(),
-    getDownloadsEnabled(),
-  ]);
+  const [pricing, catalog, downloadsEnabled, demoCatalogMinutes] =
+    await Promise.all([
+      getPricing(),
+      getPlansCatalog(),
+      getDownloadsEnabled(),
+      getDemoCatalogMinutes(),
+    ]);
   return NextResponse.json({
     membershipPriceClp: pricing.membershipPriceClp,
     resellerPriceClp: pricing.resellerPriceClp,
     minPriceClp: MP_MIN_AMOUNT_CLP,
     catalog,
     downloadsEnabled,
+    demoCatalogMinutes,
     previewMinutes: 0,
   });
 }
@@ -59,6 +64,8 @@ const patchSchema = z
       .max(1_000_000)
       .optional(),
     downloadsEnabled: z.boolean().optional(),
+    /** 0 = demo off; máx 30 días en minutos */
+    demoCatalogMinutes: z.number().int().min(0).max(30 * 24 * 60).optional(),
     catalog: z
       .object({
         tiers: z.array(tierSchema).min(1),
@@ -74,7 +81,8 @@ const patchSchema = z
     (d) =>
       d.resellerPriceClp != null ||
       d.catalog != null ||
-      d.downloadsEnabled != null,
+      d.downloadsEnabled != null ||
+      d.demoCatalogMinutes != null,
     {
       message: "Sin cambios.",
     }
@@ -99,6 +107,7 @@ export async function PATCH(request: Request) {
   let pricing = await getPricing();
   let catalog = await getPlansCatalog();
   let downloadsEnabled = await getDownloadsEnabled();
+  let demoCatalogMinutes = await getDemoCatalogMinutes();
 
   if (parsed.data.catalog) {
     catalog = await setPlansCatalog(
@@ -121,6 +130,12 @@ export async function PATCH(request: Request) {
     downloadsEnabled = await setDownloadsEnabled(parsed.data.downloadsEnabled);
   }
 
+  if (parsed.data.demoCatalogMinutes != null) {
+    demoCatalogMinutes = await setDemoCatalogMinutes(
+      parsed.data.demoCatalogMinutes
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     previewMinutes: 0,
@@ -128,5 +143,6 @@ export async function PATCH(request: Request) {
     resellerPriceClp: pricing.resellerPriceClp,
     catalog,
     downloadsEnabled,
+    demoCatalogMinutes,
   });
 }

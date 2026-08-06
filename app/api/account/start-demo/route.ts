@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  DEMO_CATALOG_MINUTES,
-  hasActiveDemo,
-  hasActiveMembership,
-} from "@/lib/access";
+import { hasActiveDemo, hasActiveMembership } from "@/lib/access";
+import { getDemoCatalogMinutes } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 
-/** Inicia (una sola vez) la demo de catálogo de 30 minutos. */
+/** Inicia (una sola vez) la demo de catálogo (duración según admin). */
 export async function POST() {
   try {
     const session = await auth();
@@ -23,6 +20,17 @@ export async function POST() {
       })
     ) {
       return NextResponse.json({ ok: true, alreadyMember: true });
+    }
+
+    const minutes = await getDemoCatalogMinutes();
+    if (minutes <= 0) {
+      return NextResponse.json(
+        {
+          error:
+            "La demo gratuita está desactivada. Elige un plan para ver VeoTV.",
+        },
+        { status: 403 }
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -44,6 +52,7 @@ export async function POST() {
           ok: true,
           demoExpiresAt: user.demoExpiresAt.toISOString(),
           alreadyActive: true,
+          minutes,
         });
       }
       return NextResponse.json(
@@ -55,9 +64,7 @@ export async function POST() {
       );
     }
 
-    const demoExpiresAt = new Date(
-      Date.now() + DEMO_CATALOG_MINUTES * 60_000
-    );
+    const demoExpiresAt = new Date(Date.now() + minutes * 60_000);
     await prisma.user.update({
       where: { id: session.user.id },
       data: { demoExpiresAt },
@@ -66,7 +73,7 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       demoExpiresAt: demoExpiresAt.toISOString(),
-      minutes: DEMO_CATALOG_MINUTES,
+      minutes,
     });
   } catch (err) {
     console.error("[start-demo]", err);

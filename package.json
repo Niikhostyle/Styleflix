@@ -15,6 +15,8 @@
     "mangas:scrape:full": "npx tsx scripts/scrape-mangas-es.ts --with-chapters --limit=40",
     "mirror:catalog": "npx tsx scripts/mirror-catalog-to-drive.ts --catalog-only",
     "mirror:download": "npx tsx scripts/mirror-catalog-to-drive.ts",
+    "mirror:drive-auth": "npx tsx scripts/drive-oauth-setup.ts",
+    "mirror:register": "npx tsx scripts/register-drive-streams.ts",
     "db:setup": "prisma db push && node prisma/seed.cjs",
     "db:up": "docker compose up -d"
   },
