@@ -14,14 +14,17 @@ const upsertSchema = z.object({
   completed: z.boolean().optional(),
 });
 
-/** Lista "Continuar viendo" del usuario autenticado */
-export async function GET() {
+/** Lista "Continuar viendo" / historial del usuario autenticado */
+export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({ items: [], history: [] });
   }
 
-  const rows = await prisma.watchProgress.findMany({
+  const wantHistory =
+    new URL(request.url).searchParams.get("history") === "1";
+
+  const continueRows = await prisma.watchProgress.findMany({
     where: {
       userId: session.user.id,
       completed: false,
@@ -30,7 +33,10 @@ export async function GET() {
     take: 24,
   });
 
-  const items = rows.map((row) => ({
+  const toItem = (
+    row: (typeof continueRows)[number],
+    opts?: { forceCompleted?: boolean }
+  ) => ({
     id: row.tmdbId,
     title: row.mediaType === "movie" ? row.title : undefined,
     name: row.mediaType === "tv" ? row.title : undefined,
@@ -40,10 +46,26 @@ export async function GET() {
     season: row.season,
     episode: row.episode,
     progressPct: row.progressPct,
+    completed: opts?.forceCompleted ?? row.completed,
     lastWatchedAt: row.lastWatchedAt.toISOString(),
-  }));
+  });
 
-  return NextResponse.json({ items });
+  const items = continueRows.map((row) => toItem(row));
+
+  if (!wantHistory) {
+    return NextResponse.json({ items });
+  }
+
+  const historyRows = await prisma.watchProgress.findMany({
+    where: { userId: session.user.id },
+    orderBy: { lastWatchedAt: "desc" },
+    take: 36,
+  });
+
+  return NextResponse.json({
+    items,
+    history: historyRows.map((row) => toItem(row)),
+  });
 }
 
 /** Guarda o actualiza progreso (solo registrados) */

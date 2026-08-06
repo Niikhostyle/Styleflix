@@ -13,6 +13,7 @@ import { getOrCreateDeviceId } from "@/lib/device-id";
 import { withPlaybackLockQuery } from "@/lib/playback-lock-url";
 import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
+import { reportWatchProgress } from "@/lib/watch-client";
 
 function attachLockToPlayUrl(
   url: string,
@@ -56,6 +57,7 @@ export default function ModalPlayer({
   mediaType,
   title,
   year = null,
+  posterPath = null,
   season = null,
   episode = null,
   seasons = [],
@@ -283,6 +285,16 @@ export default function ModalPlayer({
               : "VeoTV"
         );
         setNotice(data.notice || "");
+        reportWatchProgress({
+          mediaType,
+          tmdbId: mediaId,
+          title,
+          posterPath,
+          season: mediaType === "tv" ? (season ?? 1) : null,
+          episode: mediaType === "tv" ? (episode ?? 1) : null,
+          progressPct: mediaType === "tv" ? 12 : 8,
+          completed: false,
+        });
       } catch {
         if (!cancelled) {
           const lock = lockRef.current;
@@ -311,11 +323,41 @@ export default function ModalPlayer({
     mediaType,
     title,
     year,
+    posterPath,
     season,
     episode,
     isAnime,
     membershipActive,
     isAdmin,
+  ]);
+
+  // Progreso estimado mientras el player está abierto (embeds sin timeupdate)
+  useEffect(() => {
+    if (!open || !embedPath) return;
+    let pct = mediaType === "tv" ? 15 : 10;
+    const id = window.setInterval(() => {
+      pct = Math.min(mediaType === "movie" ? 85 : 70, pct + 4);
+      reportWatchProgress({
+        mediaType,
+        tmdbId: mediaId,
+        title,
+        posterPath,
+        season: mediaType === "tv" ? currentSeason : null,
+        episode: mediaType === "tv" ? currentEpisode : null,
+        progressPct: pct,
+        completed: false,
+      });
+    }, 45_000);
+    return () => window.clearInterval(id);
+  }, [
+    open,
+    embedPath,
+    mediaId,
+    mediaType,
+    title,
+    posterPath,
+    currentSeason,
+    currentEpisode,
   ]);
 
   // Heartbeat cada 15s mientras el player está abierto
@@ -525,12 +567,36 @@ export default function ModalPlayer({
       key={`hls-${mediaId}-${season}-${episode}-${frameNonce}`}
       src={embedPath}
       title={title}
+      onProgress={(progressPct, completed) =>
+        reportWatchProgress({
+          mediaType,
+          tmdbId: mediaId,
+          title,
+          posterPath,
+          season: mediaType === "tv" ? currentSeason : null,
+          episode: mediaType === "tv" ? currentEpisode : null,
+          progressPct,
+          completed,
+        })
+      }
     />
   ) : playKind === "video" ? (
     <NativeVideoPlayer
       key={`video-${mediaId}-${season}-${episode}-${frameNonce}`}
       src={embedPath}
       title={title}
+      onProgress={(progressPct, completed) =>
+        reportWatchProgress({
+          mediaType,
+          tmdbId: mediaId,
+          title,
+          posterPath,
+          season: mediaType === "tv" ? currentSeason : null,
+          episode: mediaType === "tv" ? currentEpisode : null,
+          progressPct,
+          completed,
+        })
+      }
     />
   ) : (
     <iframe

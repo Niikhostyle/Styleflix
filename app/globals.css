@@ -85,6 +85,13 @@ select {
   color: var(--foreground);
 }
 
+/* Espacio para tabs inferiores en smartphone */
+@media (max-width: 767px) {
+  body:has(.veotv-has-mobile-tabs) .app-page {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .glass-panel {
   border: 1px solid var(--line);
   background: rgba(12, 18, 32, 0.78);

@@ -6,45 +6,66 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import MediaRow from "@/components/MediaRow";
 import {
-  IMAGE_BASE_URL,
   getDisplayTitle,
   type MediaItem,
   type MediaType,
 } from "@/lib/tmdb";
+import { mediaImageUrl } from "@/lib/media-links";
 
 type ContinueItem = MediaItem & {
   season?: number | null;
   episode?: number | null;
   progressPct?: number;
+  completed?: boolean;
+  lastWatchedAt?: string;
 };
 
 export default function PersonalizedRows() {
   const { status } = useSession();
   const [continueWatching, setContinueWatching] = useState<ContinueItem[]>([]);
+  const [history, setHistory] = useState<ContinueItem[]>([]);
   const [recommended, setRecommended] = useState<MediaItem[]>([]);
+  const [because, setBecause] = useState("Recomendado para ti");
 
   useEffect(() => {
     if (status !== "authenticated") {
       setContinueWatching([]);
+      setHistory([]);
       setRecommended([]);
       return;
     }
 
     void Promise.all([
-      fetch("/api/watch").then((r) => r.json()),
+      fetch("/api/watch?history=1").then((r) => r.json()),
       fetch("/api/recommendations").then((r) => r.json()),
     ]).then(([watch, recs]) => {
       setContinueWatching(watch.items ?? []);
+      setHistory(watch.history ?? []);
       setRecommended(recs.items ?? []);
+      if (typeof recs.because === "string" && recs.because) {
+        setBecause(recs.because);
+      }
     });
   }, [status]);
 
   if (status !== "authenticated") return null;
 
+  const historyOnly = history.filter(
+    (h) =>
+      !continueWatching.some(
+        (c) => c.id === h.id && (c.media_type || "movie") === (h.media_type || "movie")
+      )
+  );
+
   return (
     <>
       <ProgressRow title="Continuar viendo" items={continueWatching} />
-      <MediaRow title="Recomendado para ti" items={recommended} />
+      <ProgressRow
+        title="Historial reciente"
+        items={historyOnly.slice(0, 18)}
+        showCompleted
+      />
+      <MediaRow title={because} items={recommended} />
     </>
   );
 }
@@ -52,9 +73,11 @@ export default function PersonalizedRows() {
 function ProgressRow({
   title,
   items,
+  showCompleted = false,
 }: {
   title: string;
   items: ContinueItem[];
+  showCompleted?: boolean;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
   if (!items.length) return null;
@@ -100,18 +123,19 @@ function ProgressRow({
                 ? `T${item.season} E${item.episode}`
                 : null;
             const pct = Math.min(100, Math.max(0, item.progressPct ?? 10));
+            const poster = mediaImageUrl(item.poster_path);
 
             return (
               <Link
-                key={`${type}-${item.id}`}
+                key={`${type}-${item.id}-${item.lastWatchedAt || ""}`}
                 href={`/titulo/${type}/${item.id}?play=1`}
                 data-tv-focus
                 className="tv-card group/card relative aspect-[2/3] w-[128px] flex-shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#101827] shadow-[0_12px_35px_rgba(0,0,0,0.18)] transition duration-300 hover:z-10 hover:-translate-y-1.5 hover:border-teal-200/25 md:w-[158px] lg:w-[174px]"
               >
-                {item.poster_path ? (
+                {poster ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`${IMAGE_BASE_URL}${item.poster_path}`}
+                    src={poster}
                     alt={name}
                     className="h-full w-full object-cover transition duration-500 group-hover/card:scale-[1.04]"
                     loading="lazy"
@@ -127,12 +151,18 @@ function ProgressRow({
                       {epLabel}
                     </p>
                   )}
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-                    <div
-                      className="h-full rounded-full bg-teal-300"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                  {showCompleted && item.completed ? (
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300/90">
+                      Visto
+                    </p>
+                  ) : (
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                      <div
+                        className="h-full rounded-full bg-teal-300"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               </Link>
             );

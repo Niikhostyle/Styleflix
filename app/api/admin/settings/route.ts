@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import {
+  getDownloadsEnabled,
   getPlansCatalog,
   getPricing,
+  setDownloadsEnabled,
   setPlansCatalog,
   setResellerPriceClp,
 } from "@/lib/settings";
@@ -20,15 +22,17 @@ export async function GET() {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
-  const [pricing, catalog] = await Promise.all([
+  const [pricing, catalog, downloadsEnabled] = await Promise.all([
     getPricing(),
     getPlansCatalog(),
+    getDownloadsEnabled(),
   ]);
   return NextResponse.json({
     membershipPriceClp: pricing.membershipPriceClp,
     resellerPriceClp: pricing.resellerPriceClp,
     minPriceClp: MP_MIN_AMOUNT_CLP,
     catalog,
+    downloadsEnabled,
     previewMinutes: 0,
   });
 }
@@ -54,6 +58,7 @@ const patchSchema = z
       .min(MP_MIN_AMOUNT_CLP)
       .max(1_000_000)
       .optional(),
+    downloadsEnabled: z.boolean().optional(),
     catalog: z
       .object({
         tiers: z.array(tierSchema).min(1),
@@ -65,9 +70,15 @@ const patchSchema = z
       })
       .optional(),
   })
-  .refine((d) => d.resellerPriceClp != null || d.catalog != null, {
-    message: "Sin cambios.",
-  });
+  .refine(
+    (d) =>
+      d.resellerPriceClp != null ||
+      d.catalog != null ||
+      d.downloadsEnabled != null,
+    {
+      message: "Sin cambios.",
+    }
+  );
 
 export async function PATCH(request: Request) {
   if (!(await requireAdmin())) {
@@ -87,6 +98,7 @@ export async function PATCH(request: Request) {
 
   let pricing = await getPricing();
   let catalog = await getPlansCatalog();
+  let downloadsEnabled = await getDownloadsEnabled();
 
   if (parsed.data.catalog) {
     catalog = await setPlansCatalog(
@@ -105,11 +117,16 @@ export async function PATCH(request: Request) {
     pricing = { ...pricing, resellerPriceClp };
   }
 
+  if (parsed.data.downloadsEnabled != null) {
+    downloadsEnabled = await setDownloadsEnabled(parsed.data.downloadsEnabled);
+  }
+
   return NextResponse.json({
     ok: true,
     previewMinutes: 0,
     membershipPriceClp: pricing.membershipPriceClp,
     resellerPriceClp: pricing.resellerPriceClp,
     catalog,
+    downloadsEnabled,
   });
 }

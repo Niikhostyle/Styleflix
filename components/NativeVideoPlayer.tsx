@@ -9,12 +9,16 @@ import { useEffect, useRef, useState } from "react";
 export default function NativeVideoPlayer({
   src,
   title,
+  onProgress,
 }: {
   src: string;
   title: string;
+  onProgress?: (progressPct: number, completed: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState("");
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -80,11 +84,27 @@ export default function NativeVideoPlayer({
           : "El navegador no pudo reproducir este archivo. Usa MP4 (H.264) público en Drive."
       );
     };
+    let lastSent = 0;
+    const emit = () => {
+      const dur = video.duration;
+      if (!Number.isFinite(dur) || dur <= 0) return;
+      const pct = Math.min(100, Math.round((video.currentTime / dur) * 100));
+      const completed = pct >= 90;
+      const now = Date.now();
+      if (now - lastSent < 12_000 && !completed) return;
+      lastSent = now;
+      onProgressRef.current?.(completed ? 100 : Math.max(5, pct), completed);
+    };
+    const onEnded = () => onProgressRef.current?.(100, true);
     video.addEventListener("error", onErr);
+    video.addEventListener("timeupdate", emit);
+    video.addEventListener("ended", onEnded);
 
     return () => {
       cancelled = true;
       video.removeEventListener("error", onErr);
+      video.removeEventListener("timeupdate", emit);
+      video.removeEventListener("ended", onEnded);
       video.removeAttribute("src");
       video.load();
     };

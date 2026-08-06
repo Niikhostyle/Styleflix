@@ -7,11 +7,15 @@ import Hls from "hls.js";
 export default function HlsVideoPlayer({
   src,
   title,
+  onProgress,
 }: {
   src: string;
   title: string;
+  onProgress?: (progressPct: number, completed: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -22,7 +26,6 @@ export default function HlsVideoPlayer({
       ? src
       : new URL(src, window.location.origin).href;
 
-    // Preferir hls.js: Safari nativo falla a menudo con segs .html de Zilla.
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
@@ -43,7 +46,25 @@ export default function HlsVideoPlayer({
       video.src = absolute;
     }
 
+    let lastSent = 0;
+    const emit = () => {
+      const dur = video.duration;
+      if (!Number.isFinite(dur) || dur <= 0) return;
+      const pct = Math.min(100, Math.round((video.currentTime / dur) * 100));
+      const completed = pct >= 90;
+      const now = Date.now();
+      if (now - lastSent < 12_000 && !completed) return;
+      lastSent = now;
+      onProgressRef.current?.(completed ? 100 : Math.max(5, pct), completed);
+    };
+
+    video.addEventListener("timeupdate", emit);
+    video.addEventListener("ended", () => {
+      onProgressRef.current?.(100, true);
+    });
+
     return () => {
+      video.removeEventListener("timeupdate", emit);
       if (hls) {
         hls.destroy();
         hls = null;

@@ -1,13 +1,41 @@
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
 import { Smartphone, Tv } from "lucide-react";
+import { getDownloadsEnabled } from "@/lib/settings";
 
 export const metadata = {
   title: "Descargar app | VeoTV",
   description: "Instala VeoTV en celular Android o Android TV",
 };
 
-export default function DescargarPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DescargarPage() {
+  const enabled = await getDownloadsEnabled();
+
+  if (!enabled) {
+    return (
+      <div className="app-page px-4 py-16 md:px-10">
+        <div className="mx-auto max-w-3xl">
+          <BrandMark className="mb-10" />
+          <p className="eyebrow">Apps Android</p>
+          <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] md:text-6xl">
+            Próximamente
+          </h1>
+          <p className="mt-3 max-w-xl text-neutral-300">
+            Las aplicaciones para celular y Android TV todavía no están
+            públicas. Mientras tanto puedes usar VeoTV desde el navegador.
+          </p>
+          <p className="mt-8 text-sm text-neutral-500">
+            <Link href="/login" className="text-neutral-300 underline">
+              Ir al login web
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-page px-4 py-16 md:px-10">
       <div className="mx-auto max-w-3xl">

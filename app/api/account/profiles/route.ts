@@ -7,6 +7,7 @@ import {
   getEffectiveMaxProfiles,
   listProfiles,
 } from "@/lib/profiles";
+import { normalizeAvatarKey } from "@/lib/profile-avatars";
 
 async function requireUser() {
   const session = await auth();
@@ -101,7 +102,9 @@ export async function POST(request: Request) {
     data: {
       userId: session.user.id,
       name: parsed.data.name.trim(),
-      avatarKey: parsed.data.avatarKey || String((count % 5) + 1),
+      avatarKey: normalizeAvatarKey(
+        parsed.data.avatarKey || String((count % 8) + 1)
+      ),
       isKids: Boolean(parsed.data.isKids),
       sortOrder: count,
     },
@@ -139,7 +142,9 @@ export async function PATCH(request: Request) {
     where: { id: owned.id },
     data: {
       ...(parsed.data.name ? { name: parsed.data.name.trim() } : {}),
-      ...(parsed.data.avatarKey ? { avatarKey: parsed.data.avatarKey } : {}),
+      ...(parsed.data.avatarKey
+        ? { avatarKey: normalizeAvatarKey(parsed.data.avatarKey) }
+        : {}),
       ...(typeof parsed.data.isKids === "boolean"
         ? { isKids: parsed.data.isKids }
         : {}),

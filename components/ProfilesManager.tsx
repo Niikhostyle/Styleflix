@@ -4,6 +4,11 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Trash2 } from "lucide-react";
+import { AvatarPicker, ProfileAvatar } from "@/components/ProfileAvatar";
+import {
+  nextAvatarKey,
+  type ProfileAvatarKey,
+} from "@/lib/profile-avatars";
 
 type ProfileRow = {
   id: string;
@@ -17,6 +22,7 @@ export default function ProfilesManager() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [maxProfiles, setMaxProfiles] = useState(1);
   const [name, setName] = useState("");
+  const [avatarKey, setAvatarKey] = useState<ProfileAvatarKey>("1");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,8 +31,10 @@ export default function ProfilesManager() {
     const res = await fetch("/api/account/profiles", { cache: "no-store" });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setProfiles(data.profiles || []);
-      setMaxProfiles(data.maxProfiles || 1);
+      const list = (data.profiles || []) as ProfileRow[];
+      setProfiles(list);
+      setMaxProfiles(Math.max(1, Number(data.maxProfiles) || 1));
+      setAvatarKey(nextAvatarKey(list.map((p) => p.avatarKey)));
     }
   }, []);
 
@@ -43,7 +51,7 @@ export default function ProfilesManager() {
       const res = await fetch("/api/account/profiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: name.trim(), avatarKey }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -84,26 +92,32 @@ export default function ProfilesManager() {
   }
 
   const canAdd = profiles.length < maxProfiles;
+  const slotsLeft = Math.max(0, maxProfiles - profiles.length);
 
   return (
     <section className="surface-panel rounded-3xl p-6 md:p-7">
       <h2 className="text-lg font-bold">Perfiles de visionado</h2>
       <p className="mt-1 text-sm text-slate-400">
-        Plan {session?.user?.planTier || "—"}: hasta {maxProfiles} perfil
-        {maxProfiles === 1 ? "" : "es"} · resolución{" "}
-        {session?.user?.planMaxResolution || "—"}p
-        {session?.user?.planCanDownload ? " · descargas" : ""}
+        Plan {session?.user?.planTier || "—"}:{" "}
+        <strong className="text-teal-200">
+          {profiles.length}/{maxProfiles}
+        </strong>{" "}
+        perfil{maxProfiles === 1 ? "" : "es"}
+        {slotsLeft > 0 ? ` · ${slotsLeft} disponibles` : " · límite alcanzado"}
+        {" · "}
+        resolución {session?.user?.planMaxResolution || "—"}p
       </p>
       <p className="mt-2 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-xs text-cyan-100/85">
-        Regla anti-abuso: <strong>1 persona por perfil en simultáneo</strong>.
-        Si alguien más usa el mismo perfil, la otra reproducción se bloquea.
+        Regla: <strong>1 persona por perfil en simultáneo</strong>. Más perfiles
+        = más pantallas a la vez (según tu plan).
       </p>
       <ul className="mt-4 flex flex-wrap gap-3">
         {profiles.map((p) => (
           <li
             key={p.id}
-            className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm"
+            className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm"
           >
+            <ProfileAvatar avatarKey={p.avatarKey} name={p.name} size="sm" />
             <span className="font-semibold">{p.name}</span>
             {p.isKids && (
               <span className="text-xs text-amber-300">Kids</span>
@@ -123,21 +137,28 @@ export default function ProfilesManager() {
         ))}
       </ul>
       {canAdd ? (
-        <form onSubmit={addProfile} className="mt-4 flex flex-wrap gap-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre del perfil"
-            required
-            className="rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 text-sm outline-none"
+        <form onSubmit={addProfile} className="mt-5 space-y-3">
+          <AvatarPicker
+            value={avatarKey}
+            onChange={setAvatarKey}
+            usedKeys={profiles.map((p) => p.avatarKey)}
           />
-          <button
-            type="submit"
-            disabled={busy}
-            className="brand-button rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
-          >
-            {busy ? "…" : "Agregar"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre del perfil"
+              required
+              className="rounded-xl border border-white/10 bg-[#08101d]/70 px-3 py-2 text-sm outline-none"
+            />
+            <button
+              type="submit"
+              disabled={busy}
+              className="brand-button rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            >
+              {busy ? "…" : "Agregar perfil"}
+            </button>
+          </div>
         </form>
       ) : (
         <p className="mt-3 text-sm text-white/45">

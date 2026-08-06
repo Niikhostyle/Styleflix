@@ -41,6 +41,22 @@ export default function LoginForm({
   );
   const [loading, setLoading] = useState(false);
   const [needsVerify, setNeedsVerify] = useState(false);
+  const [downloadsEnabled, setDownloadsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/settings/preview", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && typeof data.downloadsEnabled === "boolean") {
+          setDownloadsEnabled(data.downloadsEnabled);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -368,11 +384,13 @@ export default function LoginForm({
           </button>
         </form>
 
-        <p className="mt-3 text-center text-xs text-white/40">
-          <a href="/descargar" className="underline hover:text-white">
-            Apps Android
-          </a>
-        </p>
+        {downloadsEnabled && (
+          <p className="mt-3 text-center text-xs text-white/40">
+            <a href="/descargar" className="underline hover:text-white">
+              Apps Android
+            </a>
+          </p>
+        )}
       </div>
     </AnimatedMarqueeHero>
   );

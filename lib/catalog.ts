@@ -30,6 +30,7 @@ import type { MediaItem, MediaType } from "@/lib/tmdb";
 /** Las fuentes de descubrimiento son rápidas; las que mapean títulos, no. */
 const FAST_TIMEOUT_MS = 8000;
 const SLOW_TIMEOUT_MS = 15000;
+const MANGA_TIMEOUT_MS = 28000;
 
 export type CatalogPage = {
   featured: CatalogItem[];
@@ -254,12 +255,12 @@ async function loadAnimeAv1Items(): Promise<CatalogItem[]> {
 
 async function loadMangaEsItems() {
   if (!enabledSources().includes("mangadex")) return [];
-  return withTimeout(getMangaEsItems(), SLOW_TIMEOUT_MS, [], "mangadex:items");
+  return withTimeout(getMangaEsItems(), MANGA_TIMEOUT_MS, [], "mangadex:items");
 }
 
 async function loadMangaEsRows(): Promise<LoadedRow[]> {
   if (!enabledSources().includes("mangadex")) return [];
-  return withTimeout(getMangaEsRows(), SLOW_TIMEOUT_MS, [], "mangadex:rows");
+  return withTimeout(getMangaEsRows(), MANGA_TIMEOUT_MS, [], "mangadex:rows");
 }
 
 export async function getMangaCatalog(): Promise<CatalogPage> {

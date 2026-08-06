@@ -20,6 +20,8 @@ export default function AdminSettingsClient() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [downloadsEnabled, setDownloadsEnabled] = useState(false);
+  const [downloadsBusy, setDownloadsBusy] = useState(false);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -36,6 +38,9 @@ export default function AdminSettingsClient() {
       }
       if (typeof data.minPriceClp === "number") {
         setMinPriceClp(data.minPriceClp);
+      }
+      if (typeof data.downloadsEnabled === "boolean") {
+        setDownloadsEnabled(data.downloadsEnabled);
       }
     } catch {
       setError("No se pudieron cargar los ajustes.");
@@ -87,11 +92,77 @@ export default function AdminSettingsClient() {
     }
   }
 
+  async function toggleDownloads() {
+    const next = !downloadsEnabled;
+    setDownloadsBusy(true);
+    setMsg("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ downloadsEnabled: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo actualizar descargas.");
+        return;
+      }
+      setDownloadsEnabled(Boolean(data.downloadsEnabled));
+      setMsg(
+        data.downloadsEnabled
+          ? "Descargas de APK activadas (/descargar visible)."
+          : "Descargas de APK desactivadas."
+      );
+    } catch {
+      setError("Error de red.");
+    } finally {
+      setDownloadsBusy(false);
+    }
+  }
+
   return (
     <AdminShell
       title="Ajustes"
       subtitle="Planes, precios CLP y límites reales por tier."
     >
+      <div className="surface-panel mb-6 flex flex-col gap-4 rounded-3xl p-6 md:flex-row md:items-center md:justify-between md:p-7">
+        <div>
+          <h2 className="text-lg font-bold">Apps Android (/descargar)</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Activalo cuando subas los APK a{" "}
+            <code className="text-slate-300">/public/downloads/</code>. Mientras
+            esté off, la página muestra “próximamente” y se ocultan los links.
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Estado actual:{" "}
+            <span
+              className={
+                downloadsEnabled ? "text-emerald-300" : "text-amber-200"
+              }
+            >
+              {downloadsEnabled ? "Activado" : "Desactivado"}
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={downloadsBusy}
+          onClick={() => void toggleDownloads()}
+          className={
+            downloadsEnabled
+              ? "rounded-xl border border-amber-400/40 bg-amber-500/15 px-5 py-2.5 text-sm font-bold text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-60"
+              : "brand-button rounded-xl px-5 py-2.5 text-sm font-bold disabled:opacity-60"
+          }
+        >
+          {downloadsBusy
+            ? "Guardando…"
+            : downloadsEnabled
+              ? "Desactivar descargas"
+              : "Activar descargas"}
+        </button>
+      </div>
+
       <form onSubmit={save} className="space-y-6">
         <div className="surface-panel space-y-4 rounded-3xl p-6 md:p-7">
           <h2 className="text-lg font-bold">Catálogo de planes (CLP / mes)</h2>

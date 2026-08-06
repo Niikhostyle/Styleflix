@@ -33,8 +33,13 @@ export async function GET(request: Request) {
   }
 
   const saver = new URL(request.url).searchParams.get("hq") !== "1";
+  const urls = mangaChapterImageUrls(pages, saver);
+  const origin = new URL(request.url).origin;
+  const proxied = urls.map(
+    (u) => `${origin}/api/manga/image?u=${encodeURIComponent(u)}`
+  );
   return NextResponse.json({
-    images: mangaChapterImageUrls(pages, saver),
-    count: mangaChapterImageUrls(pages, saver).length,
+    images: proxied,
+    count: proxied.length,
   });
 }

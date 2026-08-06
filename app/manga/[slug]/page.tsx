@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getMangaEsBySlug } from "@/lib/manga-es";
 import MangaDetailClient from "@/components/MangaDetailClient";
@@ -27,23 +28,31 @@ export default async function MangaPage({
   if (!manga?.slug) notFound();
 
   return (
-    <MangaDetailClient
-      manga={{
-        id: manga.id,
-        slug: manga.slug,
-        title: manga.title,
-        synopsis: manga.synopsis || "",
-        poster: manga.poster,
-        status: manga.status,
-        year: manga.year,
-        genres: manga.genres || [],
-        chapters: (manga.chapters || []).map((c) => ({
-          id: c.id,
-          chapter: c.chapter,
-          title: c.title,
-          pages: c.pages,
-        })),
-      }}
-    />
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#070b14] text-white/45">
+          Cargando manga…
+        </div>
+      }
+    >
+      <MangaDetailClient
+        manga={{
+          id: manga.id,
+          slug: manga.slug,
+          title: manga.title,
+          synopsis: manga.synopsis || "",
+          poster: manga.poster,
+          status: manga.status,
+          year: manga.year,
+          genres: manga.genres || [],
+          chapters: (manga.chapters || []).map((c) => ({
+            id: c.id,
+            chapter: c.chapter,
+            title: c.title,
+            pages: c.pages,
+          })),
+        }}
+      />
+    </Suspense>
   );
 }

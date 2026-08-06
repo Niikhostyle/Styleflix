@@ -1,7 +1,10 @@
 import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
+import { getDownloadsEnabled } from "@/lib/settings";
 
-export default function Footer() {
+export default async function Footer() {
+  const downloadsEnabled = await getDownloadsEnabled();
+
   return (
     <footer className="px-4 pb-8 pt-12 text-slate-500 md:px-8 lg:px-12">
       <div className="surface-panel mx-auto max-w-[1440px] rounded-3xl px-6 py-8 md:px-8">
@@ -46,9 +49,11 @@ export default function Footer() {
               <Link href="/membresia" className="hover:text-teal-200">
                 Membresía
               </Link>
-              <Link href="/descargar" className="hover:text-teal-200">
-                Descargar app
-              </Link>
+              {downloadsEnabled && (
+                <Link href="/descargar" className="hover:text-teal-200">
+                  Descargar app
+                </Link>
+              )}
             </div>
           </div>
         </div>

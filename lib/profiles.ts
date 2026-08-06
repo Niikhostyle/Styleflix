@@ -20,13 +20,21 @@ export async function getEffectiveMaxProfiles(user: {
   planTier?: string | null;
 }): Promise<number> {
   if (user.role === "SUPER_ADMIN") return 10;
+
+  // Preferir cuota guardada en el usuario (activación de plan)
   if (user.planMaxProfiles && user.planMaxProfiles > 0) {
-    return user.planMaxProfiles;
+    return Math.min(10, Math.max(1, user.planMaxProfiles));
   }
+
+  // Fallback: catálogo por tier (por si planMaxProfiles no se rellenó)
   if (user.planTier && isPlanTier(user.planTier)) {
     const catalog = await getPlansCatalog();
-    return getTier(catalog, user.planTier as PlanTier).maxProfiles;
+    return Math.min(
+      10,
+      Math.max(1, getTier(catalog, user.planTier as PlanTier).maxProfiles)
+    );
   }
+
   // Demo / sin plan: 1 perfil
   return 1;
 }

@@ -21,8 +21,12 @@ export const PREVIEW_MINUTES_KEY = "previewMinutes";
 export const MEMBERSHIP_PRICE_KEY = "membershipPriceClp";
 export const RESELLER_PRICE_KEY = "resellerPriceClp";
 export const PLANS_CATALOG_KEY = "plansCatalog";
+/** Página /descargar y links de APK (off hasta que haya builds). */
+export const DOWNLOADS_ENABLED_KEY = "downloadsEnabled";
 
 export const DEFAULT_PREVIEW_MINUTES = 0;
+/** Por defecto off: aún no hay APKs publicados. */
+export const DEFAULT_DOWNLOADS_ENABLED = false;
 
 /** Alineado al mínimo de suscripciones Mercado Pago Chile ($950). */
 const MIN_PRICE_CLP = MP_MIN_AMOUNT_CLP;
@@ -145,6 +149,30 @@ export async function getPlanPriceClp(
 ): Promise<number> {
   const catalog = await getPlansCatalog();
   return priceClpForPeriod(catalog, tier, period);
+}
+
+export async function getDownloadsEnabled(): Promise<boolean> {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: DOWNLOADS_ENABLED_KEY },
+    });
+    if (!row?.value?.trim()) return DEFAULT_DOWNLOADS_ENABLED;
+    const v = row.value.trim().toLowerCase();
+    return v === "1" || v === "true" || v === "yes" || v === "on";
+  } catch (err) {
+    console.warn("[settings] getDownloadsEnabled", err);
+    return DEFAULT_DOWNLOADS_ENABLED;
+  }
+}
+
+export async function setDownloadsEnabled(enabled: boolean): Promise<boolean> {
+  const value = enabled ? "true" : "false";
+  await prisma.appSetting.upsert({
+    where: { key: DOWNLOADS_ENABLED_KEY },
+    create: { key: DOWNLOADS_ENABLED_KEY, value },
+    update: { value },
+  });
+  return enabled;
 }
 
 export const PRICING_CODE_DEFAULTS = {

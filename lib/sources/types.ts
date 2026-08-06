@@ -65,7 +65,15 @@ export function enabledSources(): SourceId[] {
         .filter((s): s is SourceId => ALL_SOURCES.includes(s as SourceId))
     : ALL_SOURCES.filter((id) => id !== "jikan");
 
-  return requested.filter((id) => {
+  const disabled = new Set(
+    (process.env.CATALOG_DISABLE || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  let list = requested.filter((id) => {
+    if (disabled.has(id)) return false;
     if (id === "vimeus") return Boolean(process.env.VIMEUS_API_KEY);
     if (id === "tmdb" || id === "jikan") {
       return Boolean(process.env.NEXT_PUBLIC_TMDB_API_KEY);
@@ -74,6 +82,14 @@ export function enabledSources(): SourceId[] {
     if (id === "mangadex") return true;
     return true;
   });
+
+  // Secciones propias: si CATALOG_SOURCES está seteado sin ellas, igual se
+  // mantienen activas (salvo CATALOG_DISABLE).
+  for (const id of ["mangadex", "animeav1"] as const) {
+    if (!disabled.has(id) && !list.includes(id)) list.push(id);
+  }
+
+  return list;
 }
 
 export function isSourceEnabled(id: SourceId): boolean {

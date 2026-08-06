@@ -55,6 +55,7 @@ model User {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   watchHistory WatchProgress[]
+  mangaReads   MangaReadProgress[]
   payments     Payment[]
   authTokens   AuthToken[]
   profiles     Profile[]
@@ -156,6 +157,27 @@ model WatchProgress {
 
   @@unique([userId, mediaType, tmdbId])
   @@index([userId, lastWatchedAt])
+}
+
+/// Progreso de lectura de mangas (MangaDex)
+model MangaReadProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mangaId     String
+  mangaSlug   String
+  title       String
+  poster      String?
+  chapterId   String
+  chapterNum  String
+  pageIndex   Int      @default(0)
+  progressPct Float    @default(0)
+  lastReadAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, mangaId])
+  @@index([userId, lastReadAt])
 }
 
 /// Config global (precios, catálogo de planes, etc.)

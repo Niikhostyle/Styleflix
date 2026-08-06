@@ -15,9 +15,9 @@ export default function BrandMark({
       className={`focus-ring inline-flex items-center rounded-lg ${className}`}
     >
       {!compact && (
-        <span className="font-[family-name:var(--font-display)] text-xl font-extrabold tracking-[0.04em] text-white md:text-2xl">
+        <span className="font-[family-name:var(--font-display)] text-[1.35rem] font-extrabold leading-none tracking-[0.02em] text-white sm:text-2xl md:text-[1.65rem]">
           VEO
-          <span className="bg-gradient-to-r from-teal-300 to-violet-400 bg-clip-text text-transparent">
+          <span className="bg-[linear-gradient(110deg,var(--tv-from)_0%,var(--tv-via)_45%,var(--tv-to)_100%)] bg-clip-text text-transparent">
             TV
           </span>
         </span>
@@ -25,6 +25,9 @@ export default function BrandMark({
       {compact && (
         <span className="font-[family-name:var(--font-display)] text-lg font-extrabold text-white">
           V
+          <span className="bg-[linear-gradient(110deg,var(--tv-from),var(--tv-to))] bg-clip-text text-transparent">
+            TV
+          </span>
         </span>
       )}
     </Link>
