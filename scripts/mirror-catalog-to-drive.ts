@@ -11,8 +11,7 @@
  *   4) Esperar ~5s + POST op=download_orig
  *   5) Extraer enlace directo s1.vimeos.net/...m4v.mp4
  *
- * También descarga Archive.org (dominio público) cuando aplica.
- * Reanudable vía _state/progress.json
+ * Solo Vimeus (sin Archive.org). Reanudable vía _state/progress.json
  */
 
 import {
@@ -36,14 +35,13 @@ type Category = "peliculas" | "series" | "anime";
 type CatalogEntry = {
   key: string;
   category: Category;
-  source: "vimeus" | "archive";
+  source: "vimeus";
   mediaType: "movie" | "tv";
   tmdbId: number | null;
   title: string;
   year: number | null;
   posterUrl: string | null;
   embedUrl: string | null;
-  archiveId: string | null;
   seasonsHint: number | null;
   season?: number | null;
   episode?: number | null;
@@ -323,7 +321,6 @@ async function listAllVimeus(
         year: item.year != null ? Number(item.year) || null : null,
         posterUrl: tmdbPoster(item.poster),
         embedUrl: viewKey ? playerEmbedUrl(category, tmdbId, viewKey) : null,
-        archiveId: null,
         seasonsHint: item.total_seasons ?? null,
       });
     }
@@ -333,87 +330,6 @@ async function listAllVimeus(
   }
 
   return out;
-}
-
-async function listArchive(): Promise<CatalogEntry[]> {
-  if (hasFlag("only-vimeus")) return [];
-  const collections = ["feature_films", "film_noir", "sci-fi_horror", "serials"];
-  const out: CatalogEntry[] = [];
-  const seen = new Set<string>();
-
-  for (const collection of collections) {
-    const params = new URLSearchParams({
-      q: `collection:(${collection}) AND mediatype:(movies)`,
-      rows: "200",
-      page: "1",
-      output: "json",
-    });
-    params.append("fl[]", "identifier");
-    params.append("fl[]", "title");
-    params.append("fl[]", "year");
-
-    try {
-      const payload = (await fetchJson(
-        `https://archive.org/advancedsearch.php?${params}`
-      )) as {
-        response?: {
-          docs?: {
-            identifier?: string;
-            title?: string | string[];
-            year?: string | number;
-          }[];
-        };
-      };
-      const docs = payload.response?.docs || [];
-      for (const doc of docs) {
-        const id = doc.identifier?.trim();
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        const title = Array.isArray(doc.title) ? doc.title[0] : doc.title || id;
-        out.push({
-          key: `peliculas-archive-${id}`,
-          category: "peliculas",
-          source: "archive",
-          mediaType: "movie",
-          tmdbId: null,
-          title: String(title),
-          year: doc.year != null ? Number(doc.year) || null : null,
-          posterUrl: `https://archive.org/services/img/${encodeURIComponent(id)}`,
-          embedUrl: `https://archive.org/embed/${encodeURIComponent(id)}`,
-          archiveId: id,
-          seasonsHint: null,
-        });
-      }
-      log(`Archive ${collection}: ${docs.length} docs`);
-    } catch (err) {
-      log(`Archive ${collection} error`, String(err));
-    }
-    await sleep(400);
-  }
-  return out;
-}
-
-async function pickArchiveMp4(identifier: string) {
-  const meta = (await fetchJson(
-    `https://archive.org/metadata/${encodeURIComponent(identifier)}`
-  )) as {
-    files?: { name?: string; format?: string; size?: string | number }[];
-  };
-  const candidates = (meta.files || [])
-    .filter((f) => {
-      const name = (f.name || "").toLowerCase();
-      const fmt = (f.format || "").toLowerCase();
-      return name.endsWith(".mp4") || fmt.includes("mpeg4") || fmt.includes("h.264");
-    })
-    .map((f) => ({ name: f.name!, size: Number(f.size) || 0 }))
-    .sort((a, b) => b.size - a.size);
-  const best = candidates.find((c) => c.size > 5_000_000) || candidates[0];
-  if (!best) return null;
-  return {
-    name: best.name,
-    url: `https://archive.org/download/${encodeURIComponent(identifier)}/${encodeURIComponent(best.name)}`,
-    size: best.size,
-  };
 }
 
 /** Lee embeds[] del player Vimeus (script#data). */
@@ -690,11 +606,7 @@ async function expandSeriesEpisodes(
 }
 
 function entryDir(outRoot: string, entry: CatalogEntry): string {
-  const idPart = entry.tmdbId
-    ? `tmdb-${entry.tmdbId}`
-    : entry.archiveId
-      ? `ia-${safeName(entry.archiveId, 40)}`
-      : "id-unknown";
+  const idPart = entry.tmdbId ? `tmdb-${entry.tmdbId}` : "id-unknown";
   const base = join(
     outRoot,
     entry.category,
@@ -751,20 +663,9 @@ async function processEntry(
   const dest = join(dir, videoFileName(entry));
 
   try {
-    if (entry.source === "archive" && entry.archiveId) {
-      const file = await pickArchiveMp4(entry.archiveId);
-      if (!file) throw new Error("sin mp4 archive");
-      const r = await downloadFile(file.url, dest, 100_000);
-      if (r === "ok") progress.stats.videos++;
-      writeFileSync(
-        join(dir, "video.source.json"),
-        JSON.stringify({ ...file, archiveId: entry.archiveId }, null, 2)
-      );
-    } else if (entry.source === "vimeus") {
-      const r = await downloadViaVimeusPlayer(entry, dest);
-      if (r === "ok") progress.stats.videos++;
-      log(`OK video ${entry.key} (${(statSync(dest).size / 1e9).toFixed(2)} GB)`);
-    }
+    const r = await downloadViaVimeusPlayer(entry, dest);
+    if (r === "ok") progress.stats.videos++;
+    log(`OK video ${entry.key} (${(statSync(dest).size / 1e9).toFixed(2)} GB)`);
     if (!done.has(entry.key)) progress.doneKeys.push(entry.key);
     delete progress.failed[entry.key];
   } catch (err) {
@@ -818,14 +719,14 @@ async function main() {
         ? "solo inventario"
         : postersOnly
           ? "posters+meta"
-          : "meta+posters+videos (Vimeos download + Archive)"
+          : "meta+posters+videos (Vimeos)"
     }`
   );
 
   const tmdbOnly = Number(arg("tmdb", "0")) || 0;
   let entries: CatalogEntry[] = [];
 
-  if (tmdbOnly > 0 && !hasFlag("only-archive")) {
+  if (tmdbOnly > 0) {
     // Atajo: no inventariar todo el catálogo
     const category = (arg("category", "peliculas") || "peliculas") as Category;
     const viewKey = process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY || "";
@@ -842,30 +743,22 @@ async function main() {
         embedUrl: viewKey
           ? playerEmbedUrl(category, tmdbOnly, viewKey)
           : null,
-        archiveId: null,
         seasonsHint: null,
       },
     ];
     log(`modo --tmdb ${tmdbOnly} (${category})`);
   } else {
-    const jobs: Promise<CatalogEntry[]>[] = [];
-    if (!hasFlag("only-archive")) {
-      jobs.push(listAllVimeus("movies", "peliculas"));
-      if (!onlyMovies) {
-        jobs.push(listAllVimeus("series", "series"));
-        jobs.push(listAllVimeus("animes", "anime"));
-      } else {
-        jobs.push(Promise.resolve([]));
-        jobs.push(Promise.resolve([]));
-      }
-    } else {
-      jobs.push(Promise.resolve([]), Promise.resolve([]), Promise.resolve([]));
-    }
-    jobs.push(listArchive());
-
-    const [movies, series, animes, archive] = await Promise.all(jobs);
+    const [movies, series, animes] = await Promise.all([
+      listAllVimeus("movies", "peliculas"),
+      onlyMovies
+        ? Promise.resolve([] as CatalogEntry[])
+        : listAllVimeus("series", "series"),
+      onlyMovies
+        ? Promise.resolve([] as CatalogEntry[])
+        : listAllVimeus("animes", "anime"),
+    ]);
     const byKey = new Map<string, CatalogEntry>();
-    for (const e of [...archive, ...movies, ...series, ...animes]) {
+    for (const e of [...movies, ...series, ...animes]) {
       byKey.set(e.key, e);
     }
     entries = [...byKey.values()].sort((a, b) =>
@@ -889,7 +782,6 @@ async function main() {
           peliculas: entries.filter((e) => e.category === "peliculas").length,
           series: entries.filter((e) => e.category === "series").length,
           anime: entries.filter((e) => e.category === "anime").length,
-          archive: entries.filter((e) => e.source === "archive").length,
           vimeus: entries.filter((e) => e.source === "vimeus").length,
         },
       },

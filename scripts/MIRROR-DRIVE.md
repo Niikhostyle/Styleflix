@@ -12,7 +12,7 @@ Usa el **mismo botón de descarga del player** Vimeus:
 4. Espera ~5.5s y hace POST `download_orig` (como el botón “Descargar archivo”)
 5. Baja el MP4/M4V de `s1.vimeos.net/…` (enlace ~12h ligado a tu IP)
 
-También baja Archive.org cuando hay título PD.
+Solo Vimeus (no Archive.org).
 
 ## Comandos
 
@@ -37,7 +37,6 @@ Flags útiles:
 | `--title Supergirl` | Nombre de carpeta con `--tmdb` |
 | `--category peliculas` | Con `--tmdb`: peliculas\|series\|anime |
 | `--only-movies` | Solo películas (sin series/anime) |
-| `--only-vimeus` | Sin Archive.org |
 | `--no-episodes` | No expandir SxxExx (solo ficha) |
 | `--limit N` | Primeros N títulos del inventario |
 | `--dl-wait-ms 5500` | Espera antes del POST de descarga |
@@ -46,7 +45,7 @@ Flags útiles:
 ### Probar Supergirl (como en el player)
 
 ```powershell
-npm run mirror:download -- --out "G:\Mi unidad\veotv" --tmdb 1081003 --title Supergirl --only-vimeus --concurrency 1
+npm run mirror:download -- --out "G:\Mi unidad\veotv" --tmdb 1081003 --title Supergirl --concurrency 1
 ```
 
 ## Estructura

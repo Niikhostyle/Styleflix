@@ -232,7 +232,7 @@ export default function LoginForm({
             }}
             className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
               mode === "login"
-                ? "bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white"
+                ? "bg-red-500 text-white"
                 : "text-white/50 hover:text-white"
             }`}
           >
@@ -248,7 +248,7 @@ export default function LoginForm({
             }}
             className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
               mode === "register"
-                ? "bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white"
+                ? "bg-red-500 text-white"
                 : "text-white/50 hover:text-white"
             }`}
           >
@@ -334,7 +334,7 @@ export default function LoginForm({
             type="submit"
             disabled={loading}
             data-tv-focus
-            className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-500 py-3 text-sm font-extrabold transition hover:brightness-110 disabled:opacity-60"
+            className="w-full rounded-full bg-red-500 py-3 text-sm font-extrabold transition hover:bg-red-600 disabled:opacity-60"
           >
             {loading
               ? mode === "login"

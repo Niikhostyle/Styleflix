@@ -4,12 +4,13 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
-import PosterBackdrop from "@/components/PosterBackdrop";
+import { AnimatedMarqueeHero } from "@/components/ui/hero-3";
+import { APP_NAME } from "@/lib/brand";
 
 export default function LandingHero({
-  posterPaths = [],
+  posterUrls = [],
 }: {
-  posterPaths?: string[];
+  posterUrls?: string[];
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -23,49 +24,51 @@ export default function LandingHero({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050508] text-white">
-      <PosterBackdrop posterPaths={posterPaths} />
-
-      <header className="relative z-10 flex items-center justify-between px-5 py-5 md:px-10">
-        <BrandMark className="text-2xl md:text-3xl" />
-        <Link
-          href="/login"
-          className="rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-sm font-semibold shadow-lg shadow-fuchsia-900/30 transition hover:brightness-110"
-        >
-          Iniciar sesión
-        </Link>
-      </header>
-
-      <main className="relative z-10 mx-auto flex min-h-[75vh] max-w-3xl flex-col items-center justify-center px-5 pb-24 text-center">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-white drop-shadow-lg sm:text-5xl md:text-6xl">
-          Películas y series sin límites
-        </h1>
-        <p className="mt-4 max-w-xl text-lg text-white/85 md:text-xl">
-          Cancela cuando quieras. Empieza eligiendo tu plan.
-        </p>
-        <p className="mt-6 text-sm text-white/70 md:text-base">
+    <AnimatedMarqueeHero
+      tagline="Lo más popular en tu catálogo VeoTV"
+      title={
+        <>
+          Películas y series
+          <br />
+          sin límites
+        </>
+      }
+      description="Cancela cuando quieras. Empieza eligiendo tu plan y mira lo que ya está en VeoTV."
+      images={posterUrls}
+      header={
+        <div className="flex items-center justify-between">
+          <BrandMark className="text-2xl md:text-3xl" />
+          <Link
+            href="/login"
+            className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+          >
+            Iniciar sesión
+          </Link>
+        </div>
+      }
+    >
+      <form onSubmit={onStart} className="mx-auto flex w-full flex-col gap-3">
+        <p className="text-center text-sm text-white/55">
           ¿Listo para ver? Ingresa tu email para crear o reingresar a tu cuenta.
         </p>
-        <form
-          onSubmit={onStart}
-          className="mt-5 flex w-full max-w-xl flex-col gap-3 sm:flex-row"
-        >
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="min-h-12 flex-1 rounded-md border border-white/35 bg-black/55 px-4 text-base text-white outline-none placeholder:text-white/45 focus:border-fuchsia-400/70"
+            className="min-h-12 flex-1 rounded-full border border-white/25 bg-black/60 px-5 text-base text-white outline-none placeholder:text-white/40 focus:border-red-400/70"
           />
           <button
             type="submit"
-            className="min-h-12 rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 text-lg font-semibold transition hover:brightness-110"
+            className="min-h-12 rounded-full bg-red-500 px-7 text-base font-semibold text-white transition hover:bg-red-600"
           >
-            Comenzar ›
+            Comenzar
           </button>
-        </form>
-      </main>
-    </div>
+        </div>
+        <p className="text-center text-xs text-white/35">{APP_NAME}</p>
+      </form>
+    </AnimatedMarqueeHero>
   );
 }
