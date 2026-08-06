@@ -58,6 +58,12 @@ COPY --from=builder /app/node_modules/esbuild ./node_modules/esbuild
 COPY --from=builder /app/node_modules/get-tsconfig ./node_modules/get-tsconfig
 COPY --from=builder /app/node_modules/resolve-pkg-maps ./node_modules/resolve-pkg-maps
 
+# Atajos CLI (npx prisma no funciona bien en standalone)
+RUN printf '%s\n' '#!/bin/sh' 'exec node /app/node_modules/prisma/build/index.js "$@"' > /usr/local/bin/prisma \
+  && chmod +x /usr/local/bin/prisma \
+  && printf '%s\n' '#!/bin/sh' 'exec node /app/scripts/db-push.cjs "$@"' > /usr/local/bin/db-push \
+  && chmod +x /usr/local/bin/db-push
+
 EXPOSE 3000
 # standalone genera server.js en la raíz del artefacto
 CMD ["sh", "-c", "node scripts/db-setup.cjs && node server.js"]
