@@ -25,18 +25,22 @@ export type AnimeAv1Embed = {
   lang: "SUB" | "DUB";
 };
 
-/** Embeds HTML para iframe. HLS = player Zilla /play/{hash} (no m3u8 crudo). */
+/**
+ * Mirrors embebibles. HLS/Zilla suele fallar en iframe
+ * ("player.zilla-networks.com rechazó la conexión").
+ */
 const PREFERRED_SERVERS = [
-  "hls",
   "upnshare",
   "mega",
+  "terabox",
+  "mp4upload",
   "streamtape",
   "vidhide",
   "yourupload",
   "voe",
   "filemoon",
   "dood",
-  "mp4upload",
+  "hls",
 ];
 
 export function isAnimeAv1ZillaUrl(url: string): boolean {
@@ -49,9 +53,8 @@ export function isAnimeAv1HlsUrl(url: string): boolean {
 }
 
 /**
- * Convierte scrapes de AnimeAV1 a URL embebible en el navegador.
- * animeav1-api transforma /play/→/m3u8/; el m3u8 no se puede iframear ni
- * reproducir con hls.js (segmentos 403). El player /play/ sí funciona en iframe.
+ * Normaliza URLs scrapadas. Zilla m3u8→/play/ por si el usuario elige HLS,
+ * pero el default del ranking evita Zilla.
  */
 export function animeAv1EmbedIframeUrl(url: string): string {
   const m = url.match(
@@ -63,14 +66,16 @@ export function animeAv1EmbedIframeUrl(url: string): string {
 
 function rankEmbed(e: AnimeAv1Embed): number {
   const name = e.server.toLowerCase();
+  // Zilla/HLS: último recurso (bloqueo frecuente en navegador)
+  if (name === "hls" || isAnimeAv1ZillaUrl(e.url)) {
+    return e.lang === "SUB" ? 4 : 2;
+  }
   const idx = PREFERRED_SERVERS.findIndex(
     (s) => name === s || name.includes(s)
   );
   let score = idx >= 0 ? 100 - idx * 8 : 10;
   if (e.lang === "SUB") score += 20;
   if (/^https:\/\//i.test(e.url)) score += 5;
-  // Bonus si ya es /play/ (iframe-ready)
-  if (/zilla-networks\.com\/play\//i.test(e.url)) score += 15;
   return score;
 }
 
@@ -231,7 +236,7 @@ export async function listAnimeAv1Embeds(opts: {
 }
 
 /**
- * Mejor embed scrapado de AnimeAV1 (HLS/Zilla /play/ primero).
+ * Mejor embed scrapado (UPNShare/Mega/…; HLS/Zilla al final).
  */
 export async function resolveAnimeAv1Embed(opts: {
   slug: string;
@@ -239,5 +244,9 @@ export async function resolveAnimeAv1Embed(opts: {
   preferDub?: boolean;
 }): Promise<AnimeAv1Embed | null> {
   const embeds = await listAnimeAv1Embeds(opts);
-  return embeds[0] || null;
+  if (!embeds.length) return null;
+  const playable = embeds.find(
+    (e) => e.server.toLowerCase() !== "hls" && !isAnimeAv1ZillaUrl(e.url)
+  );
+  return playable || embeds[0];
 }

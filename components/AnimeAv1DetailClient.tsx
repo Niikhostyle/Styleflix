@@ -90,14 +90,31 @@ export default function AnimeAv1DetailClient({
           return;
         }
         const list: ServerOpt[] = Array.isArray(data.embeds)
-          ? data.embeds.filter(
-              (e: ServerOpt) => e?.server && e?.url
-            )
+          ? data.embeds.filter((e: ServerOpt) => e?.server && e?.url)
           : [];
-        const url = data.embedUrl as string;
-        setServers(list.length ? list : [{ server: data.server || "VeoTV", url }]);
-        setActiveServer((data.server as string) || list[0]?.server || "");
-        setEmbedUrl(`${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`);
+        const serversList = list.length
+          ? list
+          : [{ server: data.server || "VeoTV", url: data.embedUrl as string }];
+
+        // Evitar Zilla/HLS por defecto (suele rechazar la conexión en iframe)
+        const picked =
+          (server
+            ? serversList.find(
+                (s) => s.server.toLowerCase() === server.toLowerCase()
+              )
+            : null) ||
+          serversList.find(
+            (s) =>
+              s.server.toLowerCase() !== "hls" &&
+              !/zilla-networks\.com/i.test(s.url)
+          ) ||
+          serversList[0];
+
+        setServers(serversList);
+        setActiveServer(picked.server);
+        setEmbedUrl(
+          `${picked.url}${picked.url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+        );
         setEpisode(ep);
       } catch {
         setError("Error de red.");
@@ -108,16 +125,36 @@ export default function AnimeAv1DetailClient({
     [anime.slug, canPlay]
   );
 
-  const selectServer = useCallback(
-    (opt: ServerOpt) => {
-      setActiveServer(opt.server);
-      setEmbedUrl(
-        `${opt.url}${opt.url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+  const selectServer = useCallback((opt: ServerOpt) => {
+    setActiveServer(opt.server);
+    setEmbedUrl(
+      `${opt.url}${opt.url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+    );
+    setError("");
+  }, []);
+
+  // Si el servidor activo es HLS/Zilla, avisar y ofrecer el siguiente mirror
+  useEffect(() => {
+    if (!embedUrl || !servers.length) return;
+    const isZilla =
+      activeServer.toLowerCase() === "hls" ||
+      /zilla-networks\.com/i.test(embedUrl);
+    if (!isZilla) return;
+    const t = window.setTimeout(() => {
+      const next = servers.find(
+        (s) =>
+          s.server.toLowerCase() !== "hls" &&
+          !/zilla-networks\.com/i.test(s.url)
       );
-      setError("");
-    },
-    []
-  );
+      if (next && next.server !== activeServer) {
+        setError(
+          "HLS no cargó en este navegador. Cambiando a " + next.server + "…"
+        );
+        selectServer(next);
+      }
+    }, 2500);
+    return () => window.clearTimeout(t);
+  }, [embedUrl, activeServer, servers, selectServer]);
 
   // Cargar ep. 1 al entrar si puede reproducir
   useEffect(() => {
