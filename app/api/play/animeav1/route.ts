@@ -13,7 +13,7 @@ import { isSourceEnabled } from "@/lib/sources/types";
 
 /**
  * Scrapea embeds de AnimeAV1.
- * HLS → iframe a nuestro JWPlayer (/animeav1-embed) + proxy Zilla (como animeav1.com).
+ * HLS → proxy Zilla + player nativo (hls.js); mirrors → iframe.
  */
 export async function GET(request: Request) {
   const session = await auth();
@@ -102,9 +102,10 @@ export async function GET(request: Request) {
       : streamUrl;
     return {
       server: e.server,
-      url: embedUrl,
+      url: streamUrl,
       streamUrl,
-      playKind: "iframe" as const, // JWPlayer en iframe (igual AnimeAV1)
+      embedUrl,
+      playKind: "hls" as const,
       hls: true,
     };
   }
@@ -117,9 +118,13 @@ export async function GET(request: Request) {
   return NextResponse.json({
     source: "animeav1",
     label: "VeoTV",
-    embedUrl: pickedMapped.url,
-    streamUrl: pickedMapped.streamUrl,
-    playKind: "iframe",
+    embedUrl:
+      ("embedUrl" in pickedMapped && pickedMapped.embedUrl) ||
+      pickedMapped.url,
+    streamUrl:
+      ("streamUrl" in pickedMapped && pickedMapped.streamUrl) ||
+      (pickedMapped.playKind === "hls" ? pickedMapped.url : undefined),
+    playKind: pickedMapped.playKind || "iframe",
     server: pickedMapped.server,
     embeds: mapped,
     maxResolution: maxRes,

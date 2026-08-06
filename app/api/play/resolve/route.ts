@@ -127,16 +127,13 @@ export async function GET(request: Request) {
                 })
               : "";
             const streamUrl = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
-            const embedUrl = hash
-              ? `/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
-              : streamUrl;
             return NextResponse.json(
               withPlanMeta({
                 source: "animeav1",
                 label: "VeoTV",
-                embedUrl,
+                embedUrl: streamUrl,
                 streamUrl,
-                playKind: "iframe",
+                playKind: "hls",
               })
             );
           }

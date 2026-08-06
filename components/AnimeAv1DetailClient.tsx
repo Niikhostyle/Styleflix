@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Play, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import { useSession } from "next-auth/react";
 import { mediaImageUrl } from "@/lib/media-links";
 
@@ -59,6 +60,8 @@ export default function AnimeAv1DetailClient({
 
   const [episode, setEpisode] = useState(1);
   const [embedUrl, setEmbedUrl] = useState("");
+  const [streamUrl, setStreamUrl] = useState("");
+  const [playKind, setPlayKind] = useState<"hls" | "iframe">("iframe");
   const [servers, setServers] = useState<ServerOpt[]>([]);
   const [activeServer, setActiveServer] = useState("");
   const [error, setError] = useState("");
@@ -88,10 +91,18 @@ export default function AnimeAv1DetailClient({
       : null;
 
   const applyServer = useCallback((opt: ServerOpt) => {
-    // HLS → iframe a /api/play/animeav1-embed (JWPlayer), igual que animeav1 → /play/
     setActiveServer(opt.server);
-    setEmbedUrl(withCacheBust(opt.url));
     setError("");
+    const kind =
+      opt.playKind === "hls" || Boolean(opt.streamUrl) ? "hls" : "iframe";
+    setPlayKind(kind);
+    if (kind === "hls") {
+      setStreamUrl(withCacheBust(opt.streamUrl || opt.url));
+      setEmbedUrl("");
+    } else {
+      setEmbedUrl(withCacheBust(opt.url));
+      setStreamUrl("");
+    }
   }, []);
 
   const loadEpisode = useCallback(
@@ -103,6 +114,7 @@ export default function AnimeAv1DetailClient({
       setLoading(true);
       setError("");
       setEmbedUrl("");
+      setStreamUrl("");
       try {
         const params = new URLSearchParams({
           slug: anime.slug,
@@ -111,7 +123,7 @@ export default function AnimeAv1DetailClient({
         if (server) params.set("server", server);
         const res = await fetch(`/api/play/animeav1?${params}`);
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.embedUrl) {
+        if (!res.ok || !(data.streamUrl || data.embedUrl)) {
           setError(data.error || "No se pudo cargar el episodio.");
           setServers([]);
           setActiveServer("");
@@ -125,8 +137,8 @@ export default function AnimeAv1DetailClient({
           : [
               {
                 server: data.server || "HLS",
-                url: data.embedUrl as string,
-                playKind: "iframe",
+                url: (data.streamUrl || data.embedUrl) as string,
+                playKind: data.playKind === "hls" ? "hls" : "iframe",
                 streamUrl: data.streamUrl as string | undefined,
               },
             ];
@@ -179,7 +191,7 @@ export default function AnimeAv1DetailClient({
                 <div className="flex h-full items-center justify-center text-sm text-white/50">
                   Cargando…
                 </div>
-              ) : error && !embedUrl ? (
+              ) : error && !embedUrl && !streamUrl ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   <p className="text-sm text-red-300">{error}</p>
                   {!canPlay && (
@@ -191,6 +203,12 @@ export default function AnimeAv1DetailClient({
                     </Link>
                   )}
                 </div>
+              ) : playKind === "hls" && streamUrl ? (
+                <HlsVideoPlayer
+                  key={streamUrl}
+                  src={streamUrl}
+                  title={`${anime.title} episodio ${episode}`}
+                />
               ) : embedUrl ? (
                 <iframe
                   key={embedUrl}

@@ -8,8 +8,8 @@ import {
 } from "@/lib/animeav1-token";
 
 /**
- * Página player estilo AnimeAV1: JWPlayer 8.30 + hlsjs sobre nuestro proxy Zilla.
- * Se usa en <iframe> igual que https://player.zilla-networks.com/play/{hash}
+ * Página player HLS (hls.js) sobre proxy Zilla.
+ * Fallback iframe; el cliente React prefiere HlsVideoPlayer directo.
  * GET /api/play/animeav1-embed?hash=...&t=...
  */
 export async function GET(request: Request) {
@@ -48,8 +48,7 @@ export async function GET(request: Request) {
   const m3u8 = animeAv1M3u8Url(
     `https://player.zilla-networks.com/m3u8/${hash}`
   );
-  // Relativa: JWPlayer/hls.js resuelven contra el origen del documento (veotv.cloud).
-  const streamUrl = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+  const streamPath = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -60,23 +59,40 @@ export async function GET(request: Request) {
   <title>VeoTV Player</title>
   <style>
     html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-    #player { position: absolute; inset: 0; }
+    video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
+    #err { display:none; color:#fca5a5; font:14px/1.4 system-ui,sans-serif;
+      position:absolute; inset:0; align-items:center; justify-content:center; padding:24px; text-align:center; }
   </style>
-  <script src="https://ssl.p.jwpcdn.com/player/v/8.30.0/jwplayer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
 </head>
 <body>
-  <div id="player"></div>
+  <video id="v" controls playsinline autoplay></video>
+  <div id="err"></div>
   <script>
-    jwplayer.key = "uoW6qHjBL3KNudxKVnwa3rt5LlTakbko9e6aQ6VUyKQ=";
-    jwplayer("player").setup({
-      file: ${JSON.stringify(streamUrl)},
-      width: "100%",
-      height: "100%",
-      autostart: true,
-      mute: false,
-      primary: "html5",
-      hlshtml: true
-    });
+    (function () {
+      var path = ${JSON.stringify(streamPath)};
+      var src = new URL(path, window.location.origin).href;
+      var video = document.getElementById("v");
+      var err = document.getElementById("err");
+      function fail(msg) {
+        err.style.display = "flex";
+        err.textContent = msg || "No se pudo reproducir el video.";
+      }
+      if (window.Hls && Hls.isSupported()) {
+        var hls = new Hls({ enableWorker: true, xhrSetup: function (xhr) { xhr.withCredentials = true; } });
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function () { video.play().catch(function () {}); });
+        hls.on(Hls.Events.ERROR, function (_e, data) {
+          if (data && data.fatal) fail("Error HLS (" + (data.type || "") + ")");
+        });
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = src;
+        video.play().catch(function () {});
+      } else {
+        fail("Tu navegador no soporta HLS.");
+      }
+    })();
   </script>
 </body>
 </html>`;
