@@ -25,8 +25,9 @@ export type AnimeAv1Embed = {
   lang: "SUB" | "DUB";
 };
 
-/** Embeds HTML reproducibles en iframe. Evitar HLS/Zilla (Cloudflare + 403 en segmentos). */
+/** Embeds HTML para iframe. HLS = player Zilla /play/{hash} (no m3u8 crudo). */
 const PREFERRED_SERVERS = [
+  "hls",
   "upnshare",
   "mega",
   "streamtape",
@@ -38,30 +39,38 @@ const PREFERRED_SERVERS = [
   "mp4upload",
 ];
 
-/** URLs Zilla (/play o /m3u8) no sirven en iframe ni con hls.js desde nuestro dominio. */
 export function isAnimeAv1ZillaUrl(url: string): boolean {
   return /zilla-networks\.com\/(m3u8|play)\//i.test(url);
 }
 
-/** @deprecated Usar isAnimeAv1ZillaUrl; ya no forzamos HLS nativo. */
+/** @deprecated */
 export function isAnimeAv1HlsUrl(url: string): boolean {
   return isAnimeAv1ZillaUrl(url);
 }
 
+/**
+ * Convierte scrapes de AnimeAV1 a URL embebible en el navegador.
+ * animeav1-api transforma /play/→/m3u8/; el m3u8 no se puede iframear ni
+ * reproducir con hls.js (segmentos 403). El player /play/ sí funciona en iframe.
+ */
+export function animeAv1EmbedIframeUrl(url: string): string {
+  const m = url.match(
+    /zilla-networks\.com\/(?:m3u8|play)\/([a-f0-9]{32})\/?/i
+  );
+  if (m) return `https://player.zilla-networks.com/play/${m[1]}`;
+  return url;
+}
+
 function rankEmbed(e: AnimeAv1Embed): number {
   const name = e.server.toLowerCase();
-  // Zilla/HLS: solo como último recurso (casi nunca reproduce fuera de animeav1.com)
-  if (name === "hls" || isAnimeAv1ZillaUrl(e.url)) {
-    let score = 1;
-    if (e.lang === "SUB") score += 2;
-    return score;
-  }
   const idx = PREFERRED_SERVERS.findIndex(
     (s) => name === s || name.includes(s)
   );
   let score = idx >= 0 ? 100 - idx * 8 : 10;
   if (e.lang === "SUB") score += 20;
   if (/^https:\/\//i.test(e.url)) score += 5;
+  // Bonus si ya es /play/ (iframe-ready)
+  if (/zilla-networks\.com\/play\//i.test(e.url)) score += 15;
   return score;
 }
 
@@ -167,28 +176,37 @@ export async function findAnimeAv1Match(opts: {
 }
 
 /**
- * Resuelve un embed reproducible para un episodio (default 1).
+ * Lista de mirrors de un episodio (un botón por servidor; sin etiqueta SUB/DUB).
+ * Prefiere SUB si el mismo servidor aparece en ambos.
+ * URLs Zilla se normalizan a /play/{hash} para iframe en el navegador.
  */
-export async function resolveAnimeAv1Embed(opts: {
+export async function listAnimeAv1Embeds(opts: {
   slug: string;
   episode?: number;
   preferDub?: boolean;
-}): Promise<AnimeAv1Embed | null> {
+}): Promise<AnimeAv1Embed[]> {
   const epNum = Math.max(1, opts.episode ?? 1);
   let detail: Awaited<ReturnType<typeof getEpisode>> | null = null;
   try {
     detail = await getEpisode(opts.slug, epNum);
   } catch (err) {
     console.error(`[animeav1] episode ${opts.slug}#${epNum}`, err);
-    return null;
+    return [];
   }
-  if (!detail) return null;
+  if (!detail) return [];
 
   const embeds: AnimeAv1Embed[] = [];
-  const push = (lang: "SUB" | "DUB", list?: { server: string; url: string }[]) => {
+  const push = (
+    lang: "SUB" | "DUB",
+    list?: { server: string; url: string }[]
+  ) => {
     for (const e of list || []) {
       if (!e?.url || !/^https:\/\//i.test(e.url)) continue;
-      embeds.push({ server: e.server || "mirror", url: e.url, lang });
+      embeds.push({
+        server: e.server || "mirror",
+        url: animeAv1EmbedIframeUrl(e.url),
+        lang,
+      });
     }
   };
 
@@ -200,13 +218,26 @@ export async function resolveAnimeAv1Embed(opts: {
     push("DUB", detail.embeds?.DUB);
   }
 
-  if (!embeds.length) return null;
+  // Un servidor = un botón (primera aparición gana; SUB ya va primero)
+  const byServer = new Map<string, AnimeAv1Embed>();
+  for (const e of embeds) {
+    const key = e.server.trim().toLowerCase() || e.url;
+    if (!byServer.has(key)) byServer.set(key, e);
+  }
 
-  // Preferir mirrors embebibles; Zilla/HLS casi nunca reproduce fuera de animeav1.com
-  const playable = embeds.filter(
-    (e) => e.server.toLowerCase() !== "hls" && !isAnimeAv1ZillaUrl(e.url)
-  );
-  const pool = playable.length ? playable : embeds;
-  pool.sort((a, b) => rankEmbed(b) - rankEmbed(a));
-  return pool[0];
+  const unique = [...byServer.values()];
+  unique.sort((a, b) => rankEmbed(b) - rankEmbed(a));
+  return unique;
+}
+
+/**
+ * Mejor embed scrapado de AnimeAV1 (HLS/Zilla /play/ primero).
+ */
+export async function resolveAnimeAv1Embed(opts: {
+  slug: string;
+  episode?: number;
+  preferDub?: boolean;
+}): Promise<AnimeAv1Embed | null> {
+  const embeds = await listAnimeAv1Embeds(opts);
+  return embeds[0] || null;
 }

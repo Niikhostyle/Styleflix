@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Play, ArrowLeft } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useSession } from "next-auth/react";
@@ -24,6 +24,8 @@ export type AnimeAv1Detail = {
   episodes: { id: number; number: number }[];
 };
 
+type ServerOpt = { server: string; url: string };
+
 export default function AnimeAv1DetailClient({
   anime,
 }: {
@@ -35,8 +37,9 @@ export default function AnimeAv1DetailClient({
   );
 
   const [episode, setEpisode] = useState(1);
-  const [playing, setPlaying] = useState(false);
   const [embedUrl, setEmbedUrl] = useState("");
+  const [servers, setServers] = useState<ServerOpt[]>([]);
+  const [activeServer, setActiveServer] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -47,14 +50,24 @@ export default function AnimeAv1DetailClient({
   const episodes = useMemo(() => {
     const list = [...(anime.episodes || [])].sort((a, b) => a.number - b.number);
     if (list.length) return list;
-    return Array.from({ length: Math.max(1, anime.episodesCount || 1) }, (_, i) => ({
-      id: i + 1,
-      number: i + 1,
-    }));
+    return Array.from(
+      { length: Math.max(1, anime.episodesCount || 1) },
+      (_, i) => ({
+        id: i + 1,
+        number: i + 1,
+      })
+    );
   }, [anime.episodes, anime.episodesCount]);
 
+  const epIndex = episodes.findIndex((e) => e.number === episode);
+  const prevEp = epIndex > 0 ? episodes[epIndex - 1] : null;
+  const nextEp =
+    epIndex >= 0 && epIndex < episodes.length - 1
+      ? episodes[epIndex + 1]
+      : null;
+
   const loadEpisode = useCallback(
-    async (ep: number) => {
+    async (ep: number, server?: string) => {
       if (!canPlay) {
         setError("Necesitas una membresía activa para reproducir.");
         return;
@@ -63,17 +76,29 @@ export default function AnimeAv1DetailClient({
       setError("");
       setEmbedUrl("");
       try {
-        const res = await fetch(
-          `/api/play/animeav1?slug=${encodeURIComponent(anime.slug)}&ep=${ep}`
-        );
+        const params = new URLSearchParams({
+          slug: anime.slug,
+          ep: String(ep),
+        });
+        if (server) params.set("server", server);
+        const res = await fetch(`/api/play/animeav1?${params}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.embedUrl) {
           setError(data.error || "No se pudo cargar el episodio.");
+          setServers([]);
+          setActiveServer("");
           return;
         }
+        const list: ServerOpt[] = Array.isArray(data.embeds)
+          ? data.embeds.filter(
+              (e: ServerOpt) => e?.server && e?.url
+            )
+          : [];
         const url = data.embedUrl as string;
+        setServers(list.length ? list : [{ server: data.server || "VeoTV", url }]);
+        setActiveServer((data.server as string) || list[0]?.server || "");
         setEmbedUrl(`${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`);
-        setPlaying(true);
+        setEpisode(ep);
       } catch {
         setError("Error de red.");
       } finally {
@@ -83,177 +108,222 @@ export default function AnimeAv1DetailClient({
     [anime.slug, canPlay]
   );
 
+  const selectServer = useCallback(
+    (opt: ServerOpt) => {
+      setActiveServer(opt.server);
+      setEmbedUrl(
+        `${opt.url}${opt.url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+      );
+      setError("");
+    },
+    []
+  );
+
+  // Cargar ep. 1 al entrar si puede reproducir
   useEffect(() => {
-    if (!playing) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPlaying(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [playing]);
+    if (status !== "authenticated" || !canPlay) return;
+    void loadEpisode(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, canPlay, anime.slug]);
 
   return (
-    <div className="app-page">
+    <div className="app-page min-h-screen bg-[#07090f]">
       <Navbar />
 
-      <section className="relative min-h-[70vh] w-full overflow-hidden">
-        {backdrop && (
-          <Image
-            src={backdrop}
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center opacity-50"
-            unoptimized={/^https?:\/\//i.test(backdrop)}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#06080f] via-[#06080f]/85 to-[#06080f]/40" />
+      <main className="mx-auto max-w-[1400px] px-3 pb-16 pt-24 sm:px-5 md:px-8">
+        <Link
+          href="/animes"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/45 transition hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver a animes
+        </Link>
 
-        <div className="relative z-10 mx-auto flex max-w-[1200px] flex-col gap-8 px-4 pb-16 pt-28 md:flex-row md:items-end md:px-8">
-          {poster && (
-            <div className="relative mx-auto aspect-[2/3] w-44 shrink-0 overflow-hidden rounded-2xl border border-white/10 shadow-2xl md:mx-0 md:w-52">
-              <Image
-                src={poster}
-                alt={anime.title}
-                fill
-                className="object-cover"
-                sizes="208px"
-                unoptimized={/^https?:\/\//i.test(poster)}
-              />
-            </div>
-          )}
-
-          <div className="flex-1 text-center md:pb-2 md:text-left">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-300">
-              Anime
-            </p>
-            <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-white md:text-5xl">
-              {anime.title}
-            </h1>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-white/60 md:justify-start">
-              {year && <span>{year}</span>}
-              {anime.statusText && <span>· {anime.statusText}</span>}
-              {anime.episodesCount > 0 && (
-                <span>· {anime.episodesCount} episodios</span>
-              )}
-              {anime.score != null && anime.score > 0 && (
-                <span>· ★ {anime.score.toFixed(1)}</span>
-              )}
-            </div>
-            {anime.genres && anime.genres.length > 0 && (
-              <div className="mt-3 flex flex-wrap justify-center gap-2 md:justify-start">
-                {anime.genres.slice(0, 8).map((g) => (
-                  <span
-                    key={g.name}
-                    className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70"
-                  >
-                    {g.name}
-                  </span>
-                ))}
-              </div>
-            )}
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/65 md:text-base">
-              {anime.synopsis || "Sin sinopsis."}
-            </p>
-
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 md:justify-start">
-              {status === "authenticated" && canPlay ? (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_300px]">
+          {/* Columna principal */}
+          <div className="min-w-0">
+            {/* Player */}
+            <div className="relative aspect-video overflow-hidden rounded-xl border border-white/[0.08] bg-black shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+              {loading ? (
+                <div className="flex h-full items-center justify-center text-sm text-white/50">
+                  Cargando…
+                </div>
+              ) : error && !embedUrl ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  <p className="text-sm text-red-300">{error}</p>
+                  {!canPlay && (
+                    <Link
+                      href="/membresia"
+                      className="brand-button rounded-lg px-4 py-2 text-sm font-bold"
+                    >
+                      Activar membresía
+                    </Link>
+                  )}
+                </div>
+              ) : embedUrl ? (
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  title={`${anime.title} episodio ${episode}`}
+                  className="absolute inset-0 h-full w-full border-0"
+                  allowFullScreen
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              ) : (
                 <button
                   type="button"
-                  disabled={loading}
-                  onClick={() => {
-                    setEpisode(1);
-                    void loadEpisode(1);
-                  }}
-                  className="brand-button inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold disabled:opacity-60"
+                  onClick={() => void loadEpisode(episode)}
+                  className="group relative flex h-full w-full items-center justify-center"
                 >
-                  <Play className="h-4 w-4 fill-current" />
-                  {loading ? "Cargando…" : "Reproducir"}
+                  {(backdrop || poster) && (
+                    <Image
+                      src={backdrop || poster}
+                      alt=""
+                      fill
+                      className="object-cover opacity-40 transition group-hover:opacity-50"
+                      unoptimized
+                      priority
+                    />
+                  )}
+                  <span className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-teal-400 text-black shadow-lg shadow-teal-400/30 transition group-hover:scale-105">
+                    <Play className="h-7 w-7 fill-current pl-0.5" />
+                  </span>
                 </button>
-              ) : (
-                <Link
-                  href="/membresia"
-                  className="brand-button inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold"
-                >
-                  Activar membresía para ver
-                </Link>
               )}
-              <Link
-                href="/animes"
-                className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Volver a animes
-              </Link>
             </div>
-            {error && !playing && (
-              <p className="mt-3 text-sm text-red-300">{error}</p>
-            )}
-          </div>
-        </div>
-      </section>
 
-      <main className="relative z-10 mx-auto max-w-[1200px] px-4 pb-20 md:px-8">
-        <h2 className="mb-4 text-xl font-bold">Episodios</h2>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-          {episodes.map((ep) => (
-            <button
-              key={ep.id}
-              type="button"
-              disabled={!canPlay || loading}
-              onClick={() => {
-                setEpisode(ep.number);
-                void loadEpisode(ep.number);
-              }}
-              className={`rounded-lg border px-2 py-2.5 text-sm font-semibold transition disabled:opacity-40 ${
-                episode === ep.number && playing
-                  ? "border-teal-300/50 bg-teal-300/15 text-teal-100"
-                  : "border-white/10 bg-white/[0.04] text-white/80 hover:border-teal-300/30 hover:bg-teal-300/10"
-              }`}
-            >
-              {ep.number}
-            </button>
-          ))}
+            {/* Anterior / Siguiente */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={!prevEp || loading || !canPlay}
+                onClick={() => prevEp && void loadEpisode(prevEp.number)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-sm font-semibold text-white/85 transition hover:border-teal-300/35 hover:bg-teal-300/10 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={!nextEp || loading || !canPlay}
+                onClick={() => nextEp && void loadEpisode(nextEp.number)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-sm font-semibold text-white/85 transition hover:border-teal-300/35 hover:bg-teal-300/10 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Servidores (sin SUB) */}
+            {servers.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2.5">
+                {servers.map((s) => {
+                  const active =
+                    s.server.toLowerCase() === activeServer.toLowerCase();
+                  return (
+                    <button
+                      key={s.server}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => selectServer(s)}
+                      className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                        active
+                          ? "bg-teal-400 text-black shadow-md shadow-teal-400/25"
+                          : "bg-white/[0.06] text-white/75 hover:bg-white/[0.1] hover:text-white"
+                      }`}
+                    >
+                      {s.server}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Meta */}
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-teal-300">{anime.title}</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white md:text-3xl">
+                Episodio {episode}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/45">
+                <span>Anime</span>
+                {year && (
+                  <>
+                    <span className="text-white/20">·</span>
+                    <span>{year}</span>
+                  </>
+                )}
+                {anime.statusText && (
+                  <>
+                    <span className="text-white/20">·</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      {anime.statusText}
+                    </span>
+                  </>
+                )}
+                {anime.score != null && anime.score > 0 && (
+                  <>
+                    <span className="text-white/20">·</span>
+                    <span>★ {anime.score.toFixed(1)}</span>
+                  </>
+                )}
+              </div>
+              {anime.genres && anime.genres.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {anime.genres.slice(0, 8).map((g) => (
+                    <span
+                      key={g.name}
+                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-white/65"
+                    >
+                      {g.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-white/55 md:text-[15px]">
+                {anime.synopsis || "Sin sinopsis."}
+              </p>
+              {error && embedUrl && (
+                <p className="mt-3 text-sm text-red-300">{error}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Sidebar episodios */}
+          <aside className="rounded-xl border border-white/[0.08] bg-[#0c1018] p-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/40">
+              Estás viendo
+            </p>
+            <p className="mt-1 text-base font-bold text-white">
+              Episodio {episode}
+            </p>
+            <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-4">
+              {episodes.map((ep) => {
+                const active = ep.number === episode;
+                return (
+                  <button
+                    key={ep.id}
+                    type="button"
+                    disabled={!canPlay || loading}
+                    onClick={() => void loadEpisode(ep.number)}
+                    className={`aspect-square rounded-lg text-sm font-semibold transition disabled:opacity-40 ${
+                      active
+                        ? "border-2 border-teal-400 bg-teal-400/10 text-teal-200"
+                        : "border border-transparent bg-white/[0.06] text-white/70 hover:bg-white/[0.1] hover:text-white"
+                    }`}
+                  >
+                    {ep.number}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
         </div>
       </main>
 
       <Footer />
-
-      {playing && (
-        <div className="fixed inset-0 z-[100] bg-black">
-          <button
-            type="button"
-            onClick={() => setPlaying(false)}
-            className="absolute left-3 top-3 z-20 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2.5 text-sm font-semibold text-white shadow-lg backdrop-blur-sm md:left-6 md:top-6"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Volver
-          </button>
-          <p className="pointer-events-none absolute left-1/2 top-4 z-20 max-w-[70%] -translate-x-1/2 truncate text-center text-sm font-semibold text-white drop-shadow md:top-6">
-            {anime.title} · Ep. {episode}
-          </p>
-          {error ? (
-            <div className="flex h-full items-center justify-center text-red-300">
-              {error}
-            </div>
-          ) : embedUrl ? (
-            <iframe
-              key={embedUrl}
-              src={embedUrl}
-              title={`${anime.title} episodio ${episode}`}
-              className="absolute inset-0 h-full w-full border-0"
-              allowFullScreen
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-white/60">
-              Cargando…
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
