@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Imagen Docker más chica (Coolify export falla con node_modules completo)
+  output: "standalone",
   // Permite el túnel ngrok en desarrollo (si no, Next bloquea /_next y RSC → Unexpected token '<')
   allowedDevOrigins: [
     "*.ngrok-free.app",

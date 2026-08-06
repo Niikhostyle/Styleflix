@@ -5,9 +5,19 @@
  * (así Coolify no entra en crash-loop).
  */
 const { execSync } = require("node:child_process");
+const path = require("node:path");
+const fs = require("node:fs");
 
 function run(cmd, env) {
   execSync(cmd, { stdio: "inherit", env });
+}
+
+function bin(name, fallbacks) {
+  for (const rel of fallbacks) {
+    const abs = path.join(__dirname, "..", rel);
+    if (fs.existsSync(abs)) return abs;
+  }
+  return name;
 }
 
 function stripQuotes(value) {
@@ -75,8 +85,23 @@ if (authSecret) {
 }
 
 try {
-  run("npx prisma db push --skip-generate", env);
-  run("npx tsx prisma/seed.ts", env);
+  const prismaCli = bin("prisma", [
+    "node_modules/prisma/build/index.js",
+    "node_modules/.bin/prisma",
+  ]);
+  const tsxCli = bin("tsx", [
+    "node_modules/tsx/dist/cli.mjs",
+    "node_modules/.bin/tsx",
+  ]);
+  const prismaCmd = prismaCli.endsWith(".js")
+    ? `node "${prismaCli}"`
+    : `"${prismaCli}"`;
+  const tsxCmd = tsxCli.endsWith(".mjs")
+    ? `node "${tsxCli}"`
+    : `"${tsxCli}"`;
+
+  run(`${prismaCmd} db push --skip-generate`, env);
+  run(`${tsxCmd} prisma/seed.ts`, env);
   console.log("[db-setup] Base de datos lista.");
 } catch (err) {
   console.error("[db-setup] Error:", err?.message || err);
