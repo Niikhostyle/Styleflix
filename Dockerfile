@@ -50,13 +50,11 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
 
-# db-setup en arranque: prisma CLI + tsx (están en dependencies)
+# db-setup: solo Prisma CLI (seed es CJS, sin tsx/esbuild)
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
-COPY --from=builder /app/node_modules/esbuild ./node_modules/esbuild
-COPY --from=builder /app/node_modules/get-tsconfig ./node_modules/get-tsconfig
-COPY --from=builder /app/node_modules/resolve-pkg-maps ./node_modules/resolve-pkg-maps
+# bcryptjs para seed.cjs si standalone no lo empaquetó
+COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
 
 # Atajos CLI (npx prisma no funciona bien en standalone)
 RUN printf '%s\n' '#!/bin/sh' 'exec node /app/node_modules/prisma/build/index.js "$@"' > /usr/local/bin/prisma \

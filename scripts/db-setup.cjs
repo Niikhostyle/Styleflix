@@ -89,19 +89,19 @@ try {
     "node_modules/prisma/build/index.js",
     "node_modules/.bin/prisma",
   ]);
-  const tsxCli = bin("tsx", [
-    "node_modules/tsx/dist/cli.mjs",
-    "node_modules/.bin/tsx",
-  ]);
   const prismaCmd = prismaCli.endsWith(".js")
     ? `node "${prismaCli}"`
     : `"${prismaCli}"`;
-  const tsxCmd = tsxCli.endsWith(".mjs")
-    ? `node "${tsxCli}"`
-    : `"${tsxCli}"`;
 
   run(`${prismaCmd} db push --skip-generate`, env);
-  run(`${tsxCmd} prisma/seed.ts`, env);
+
+  // Seed en CJS (no depende de tsx/esbuild en la imagen standalone)
+  const seedCjs = path.join(__dirname, "..", "prisma", "seed.cjs");
+  if (fs.existsSync(seedCjs)) {
+    run(`node "${seedCjs}"`, env);
+  } else {
+    console.warn("[db-setup] prisma/seed.cjs no encontrado; se omite seed.");
+  }
   console.log("[db-setup] Base de datos lista.");
 } catch (err) {
   console.error("[db-setup] Error:", err?.message || err);
