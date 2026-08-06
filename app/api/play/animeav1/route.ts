@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
-import { resolveAnimeAv1Embed } from "@/lib/animeav1";
+import { isAnimeAv1HlsUrl, resolveAnimeAv1Embed } from "@/lib/animeav1";
 import { isSourceEnabled } from "@/lib/sources/types";
 
 /**
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
   if (!isSourceEnabled("animeav1")) {
     return NextResponse.json(
-      { error: "AnimeAV1 no está disponible." },
+      { error: "Fuente de anime no disponible." },
       { status: 503 }
     );
   }
@@ -50,23 +50,25 @@ export async function GET(request: Request) {
 
   if (!embed?.url) {
     return NextResponse.json(
-      { error: "Episodio no disponible en AnimeAV1." },
+      { error: "Episodio no disponible." },
       { status: 404 }
     );
   }
 
   const maxRes = session.user.planMaxResolution || 1080;
+  const hls = isAnimeAv1HlsUrl(embed.url);
+
   return NextResponse.json({
     source: "animeav1",
-    label: "AnimeAV1",
+    label: "VeoTV",
     embedUrl: embed.url,
+    streamUrl: hls ? embed.url : undefined,
+    playKind: hls ? "hls" : "iframe",
     server: embed.server,
     lang: embed.lang,
-    credit: "Reproducción vía AnimeAV1 (animeav1.com)",
     maxResolution: maxRes,
-    notice:
-      maxRes <= 720
-        ? "Reproducción vía AnimeAV1 · Tu plan Estándar reproduce hasta 720p."
-        : "Reproducción vía AnimeAV1 · animeav1.com",
+    ...(maxRes <= 720
+      ? { notice: "Tu plan Estándar reproduce hasta 720p." }
+      : {}),
   });
 }

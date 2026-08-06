@@ -32,7 +32,19 @@ const PREFERRED_SERVERS = [
   "vidhide",
   "yourupload",
   "mega",
+  "upnshare",
 ];
+
+/** Detecta streams HLS directos (p. ej. zilla-networks) para player nativo fullscreen. */
+export function isAnimeAv1HlsUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return (
+    u.includes("application/x-mpegurl") ||
+    u.includes(".m3u8") ||
+    u.includes("/m3u8/") ||
+    u.includes("zilla-networks.com")
+  );
+}
 
 function rankEmbed(e: AnimeAv1Embed): number {
   const name = e.server.toLowerCase();

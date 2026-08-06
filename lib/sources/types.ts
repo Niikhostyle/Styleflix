@@ -23,7 +23,7 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   jikan: "MyAnimeList",
   pluto: "Pluto TV",
   archive: "Archive.org",
-  animeav1: "AnimeAV1",
+  animeav1: "VeoTV",
 };
 
 /**

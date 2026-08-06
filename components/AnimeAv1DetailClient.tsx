@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Play, ArrowLeft, ExternalLink } from "lucide-react";
+import { Play, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import { useSession } from "next-auth/react";
 import { mediaImageUrl } from "@/lib/media-links";
 
@@ -37,7 +38,7 @@ export default function AnimeAv1DetailClient({
   const [episode, setEpisode] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [embedUrl, setEmbedUrl] = useState("");
-  const [notice, setNotice] = useState("");
+  const [playKind, setPlayKind] = useState<"iframe" | "hls">("iframe");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,24 +63,23 @@ export default function AnimeAv1DetailClient({
       }
       setLoading(true);
       setError("");
-      setNotice("");
+      setEmbedUrl("");
       try {
         const res = await fetch(
           `/api/play/animeav1?slug=${encodeURIComponent(anime.slug)}&ep=${ep}`
         );
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.embedUrl) {
+        if (!res.ok || !(data.streamUrl || data.embedUrl)) {
           setError(data.error || "No se pudo cargar el episodio.");
-          setEmbedUrl("");
           return;
         }
+        const kind = data.playKind === "hls" ? "hls" : "iframe";
+        const url = (data.streamUrl || data.embedUrl) as string;
+        setPlayKind(kind);
         setEmbedUrl(
-          `${data.embedUrl}${data.embedUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`
-        );
-        setNotice(
-          data.notice ||
-            data.credit ||
-            "Reproducción vía AnimeAV1 · animeav1.com"
+          kind === "hls"
+            ? url
+            : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
         );
         setPlaying(true);
       } catch {
@@ -134,7 +134,7 @@ export default function AnimeAv1DetailClient({
 
           <div className="flex-1 text-center md:pb-2 md:text-left">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-300">
-              Anime · AnimeAV1
+              Anime
             </p>
             <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-white md:text-5xl">
               {anime.title}
@@ -187,15 +187,6 @@ export default function AnimeAv1DetailClient({
                   Activar membresía para ver
                 </Link>
               )}
-              <a
-                href={`https://animeav1.com/media/${encodeURIComponent(anime.slug)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-3 text-sm text-white/70 hover:text-white"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Ver en AnimeAV1
-              </a>
               <Link
                 href="/animes"
                 className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white"
@@ -204,18 +195,6 @@ export default function AnimeAv1DetailClient({
                 Volver a animes
               </Link>
             </div>
-            <p className="mt-4 text-xs text-white/40">
-              Catálogo y reproducción con créditos a{" "}
-              <a
-                href="https://animeav1.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-teal-300/80 underline"
-              >
-                AnimeAV1
-              </a>
-              .
-            </p>
             {error && !playing && (
               <p className="mt-3 text-sm text-red-300">{error}</p>
             )}
@@ -250,40 +229,40 @@ export default function AnimeAv1DetailClient({
       <Footer />
 
       {playing && (
-        <div className="fixed inset-0 z-[80] bg-black">
-          <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-black/80 to-transparent px-4 py-4">
-            <button
-              type="button"
-              onClick={() => setPlaying(false)}
-              className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white backdrop-blur"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver
-            </button>
-            <div className="min-w-0 flex-1 text-center">
-              <p className="truncate text-sm font-semibold text-white">
-                {anime.title} · Ep. {episode}
-              </p>
-              {notice && (
-                <p className="truncate text-xs text-teal-200/80">{notice}</p>
-              )}
-            </div>
-            <div className="w-24" />
-          </div>
+        <div className="fixed inset-0 z-[100] bg-black">
+          <button
+            type="button"
+            onClick={() => setPlaying(false)}
+            className="absolute left-3 top-3 z-20 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2.5 text-sm font-semibold text-white shadow-lg backdrop-blur-sm md:left-6 md:top-6"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Volver
+          </button>
+          <p className="pointer-events-none absolute left-1/2 top-4 z-20 max-w-[70%] -translate-x-1/2 truncate text-center text-sm font-semibold text-white drop-shadow md:top-6">
+            {anime.title} · Ep. {episode}
+          </p>
           {error ? (
             <div className="flex h-full items-center justify-center text-red-300">
               {error}
             </div>
           ) : embedUrl ? (
-            <iframe
-              key={embedUrl}
-              src={embedUrl}
-              title={`${anime.title} episodio ${episode}`}
-              className="absolute inset-0 h-full w-full border-0"
-              allowFullScreen
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            playKind === "hls" ? (
+              <HlsVideoPlayer
+                key={`hls-${anime.slug}-${episode}-${embedUrl}`}
+                src={embedUrl}
+                title={`${anime.title} episodio ${episode}`}
+              />
+            ) : (
+              <iframe
+                key={embedUrl}
+                src={embedUrl}
+                title={`${anime.title} episodio ${episode}`}
+                className="absolute inset-0 h-full w-full border-0"
+                allowFullScreen
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            )
           ) : (
             <div className="flex h-full items-center justify-center text-white/60">
               Cargando…

@@ -56,7 +56,7 @@ export default function Hero({ item, mediaType = "movie" }: HeroProps) {
         <div className="max-w-2xl">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-teal-200 backdrop-blur-md">
             <Sparkles className="h-3.5 w-3.5" />
-            Selección VeoTV{item.animeAv1Slug ? " · AnimeAV1" : ""}
+            Selección VeoTV
           </div>
 
           <h1 className="mb-5 max-w-xl text-5xl font-black leading-[0.92] tracking-[-0.055em] text-white drop-shadow-lg md:text-7xl lg:text-[5.25rem]">

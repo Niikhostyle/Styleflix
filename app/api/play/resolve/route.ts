@@ -7,7 +7,7 @@ import {
   vimeusHasTmdbId,
 } from "@/lib/vimeus";
 import { findPlutoMatch, resolvePlutoHlsUrl } from "@/lib/pluto";
-import { findAnimeAv1Match, resolveAnimeAv1Embed } from "@/lib/animeav1";
+import { findAnimeAv1Match, isAnimeAv1HlsUrl, resolveAnimeAv1Embed } from "@/lib/animeav1";
 import { findArchiveMatch } from "@/lib/sources/archive";
 import { findCustomStream } from "@/lib/sources/custom";
 import { isSourceEnabled } from "@/lib/sources/types";
@@ -118,10 +118,10 @@ export async function GET(request: Request) {
           return NextResponse.json(
             withPlanMeta({
               source: "animeav1",
-              label: "AnimeAV1",
+              label: "VeoTV",
               embedUrl: embed.url,
-              credit: "Reproducción vía AnimeAV1 (animeav1.com)",
-              notice: "Reproducción vía AnimeAV1 · animeav1.com",
+              streamUrl: isAnimeAv1HlsUrl(embed.url) ? embed.url : undefined,
+              playKind: isAnimeAv1HlsUrl(embed.url) ? "hls" : "iframe",
             })
           );
         }

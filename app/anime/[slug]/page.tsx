@@ -15,7 +15,7 @@ export async function generateMetadata({
     title: anime?.title
       ? `${anime.title} | Animes VeoTV`
       : "Anime | VeoTV",
-    description: anime?.synopsis?.slice(0, 160) || "Anime en VeoTV vía AnimeAV1",
+    description: anime?.synopsis?.slice(0, 160) || "Anime en VeoTV",
   };
 }
 
