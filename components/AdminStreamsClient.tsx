@@ -353,9 +353,9 @@ export default function AdminStreamsClient() {
             className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-teal-300/50"
           />
           <p className="text-[11px] leading-relaxed text-white/40">
-            Google Drive: pega el link compartido (open/view). Se convierte solo a{" "}
-            <span className="text-cyan-200/80">/preview</span>. El archivo debe
-            estar en “Cualquiera con el enlace”.
+            Google Drive: pega el link compartido (open/view). Se reproduce con el{" "}
+            <span className="text-cyan-200/80">player VeoTV</span> (no iframe). El
+            archivo debe estar en “Cualquiera con el enlace” (Lector).
           </p>
         </label>
 

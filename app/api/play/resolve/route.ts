@@ -11,6 +11,7 @@ import { findAnimeAv1Match, isAnimeAv1HlsUrl, animeAv1M3u8Url, animeAv1ZillaHash
 import { signAnimeAv1StreamToken } from "@/lib/animeav1-token";
 import { findArchiveMatch } from "@/lib/sources/archive";
 import { findCustomStream } from "@/lib/sources/custom";
+import { extractGoogleDriveFileId, isGoogleDriveUrl } from "@/lib/embed-url";
 import { isSourceEnabled } from "@/lib/sources/types";
 import {
   getBestTrailerKey,
@@ -95,11 +96,26 @@ export async function GET(request: Request) {
       episode: type === "tv" ? episode : undefined,
     });
     if (custom?.embedUrl) {
+      if (isGoogleDriveUrl(custom.embedUrl)) {
+        const fileId = extractGoogleDriveFileId(custom.embedUrl);
+        if (fileId) {
+          return NextResponse.json(
+            withPlanMeta({
+              source: "custom",
+              label: custom.label || "VeoTV",
+              playKind: "video",
+              streamUrl: `/api/play/drive?id=${encodeURIComponent(fileId)}`,
+              embedUrl: `/api/play/drive?id=${encodeURIComponent(fileId)}`,
+            })
+          );
+        }
+      }
       return NextResponse.json(
         withPlanMeta({
           source: "custom",
           label: custom.label || "VeoTV",
           embedUrl: custom.embedUrl,
+          playKind: "iframe",
         })
       );
     }

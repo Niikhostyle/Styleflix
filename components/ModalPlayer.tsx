@@ -59,7 +59,7 @@ export default function ModalPlayer({
 
   const [frameNonce, setFrameNonce] = useState(0);
   const [embedPath, setEmbedPath] = useState("");
-  const [playKind, setPlayKind] = useState<"iframe" | "hls">("iframe");
+  const [playKind, setPlayKind] = useState<"iframe" | "hls" | "video">("iframe");
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [sourceLabel, setSourceLabel] = useState("");
   const [notice, setNotice] = useState("");
@@ -183,10 +183,15 @@ export default function ModalPlayer({
           setSourceId(null);
           return;
         }
-        const kind = data.playKind === "hls" ? "hls" : "iframe";
+        const kind =
+          data.playKind === "hls"
+            ? "hls"
+            : data.playKind === "video"
+              ? "video"
+              : "iframe";
         setPlayKind(kind);
         setEmbedPath(
-          kind === "hls"
+          kind === "hls" || kind === "video"
             ? url
             : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
         );
@@ -307,6 +312,16 @@ export default function ModalPlayer({
       key={`hls-${mediaId}-${season}-${episode}-${frameNonce}`}
       src={embedPath}
       title={title}
+    />
+  ) : playKind === "video" ? (
+    <video
+      key={`video-${mediaId}-${season}-${episode}-${frameNonce}`}
+      src={embedPath}
+      title={title}
+      controls
+      playsInline
+      autoPlay
+      className="absolute inset-0 h-full w-full bg-black object-contain"
     />
   ) : (
     <iframe
