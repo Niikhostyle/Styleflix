@@ -164,6 +164,33 @@ export async function sendTitleRequestNotice(opts: {
   return sendMail({ to: opts.to, subject, html, text });
 }
 
+export async function sendFeedbackNotice(opts: {
+  to: string;
+  name: string;
+  email: string;
+  category: string;
+  message: string;
+}) {
+  const adminUrl = `${publicBaseUrl()}/admin/feedback`;
+  const labels: Record<string, string> = {
+    DUDA: "Duda",
+    QUEJA: "Queja",
+    SUGERENCIA: "Sugerencia",
+    OTRO: "Otro",
+  };
+  const kind = labels[opts.category] || opts.category;
+  const subject = `Feedback VeoTV · ${kind} · ${opts.name}`;
+  const text = `${opts.name} <${opts.email}> envió ${kind}:\n\n${opts.message}\n\nRevisa: ${adminUrl}\n`;
+  const html = wrapHtml(
+    `Nuevo feedback · ${kind}`,
+    `<p style="margin:0 0 12px;color:#cfcfcf;line-height:1.55;"><strong style="color:#fff;">${escapeHtml(opts.name)}</strong> (${escapeHtml(opts.email)})</p>
+     <p style="margin:0 0 12px;color:#5EEAD4;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">${escapeHtml(kind)}</p>
+     <p style="margin:0 0 20px;color:#e8e8e8;line-height:1.6;white-space:pre-wrap;">${escapeHtml(opts.message)}</p>
+     <p style="margin:0;"><a href="${adminUrl}" style="display:inline-block;background:#5EEAD4;color:#07111D;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;">Ver feedback</a></p>`
+  );
+  return sendMail({ to: opts.to, subject, html, text });
+}
+
 function escapeHtml(s: string) {
   return s
     .replace(/&/g, "&amp;")

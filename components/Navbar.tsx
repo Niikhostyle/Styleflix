@@ -10,6 +10,7 @@ import {
   Film,
   Home,
   LogOut,
+  MessageSquare,
   Search,
   Sparkles,
   X,
@@ -33,6 +34,7 @@ const links = [
   { href: "/peliculas", label: "Películas", short: "Cine", Icon: Film },
   { href: "/animes", label: "Animes", short: "Anime", Icon: Sparkles },
   { href: "/mangas", label: "Mangas", short: "Manga", Icon: BookOpen },
+  { href: "/feedback", label: "Feedback", short: "Feedback", Icon: MessageSquare },
 ] as const;
 
 function linkActive(pathname: string, href: string) {
@@ -499,7 +501,7 @@ export default function Navbar() {
             paddingBottom: "max(0.35rem, env(safe-area-inset-bottom))",
           }}
         >
-          <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0 px-1 pt-1">
+          <ul className="mx-auto grid max-w-lg grid-cols-6 gap-0 px-0.5 pt-1">
             {links.map(({ href, short, Icon }) => {
               const active = linkActive(pathname, href);
               return (

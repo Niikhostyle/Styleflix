@@ -60,6 +60,7 @@ model User {
   authTokens   AuthToken[]
   profiles     Profile[]
   titleRequests TitleRequest[]
+  feedbacks    Feedback[]
 
   @@index([grantedByUserId])
   @@index([lastSeenAt])
@@ -230,6 +231,27 @@ model TitleRequest {
 
   @@unique([userId, mediaType, tmdbId])
   @@index([status, createdAt])
+}
+
+/// Feedback público: dudas, quejas y sugerencias
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// DUDA | QUEJA | SUGERENCIA | OTRO
+  category  String
+  name      String
+  email     String
+  message   String
+  /// NEW | READ | RESOLVED
+  status    String   @default("NEW")
+  ip        String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+  @@index([email, createdAt])
 }
 
 /// Eventos de seguridad (escaneo, scraping, auth, rate limit, etc.)

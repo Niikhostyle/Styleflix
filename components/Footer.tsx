@@ -35,6 +35,12 @@ export default async function Footer() {
               <Link href="/animes" className="hover:text-teal-200">
                 Animes
               </Link>
+              <Link href="/mangas" className="hover:text-teal-200">
+                Mangas
+              </Link>
+              <Link href="/feedback" className="hover:text-teal-200">
+                Feedback
+              </Link>
             </div>
           </div>
 
@@ -48,6 +54,9 @@ export default async function Footer() {
               </Link>
               <Link href="/membresia" className="hover:text-teal-200">
                 Membresía
+              </Link>
+              <Link href="/feedback" className="hover:text-teal-200">
+                Feedback
               </Link>
               {downloadsEnabled && (
                 <Link href="/descargar" className="hover:text-teal-200">

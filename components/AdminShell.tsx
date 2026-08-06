@@ -11,12 +11,14 @@ import {
   Link2,
   Inbox,
   Shield,
+  MessageSquare,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 const nav = [
   { href: "/admin", label: "Usuarios", icon: Users },
   { href: "/admin/solicitudes", label: "Solicitudes", icon: Inbox },
+  { href: "/admin/feedback", label: "Feedback", icon: MessageSquare },
   { href: "/admin/streams", label: "Links propios", icon: Link2 },
   { href: "/admin/seguridad", label: "Seguridad", icon: Shield },
   { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
