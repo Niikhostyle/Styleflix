@@ -313,9 +313,11 @@ export async function PATCH(
         where: { id },
         data: {
           subscriptionStatus: "EXPIRED",
-          currentPeriodEnd: new Date(),
+          // Pasado estricto: evita race con JWT que aún tiene periodEnd ≈ now
+          currentPeriodEnd: new Date(Date.now() - 60_000),
           cancelledAt: new Date(),
           prepaidDays: null,
+          demoExpiresAt: null,
         },
       });
       return NextResponse.json({ ok: true, user: updated });

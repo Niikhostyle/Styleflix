@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma";
+
 export type Role = "USER" | "SUPER_ADMIN";
 
 export type SubscriptionStatus =
@@ -53,6 +55,46 @@ export function hasActiveDemo(user: MembershipFields | null | undefined): boolea
 /** Puede ver/reproducir catálogo: membresía o demo. */
 export function hasCatalogAccess(user: MembershipFields | null | undefined): boolean {
   return hasActiveMembership(user) || hasActiveDemo(user);
+}
+
+/**
+ * Acceso de catálogo leyendo la DB (no JWT stale).
+ * Usar en APIs de play / billing críticas tras revoke admin.
+ */
+export async function requireLiveCatalogAccess(userId: string): Promise<
+  | {
+      ok: true;
+      user: {
+        id: string;
+        role: string;
+        subscriptionStatus: string;
+        currentPeriodEnd: Date | null;
+        demoExpiresAt: Date | null;
+      };
+    }
+  | { ok: false; status: 401 | 403; error: string }
+> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      subscriptionStatus: true,
+      currentPeriodEnd: true,
+      demoExpiresAt: true,
+    },
+  });
+  if (!user) {
+    return { ok: false, status: 401, error: "No autorizado." };
+  }
+  if (!hasCatalogAccess(user)) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Necesitas una membresía o demo activa.",
+    };
+  }
+  return { ok: true, user };
 }
 
 export function demoMsRemaining(user: MembershipFields | null | undefined): number {

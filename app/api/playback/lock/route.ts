@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import { clientIpFromHeaders } from "@/lib/security";
 import {
   acquirePlaybackLock,
@@ -10,27 +10,10 @@ import {
 } from "@/lib/playback-lock";
 import { getSelectedProfileId } from "@/lib/profiles";
 
-function denyIfNoAccess(session: {
-  user: {
-    role?: string;
-    subscriptionStatus?: string;
-    currentPeriodEnd?: string | null;
-    demoExpiresAt?: string | null;
-  };
-}) {
-  if (session.user.role === "SUPER_ADMIN") return null;
-  if (
-    !hasCatalogAccess({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-  ) {
-    return NextResponse.json(
-      { error: "Necesitas una membresía o demo activa." },
-      { status: 403 }
-    );
+async function denyIfNoLiveAccess(userId: string) {
+  const live = await requireLiveCatalogAccess(userId);
+  if (!live.ok) {
+    return NextResponse.json({ error: live.error }, { status: live.status });
   }
   return null;
 }
@@ -47,7 +30,7 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  const denied = denyIfNoAccess(session);
+  const denied = await denyIfNoLiveAccess(session.user.id);
   if (denied) return denied;
 
   const body = await request.json().catch(() => ({}));

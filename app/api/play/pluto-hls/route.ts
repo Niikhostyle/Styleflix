@@ -1,26 +1,42 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import { isPlutoStreamUrl, rewritePlutoPlaylist } from "@/lib/pluto";
+import {
+  assertPlaybackLock,
+  playbackHeadersFromRequest,
+  playbackLockQueryPrefix,
+} from "@/lib/playback-lock";
+import { getSelectedProfileId } from "@/lib/profiles";
 
 /**
  * Proxy HLS de Pluto (CORS solo permite pluto.tv).
- * GET /api/play/pluto-hls?u=<urlencoded https://…pluto…/master.m3u8>
+ * GET /api/play/pluto-hls?u=<urlencoded…>&pid=&did=&ltk=
  */
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (
-    !hasCatalogAccess({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-  ) {
-    return NextResponse.json({ error: "Membresía requerida." }, { status: 403 });
+  const live = await requireLiveCatalogAccess(session.user.id);
+  if (!live.ok) {
+    return NextResponse.json({ error: live.error }, { status: live.status });
+  }
+
+  const hdrs = playbackHeadersFromRequest(request);
+  const cookieProfile = await getSelectedProfileId();
+  const lockCheck = await assertPlaybackLock({
+    userId: session.user.id,
+    profileId: hdrs.profileId || cookieProfile,
+    deviceId: hdrs.deviceId,
+    lockToken: hdrs.lockToken,
+    bypass: live.user.role === "SUPER_ADMIN" && !hdrs.lockToken,
+  });
+  if (!lockCheck.ok) {
+    return NextResponse.json(
+      { error: lockCheck.error, code: "PLAYBACK_LOCK" },
+      { status: lockCheck.status }
+    );
   }
 
   const src = new URL(request.url).searchParams.get("u");
@@ -60,7 +76,15 @@ export async function GET(request: Request) {
     if (isPlaylist) {
       const text = buf.toString("utf8");
       const origin = new URL(request.url).origin;
-      const proxyBase = `${origin}/api/play/pluto-hls?u=`;
+      const lockQ =
+        hdrs.deviceId && hdrs.lockToken
+          ? playbackLockQueryPrefix({
+              profileId: lockCheck.profileId,
+              deviceId: hdrs.deviceId,
+              lockToken: hdrs.lockToken,
+            })
+          : "";
+      const proxyBase = `${origin}/api/play/pluto-hls?${lockQ}u=`;
       const rewritten = rewritePlutoPlaylist(text, src, proxyBase);
       return new NextResponse(rewritten, {
         status: 200,

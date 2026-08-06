@@ -64,8 +64,13 @@ declare module "next-auth/jwt" {
     planMaxResolution: number | null;
     planCanRequest: boolean;
     planCanDownload: boolean;
+    /** Epoch ms del último refresh de membresía desde DB */
+    accessCheckedAt?: number;
   }
 }
+
+/** Releer membresía/demo desde DB al menos cada N ms (post-revoke admin). */
+const JWT_ACCESS_REFRESH_MS = 20_000;
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -205,38 +210,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.planMaxResolution = user.planMaxResolution;
         token.planCanRequest = user.planCanRequest;
         token.planCanDownload = user.planCanDownload;
+        token.accessCheckedAt = Date.now();
       }
 
-      // Demo / membresía: aplicar payload del cliente de inmediato (evita cuelgues).
+      // Demo post-pago: solo fechas tipadas; NUNCA confiar catalogAccess del cliente.
+      // El refresh DB debajo es la fuente de verdad.
       if (trigger === "update" && session && typeof session === "object") {
         const s = session as {
           demoExpiresAt?: string | null;
-          demoActive?: boolean;
-          catalogAccess?: boolean;
-          membershipActive?: boolean;
           planTier?: string | null;
           planMaxProfiles?: number | null;
           planMaxResolution?: number | null;
         };
         if (s.demoExpiresAt !== undefined) {
           token.demoExpiresAt = s.demoExpiresAt;
-          token.demoActive =
-            s.demoActive ??
-            Boolean(
-              s.demoExpiresAt && new Date(s.demoExpiresAt).getTime() > Date.now()
-            );
-          token.catalogAccess = Boolean(
-            s.catalogAccess ?? (token.membershipActive || token.demoActive)
-          );
-        }
-        if (typeof s.catalogAccess === "boolean") {
-          token.catalogAccess = s.catalogAccess;
-        }
-        if (typeof s.demoActive === "boolean") {
-          token.demoActive = s.demoActive;
-        }
-        if (typeof s.membershipActive === "boolean") {
-          token.membershipActive = s.membershipActive;
         }
         if (s.planTier !== undefined) token.planTier = s.planTier;
         if (s.planMaxProfiles !== undefined) {
@@ -247,7 +234,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      if ((trigger === "update" || user) && token.id) {
+      const shouldRefreshDb =
+        Boolean(token.id) &&
+        (Boolean(user) ||
+          trigger === "update" ||
+          !token.accessCheckedAt ||
+          Date.now() - Number(token.accessCheckedAt) >= JWT_ACCESS_REFRESH_MS);
+
+      if (shouldRefreshDb && token.id) {
         try {
           let dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
@@ -301,6 +295,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.planMaxResolution = membership.planMaxResolution;
             token.planCanRequest = membership.planCanRequest;
             token.planCanDownload = membership.planCanDownload;
+            token.accessCheckedAt = Date.now();
           }
         } catch (err) {
           console.error("[auth] jwt refresh", err);

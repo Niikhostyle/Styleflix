@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import { animeAv1M3u8Url } from "@/lib/animeav1";
 import {
   signAnimeAv1StreamToken,
@@ -25,18 +25,18 @@ export async function GET(request: Request) {
   const checked = verifyAnimeAv1StreamToken(token, hash);
   if (checked.ok) {
     userId = checked.userId;
+    const live = await requireLiveCatalogAccess(userId);
+    if (!live.ok) {
+      return new NextResponse(live.error, { status: live.status });
+    }
   } else {
     const session = await auth();
-    if (
-      !session?.user?.id ||
-      !hasCatalogAccess({
-        role: session.user.role,
-        subscriptionStatus: session.user.subscriptionStatus,
-        currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-    ) {
+    if (!session?.user?.id) {
       return new NextResponse("No autorizado", { status: 401 });
+    }
+    const live = await requireLiveCatalogAccess(session.user.id);
+    if (!live.ok) {
+      return new NextResponse(live.error, { status: live.status });
     }
     userId = session.user.id;
   }

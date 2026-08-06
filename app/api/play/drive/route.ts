@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import { extractGoogleDriveFileId } from "@/lib/embed-url";
 import { openGoogleDriveStream } from "@/lib/drive-stream";
+import {
+  assertPlaybackLock,
+  playbackHeadersFromRequest,
+} from "@/lib/playback-lock";
+import { getSelectedProfileId } from "@/lib/profiles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Proxy de video desde Google Drive (archivo público con enlace).
- * GET /api/play/drive?id=FILE_ID
+ * GET /api/play/drive?id=FILE_ID&pid=&did=&ltk=
  * Soporta Range para seeking en <video>.
  */
 export async function GET(request: Request) {
@@ -17,17 +22,24 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (
-    !hasCatalogAccess({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-  ) {
+  const live = await requireLiveCatalogAccess(session.user.id);
+  if (!live.ok) {
+    return NextResponse.json({ error: live.error }, { status: live.status });
+  }
+
+  const hdrs = playbackHeadersFromRequest(request);
+  const cookieProfile = await getSelectedProfileId();
+  const lockCheck = await assertPlaybackLock({
+    userId: session.user.id,
+    profileId: hdrs.profileId || cookieProfile,
+    deviceId: hdrs.deviceId,
+    lockToken: hdrs.lockToken,
+    bypass: live.user.role === "SUPER_ADMIN" && !hdrs.lockToken,
+  });
+  if (!lockCheck.ok) {
     return NextResponse.json(
-      { error: "Necesitas membresía o demo activa." },
-      { status: 403 }
+      { error: lockCheck.error, code: "PLAYBACK_LOCK" },
+      { status: lockCheck.status }
     );
   }
 

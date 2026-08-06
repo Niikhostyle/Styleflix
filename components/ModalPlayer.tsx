@@ -10,8 +10,18 @@ import { useSession } from "next-auth/react";
 import { isBackKey } from "@/lib/tv";
 import type { MediaType } from "@/lib/tmdb";
 import { getOrCreateDeviceId } from "@/lib/device-id";
+import { withPlaybackLockQuery } from "@/lib/playback-lock-url";
 import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
+
+function attachLockToPlayUrl(
+  url: string,
+  lock: { profileId: string; deviceId: string; lockToken: string } | null
+) {
+  if (!lock) return url;
+  if (!url.includes("/api/play/")) return url;
+  return withPlaybackLockQuery(url, lock);
+}
 
 export type SeasonMeta = {
   seasonNumber: number;
@@ -257,11 +267,12 @@ export default function ModalPlayer({
             : data.playKind === "video"
               ? "video"
               : "iframe";
+        const playUrl = attachLockToPlayUrl(url, lockRef.current);
         setPlayKind(kind);
         setEmbedPath(
           kind === "hls" || kind === "video"
-            ? url
-            : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+            ? playUrl
+            : `${playUrl}${playUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`
         );
         setSourceId(data.source || null);
         setSourceLabel(
@@ -394,11 +405,12 @@ export default function ModalPlayer({
           : data.playKind === "video"
             ? "video"
             : "iframe";
+      const playUrl = attachLockToPlayUrl(url, lockRef.current);
       setPlayKind(kind);
       setEmbedPath(
         kind === "hls" || kind === "video"
-          ? url
-          : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
+          ? playUrl
+          : `${playUrl}${playUrl.includes("?") ? "&" : "?"}_r=${Date.now()}`
       );
       setSourceId(data.source || null);
       setSourceLabel(

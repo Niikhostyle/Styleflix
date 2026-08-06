@@ -229,9 +229,22 @@ export async function assertPlaybackLock(opts: {
 }
 
 export function playbackHeadersFromRequest(request: Request) {
+  const url = new URL(request.url);
   return {
-    profileId: request.headers.get("x-veotv-profile-id"),
-    deviceId: request.headers.get("x-veotv-device-id"),
-    lockToken: request.headers.get("x-veotv-playback-token"),
+    profileId:
+      request.headers.get("x-veotv-profile-id") ||
+      url.searchParams.get("pid"),
+    deviceId:
+      request.headers.get("x-veotv-device-id") ||
+      url.searchParams.get("did"),
+    lockToken:
+      request.headers.get("x-veotv-playback-token") ||
+      url.searchParams.get("ltk"),
   };
 }
+
+export {
+  withPlaybackLockQuery,
+  playbackLockQueryPrefix,
+} from "@/lib/playback-lock-url";
+

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import {
   animeAv1ZillaHash,
   fetchZillaUpstream,
@@ -8,12 +8,18 @@ import {
   rewriteZillaPlaylist,
 } from "@/lib/animeav1";
 import { verifyAnimeAv1StreamToken } from "@/lib/animeav1-token";
+import {
+  assertPlaybackLock,
+  playbackHeadersFromRequest,
+  playbackLockQueryPrefix,
+} from "@/lib/playback-lock";
+import { getSelectedProfileId } from "@/lib/profiles";
 import { requestPublicOrigin } from "@/lib/public-url";
 
 /**
  * Proxy HLS Zilla (igual que el stream de animeav1.com / JWPlayer+hlsjs).
- * Auth: sesión con membresía O token firmado `t` (para fragmentos HLS).
- * GET /api/play/animeav1-hls?u=...&t=...
+ * Auth: token firmado `t` (fragmentos HLS) + lock pid/did/ltk.
+ * GET /api/play/animeav1-hls?u=...&t=...&pid=&did=&ltk=
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,24 +33,43 @@ export async function GET(request: Request) {
   const hash = animeAv1ZillaHash(src);
   const tokenOk = verifyAnimeAv1StreamToken(token, hash || undefined);
 
-  if (!tokenOk.ok) {
+  let userId: string | null = null;
+  let isAdmin = false;
+
+  if (tokenOk.ok) {
+    userId = tokenOk.userId;
+    const live = await requireLiveCatalogAccess(userId);
+    if (!live.ok) {
+      return NextResponse.json({ error: live.error }, { status: live.status });
+    }
+    isAdmin = live.user.role === "SUPER_ADMIN";
+  } else {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado." }, { status: 401 });
     }
-    if (
-      !hasCatalogAccess({
-        role: session.user.role,
-        subscriptionStatus: session.user.subscriptionStatus,
-        currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-    ) {
-      return NextResponse.json(
-        { error: "Membresía requerida." },
-        { status: 403 }
-      );
+    const live = await requireLiveCatalogAccess(session.user.id);
+    if (!live.ok) {
+      return NextResponse.json({ error: live.error }, { status: live.status });
     }
+    userId = session.user.id;
+    isAdmin = live.user.role === "SUPER_ADMIN";
+  }
+
+  const hdrs = playbackHeadersFromRequest(request);
+  const cookieProfile = await getSelectedProfileId().catch(() => null);
+  const lockCheck = await assertPlaybackLock({
+    userId: userId!,
+    profileId: hdrs.profileId || cookieProfile,
+    deviceId: hdrs.deviceId,
+    lockToken: hdrs.lockToken,
+    bypass: isAdmin && !hdrs.lockToken,
+  });
+  if (!lockCheck.ok) {
+    return NextResponse.json(
+      { error: lockCheck.error, code: "PLAYBACK_LOCK" },
+      { status: lockCheck.status }
+    );
   }
 
   try {
@@ -61,13 +86,20 @@ export async function GET(request: Request) {
     const buf = Buffer.from(await upstream.arrayBuffer());
     const origin = requestPublicOrigin(request);
 
-    // Conservar token en URLs reescritas de la playlist (rutas relativas = mismo host público)
     const tokenQ = tokenOk.ok
       ? `t=${encodeURIComponent(token!)}&`
       : token
         ? `t=${encodeURIComponent(token)}&`
         : "";
-    const proxyBase = `/api/play/animeav1-hls?${tokenQ}u=`;
+    const lockQ =
+      hdrs.deviceId && hdrs.lockToken
+        ? playbackLockQueryPrefix({
+            profileId: lockCheck.profileId,
+            deviceId: hdrs.deviceId,
+            lockToken: hdrs.lockToken,
+          })
+        : "";
+    const proxyBase = `/api/play/animeav1-hls?${tokenQ}${lockQ}u=`;
 
     const isPlaylist =
       ctype.includes("mpegurl") ||
@@ -88,7 +120,6 @@ export async function GET(request: Request) {
       });
     }
 
-    // fMP4 (init/segs) aunque el CDN diga text/html
     const looksFmp4 =
       buf.length > 8 &&
       (buf.slice(4, 8).toString("utf8") === "ftyp" ||

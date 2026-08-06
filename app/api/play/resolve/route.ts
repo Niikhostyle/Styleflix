@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import {
   getVimeusEmbedUrl,
@@ -17,6 +17,7 @@ import { isSourceEnabled } from "@/lib/sources/types";
 import {
   assertPlaybackLock,
   playbackHeadersFromRequest,
+  withPlaybackLockQuery,
 } from "@/lib/playback-lock";
 import { getSelectedProfileId } from "@/lib/profiles";
 import {
@@ -35,18 +36,9 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (
-    !hasCatalogAccess({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-  ) {
-    return NextResponse.json(
-      { error: "Necesitas una membresía activa para reproducir." },
-      { status: 403 }
-    );
+  const live = await requireLiveCatalogAccess(session.user.id);
+  if (!live.ok) {
+    return NextResponse.json({ error: live.error }, { status: live.status });
   }
 
   const hdrs = playbackHeadersFromRequest(request);
@@ -56,7 +48,7 @@ export async function GET(request: Request) {
     profileId: hdrs.profileId || cookieProfile,
     deviceId: hdrs.deviceId,
     lockToken: hdrs.lockToken,
-    bypass: session.user.role === "SUPER_ADMIN" && !hdrs.lockToken,
+    bypass: live.user.role === "SUPER_ADMIN" && !hdrs.lockToken,
   });
   if (!lockCheck.ok) {
     return NextResponse.json(
@@ -64,6 +56,15 @@ export async function GET(request: Request) {
       { status: lockCheck.status }
     );
   }
+
+  const lock =
+    hdrs.deviceId && hdrs.lockToken
+      ? {
+          profileId: lockCheck.profileId,
+          deviceId: hdrs.deviceId,
+          lockToken: hdrs.lockToken,
+        }
+      : null;
 
   // Resolución desde DB (no JWT stale): Estándar = 720, etc.
   const dbPlan = await prisma.user.findUnique({
@@ -131,16 +132,20 @@ export async function GET(request: Request) {
       if (isGoogleDriveUrl(custom.embedUrl)) {
         const fileId = extractGoogleDriveFileId(custom.embedUrl);
         if (fileId) {
-          return NextResponse.json(
-            withPlanMeta({
-              source: "custom",
-              label: custom.label || "VeoTV",
-              playKind: "video",
-              streamUrl: `/api/play/drive?id=${encodeURIComponent(fileId)}`,
-              embedUrl: `/api/play/drive?id=${encodeURIComponent(fileId)}`,
-            })
-          );
-        }
+            const drivePath = `/api/play/drive?id=${encodeURIComponent(fileId)}`;
+            const streamUrl = lock
+              ? withPlaybackLockQuery(drivePath, lock)
+              : drivePath;
+            return NextResponse.json(
+              withPlanMeta({
+                source: "custom",
+                label: custom.label || "VeoTV",
+                playKind: "video",
+                streamUrl,
+                embedUrl: streamUrl,
+              })
+            );
+          }
       }
       return NextResponse.json(
         withPlanMeta({
@@ -175,7 +180,10 @@ export async function GET(request: Request) {
                   userId: session.user!.id,
                 })
               : "";
-            const streamUrl = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+            const streamUrlRaw = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+            const streamUrl = lock
+              ? withPlaybackLockQuery(streamUrlRaw, lock)
+              : streamUrlRaw;
             return NextResponse.json(
               withPlanMeta({
                 source: "animeav1",
@@ -229,7 +237,10 @@ export async function GET(request: Request) {
         }).catch(() => null);
         if (hls) {
           const origin = new URL(request.url).origin;
-          const streamUrl = `${origin}/api/play/pluto-hls?u=${encodeURIComponent(hls)}`;
+          const streamUrlRaw = `${origin}/api/play/pluto-hls?u=${encodeURIComponent(hls)}`;
+          const streamUrl = lock
+            ? withPlaybackLockQuery(streamUrlRaw, lock)
+            : streamUrlRaw;
           return NextResponse.json(
             withPlanMeta({
               source: "pluto",

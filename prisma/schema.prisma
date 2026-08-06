@@ -131,7 +131,7 @@ model Payment {
   createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
-  @@index([externalId])
+  @@unique([externalId])
 }
 
 /// Progreso / historial de visionado (solo usuarios registrados)

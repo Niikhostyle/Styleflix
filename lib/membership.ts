@@ -106,6 +106,38 @@ export async function activateMembership(opts: {
     planFeatures: entitlements.planFeatures,
   };
 
+  const repairOnly = async () => {
+    if (
+      user.subscriptionStatus === "ACTIVE" &&
+      user.currentPeriodEnd &&
+      user.currentPeriodEnd > now
+    ) {
+      const fixed = await prisma.user.update({
+        where: { id: opts.userId },
+        data: {
+          ...entitlementData,
+          cancelledAt: null,
+          prepaidDays: null,
+          ...(opts.mpPreapprovalId
+            ? { mpPreapprovalId: opts.mpPreapprovalId }
+            : {}),
+        },
+      });
+      await ensurePrimaryProfile({
+        userId: opts.userId,
+        name: user.name,
+        maxProfiles: entitlements.planMaxProfiles,
+      });
+      return fixed;
+    }
+    await ensurePrimaryProfile({
+      userId: opts.userId,
+      name: user.name,
+      maxProfiles: entitlements.planMaxProfiles,
+    });
+    return user;
+  };
+
   // Idempotencia: si este pago MP ya activó, no duplicar meses; sí reparar entitlements.
   if (opts.payment?.externalId) {
     const existing = await prisma.payment.findFirst({
@@ -115,38 +147,8 @@ export async function activateMembership(opts: {
       },
     });
     if (existing) {
-      // Pago ya consumido: solo reparar entitlements si la membresía sigue vigente.
-      // NUNCA re-extender meses con un pago viejo (evita membresía gratis al vencer).
-      if (
-        user.subscriptionStatus === "ACTIVE" &&
-        user.currentPeriodEnd &&
-        user.currentPeriodEnd > now
-      ) {
-        const fixed = await prisma.user.update({
-          where: { id: opts.userId },
-          data: {
-            ...entitlementData,
-            cancelledAt: null,
-            prepaidDays: null,
-            ...(opts.mpPreapprovalId
-              ? { mpPreapprovalId: opts.mpPreapprovalId }
-              : {}),
-          },
-        });
-        await ensurePrimaryProfile({
-          userId: opts.userId,
-          name: user.name,
-          maxProfiles: entitlements.planMaxProfiles,
-        });
-        return fixed;
-      }
-      // Membresía vencida o inactiva + mismo paymentId → no reactivar
-      await ensurePrimaryProfile({
-        userId: opts.userId,
-        name: user.name,
-        maxProfiles: entitlements.planMaxProfiles,
-      });
-      return user;
+      // Pago ya consumido: NUNCA re-extender meses con un pago viejo.
+      return repairOnly();
     }
   }
 
@@ -156,20 +158,98 @@ export async function activateMembership(opts: {
       : now;
   const currentPeriodEnd = addMonths(base, months);
 
+  const userData = {
+    subscriptionStatus: "ACTIVE" as const,
+    currentPeriodEnd,
+    membershipStartedAt: user.membershipStartedAt ?? now,
+    cancelledAt: null,
+    planSource: user.planSource || "DIRECT",
+    prepaidDays: null,
+    ...entitlementData,
+    ...(opts.mpPreapprovalId
+      ? { mpPreapprovalId: opts.mpPreapprovalId }
+      : {}),
+  };
+
+  // Claim atómico: crear Payment con externalId único ANTES de sumar meses.
+  // Si dos webhooks/sync corren a la vez, el segundo pierde por P2002 y no duplica.
+  if (opts.payment?.externalId) {
+    const amount =
+      opts.payment.amount ?? (await membershipAmount());
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.payment.create({
+          data: {
+            userId: opts.userId,
+            externalId: opts.payment!.externalId!,
+            amount,
+            currency: opts.payment!.currency || "CLP",
+            status: opts.payment!.status,
+            rawPayload: opts.payment!.rawPayload,
+            paidAt: opts.payment!.paidAt ?? now,
+          },
+        });
+        return tx.user.update({
+          where: { id: opts.userId },
+          data: userData,
+        });
+      });
+
+      await ensurePrimaryProfile({
+        userId: opts.userId,
+        name: user.name,
+        maxProfiles: entitlements.planMaxProfiles,
+      });
+      return updated;
+    } catch (err) {
+      if (
+        err &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code?: string }).code === "P2002"
+      ) {
+        // Otro request ya reclamó este pago: no sumar meses otra vez.
+        const fresh = await prisma.user.findUnique({
+          where: { id: opts.userId },
+        });
+        if (!fresh) return null;
+        if (
+          fresh.subscriptionStatus === "ACTIVE" &&
+          fresh.currentPeriodEnd &&
+          fresh.currentPeriodEnd > now
+        ) {
+          const fixed = await prisma.user.update({
+            where: { id: opts.userId },
+            data: {
+              ...entitlementData,
+              cancelledAt: null,
+              prepaidDays: null,
+              ...(opts.mpPreapprovalId
+                ? { mpPreapprovalId: opts.mpPreapprovalId }
+                : {}),
+            },
+          });
+          await ensurePrimaryProfile({
+            userId: opts.userId,
+            name: fresh.name,
+            maxProfiles: entitlements.planMaxProfiles,
+          });
+          return fixed;
+        }
+        await ensurePrimaryProfile({
+          userId: opts.userId,
+          name: fresh.name,
+          maxProfiles: entitlements.planMaxProfiles,
+        });
+        return fresh;
+      }
+      throw err;
+    }
+  }
+
   const updated = await prisma.user.update({
     where: { id: opts.userId },
-    data: {
-      subscriptionStatus: "ACTIVE",
-      currentPeriodEnd,
-      membershipStartedAt: user.membershipStartedAt ?? now,
-      cancelledAt: null,
-      planSource: user.planSource || "DIRECT",
-      prepaidDays: null,
-      ...entitlementData,
-      ...(opts.mpPreapprovalId
-        ? { mpPreapprovalId: opts.mpPreapprovalId }
-        : {}),
-    },
+    data: userData,
   });
 
   await ensurePrimaryProfile({

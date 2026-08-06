@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasCatalogAccess } from "@/lib/access";
+import { requireLiveCatalogAccess } from "@/lib/access";
 import {
   getMangaChapterPages,
   mangaChapterImageUrls,
@@ -14,19 +14,9 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (
-    session.user.role !== "SUPER_ADMIN" &&
-    !hasCatalogAccess({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
-      demoExpiresAt: session.user.demoExpiresAt,
-    })
-  ) {
-    return NextResponse.json(
-      { error: "Necesitas membresía o demo para leer." },
-      { status: 403 }
-    );
+  const live = await requireLiveCatalogAccess(session.user.id);
+  if (!live.ok) {
+    return NextResponse.json({ error: live.error }, { status: live.status });
   }
 
   const chapterId = new URL(request.url).searchParams.get("chapterId") || "";
