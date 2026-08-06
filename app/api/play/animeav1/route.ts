@@ -80,7 +80,6 @@ export async function GET(request: Request) {
   }
 
   const maxRes = session.user.planMaxResolution || 1080;
-  const origin = new URL(request.url).origin;
 
   function mapEmbed(e: { server: string; url: string }) {
     const hls = isAnimeAv1HlsUrl(e.url);
@@ -96,9 +95,10 @@ export async function GET(request: Request) {
     const t = hash
       ? signAnimeAv1StreamToken({ hash, userId: session!.user!.id })
       : "";
-    const streamUrl = `${origin}/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+    // Relativas: mismo host que ve el usuario (evita localhost del contenedor Coolify).
+    const streamUrl = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
     const embedUrl = hash
-      ? `${origin}/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
+      ? `/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
       : streamUrl;
     return {
       server: e.server,

@@ -45,11 +45,11 @@ export async function GET(request: Request) {
       ? token!
       : signAnimeAv1StreamToken({ hash, userId });
 
-  const origin = new URL(request.url).origin;
   const m3u8 = animeAv1M3u8Url(
     `https://player.zilla-networks.com/m3u8/${hash}`
   );
-  const streamUrl = `${origin}/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+  // Relativa: JWPlayer/hls.js resuelven contra el origen del documento (veotv.cloud).
+  const streamUrl = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
 
   const html = `<!DOCTYPE html>
 <html lang="es">

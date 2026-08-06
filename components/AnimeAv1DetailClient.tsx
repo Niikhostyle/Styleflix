@@ -31,9 +31,14 @@ type ServerOpt = {
   streamUrl?: string;
 };
 
-/** Cache-bust sin romper #hash de UPNShare/Mega. */
+/** Cache-bust sin romper #hash de UPNShare/Mega ni rutas relativas. */
 function withCacheBust(url: string): string {
   try {
+    if (url.startsWith("/")) {
+      const u = new URL(url, "https://local.invalid");
+      u.searchParams.set("_r", String(Date.now()));
+      return `${u.pathname}${u.search}${u.hash}`;
+    }
     const u = new URL(url);
     u.searchParams.set("_r", String(Date.now()));
     return u.toString();

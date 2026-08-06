@@ -116,7 +116,6 @@ export async function GET(request: Request) {
           episode: type === "tv" ? episode ?? 1 : 1,
         }).catch(() => null);
         if (embed?.url) {
-          const origin = new URL(request.url).origin;
           const hls = isAnimeAv1HlsUrl(embed.url);
           if (hls) {
             const hash = animeAv1ZillaHash(embed.url);
@@ -127,9 +126,9 @@ export async function GET(request: Request) {
                   userId: session.user!.id,
                 })
               : "";
-            const streamUrl = `${origin}/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+            const streamUrl = `/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
             const embedUrl = hash
-              ? `${origin}/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
+              ? `/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
               : streamUrl;
             return NextResponse.json(
               withPlanMeta({

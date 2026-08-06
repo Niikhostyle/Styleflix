@@ -8,6 +8,7 @@ import {
   rewriteZillaPlaylist,
 } from "@/lib/animeav1";
 import { verifyAnimeAv1StreamToken } from "@/lib/animeav1-token";
+import { requestPublicOrigin } from "@/lib/public-url";
 
 /**
  * Proxy HLS Zilla (igual que el stream de animeav1.com / JWPlayer+hlsjs).
@@ -57,15 +58,15 @@ export async function GET(request: Request) {
 
     const ctype = (upstream.headers.get("content-type") || "").toLowerCase();
     const buf = Buffer.from(await upstream.arrayBuffer());
-    const origin = new URL(request.url).origin;
+    const origin = requestPublicOrigin(request);
 
-    // Conservar token en URLs reescritas de la playlist
+    // Conservar token en URLs reescritas de la playlist (rutas relativas = mismo host público)
     const tokenQ = tokenOk.ok
       ? `t=${encodeURIComponent(token!)}&`
       : token
         ? `t=${encodeURIComponent(token)}&`
         : "";
-    const proxyBase = `${origin}/api/play/animeav1-hls?${tokenQ}u=`;
+    const proxyBase = `/api/play/animeav1-hls?${tokenQ}u=`;
 
     const isPlaylist =
       ctype.includes("mpegurl") ||
