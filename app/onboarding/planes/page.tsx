@@ -26,7 +26,8 @@ export default async function OnboardingPlanesPage({
       step={2}
       title="Elige tu plan"
       subtitle="Sin compromisos. Cancela cuando quieras. Cambia de plan en cualquier momento."
-      backHref="/onboarding/cuenta"
+      backHref="/login"
+      signOutOnBack
       wide
     >
       {failed && (

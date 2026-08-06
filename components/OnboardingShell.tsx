@@ -1,5 +1,5 @@
-import Link from "next/link";
 import BrandMark from "@/components/BrandMark";
+import OnboardingBackLink from "@/components/OnboardingBackLink";
 
 export default function OnboardingShell({
   step,
@@ -8,6 +8,7 @@ export default function OnboardingShell({
   subtitle,
   children,
   backHref,
+  signOutOnBack = false,
   wide = false,
 }: {
   step: number;
@@ -16,6 +17,8 @@ export default function OnboardingShell({
   subtitle?: string;
   children: React.ReactNode;
   backHref?: string;
+  /** Cierra sesión antes de navegar (evita rebote a /onboarding/planes). */
+  signOutOnBack?: boolean;
   /** Layout ancho para pasos como planes */
   wide?: boolean;
 }) {
@@ -69,9 +72,7 @@ export default function OnboardingShell({
           {children}
           {backHref && (
             <div className="mt-8 text-center">
-              <Link href={backHref} className="text-sm text-white/45 hover:text-white">
-                Volver
-              </Link>
+              <OnboardingBackLink href={backHref} signOutFirst={signOutOnBack} />
             </div>
           )}
         </div>

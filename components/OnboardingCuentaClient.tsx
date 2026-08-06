@@ -67,7 +67,8 @@ export default function OnboardingCuentaClient() {
       step={1}
       title="Crea tu cuenta"
       subtitle="Sin compromisos — cancela cuando quieras."
-      backHref="/"
+      backHref="/login"
+      signOutOnBack
     >
       <ul className="mb-6 space-y-2 text-sm text-white/70">
         {[
