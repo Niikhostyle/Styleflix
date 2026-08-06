@@ -86,9 +86,11 @@ function toMatch(item: PlutoRawItem): PlutoMatch | null {
 
 async function fetchCatalogPage(page: number): Promise<PlutoRawItem[]> {
   const url = `${PLUTO_API}?includeItems=true&deviceType=web&page=${page}`;
+  // Respuestas ~2–9 MB: Next.js Data Cache solo admite ≤2 MB.
+  // Usamos caché en memoria (catalogCache) en loadCatalog().
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
-    next: { revalidate: 3600 },
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`Pluto catalog ${res.status}`);
   const data = (await res.json()) as {
@@ -106,8 +108,9 @@ async function loadCatalog() {
     return catalogCache;
   }
 
+  // 2 páginas bastan para un índice usable; 4×9 MB satura memoria/red.
   const pages = await Promise.all(
-    [1, 2, 3, 4].map((page) => fetchCatalogPage(page).catch(() => []))
+    [1, 2].map((page) => fetchCatalogPage(page).catch(() => []))
   );
   const seen = new Set<string>();
   const movies: PlutoMatch[] = [];

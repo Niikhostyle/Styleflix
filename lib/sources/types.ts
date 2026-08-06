@@ -44,8 +44,9 @@ export type CatalogRow = {
 };
 
 /**
- * Fuentes activas. Se controla con CATALOG_SOURCES (lista separada por comas);
- * si no está definida se habilitan todas las que tengan sus credenciales.
+ * Fuentes activas. Se controla con CATALOG_SOURCES (lista separada por comas).
+ * Por defecto se omiten fuentes ruidosas/redundantes (jikan): el anime va por
+ * AnimeAV1. Para reactivar: CATALOG_SOURCES=vimeus,tmdb,jikan,pluto,archive,animeav1
  */
 export function enabledSources(): SourceId[] {
   const raw = (process.env.CATALOG_SOURCES || "").trim();
@@ -54,7 +55,7 @@ export function enabledSources(): SourceId[] {
         .split(",")
         .map((s) => s.trim().toLowerCase())
         .filter((s): s is SourceId => ALL_SOURCES.includes(s as SourceId))
-    : ALL_SOURCES;
+    : ALL_SOURCES.filter((id) => id !== "jikan");
 
   return requested.filter((id) => {
     if (id === "vimeus") return Boolean(process.env.VIMEUS_API_KEY);
