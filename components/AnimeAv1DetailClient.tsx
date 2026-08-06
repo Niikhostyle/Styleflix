@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Play, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import { useSession } from "next-auth/react";
 import { mediaImageUrl } from "@/lib/media-links";
 
@@ -38,7 +37,6 @@ export default function AnimeAv1DetailClient({
   const [episode, setEpisode] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [embedUrl, setEmbedUrl] = useState("");
-  const [playKind, setPlayKind] = useState<"iframe" | "hls">("iframe");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -69,18 +67,12 @@ export default function AnimeAv1DetailClient({
           `/api/play/animeav1?slug=${encodeURIComponent(anime.slug)}&ep=${ep}`
         );
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !(data.streamUrl || data.embedUrl)) {
+        if (!res.ok || !data.embedUrl) {
           setError(data.error || "No se pudo cargar el episodio.");
           return;
         }
-        const kind = data.playKind === "hls" ? "hls" : "iframe";
-        const url = (data.streamUrl || data.embedUrl) as string;
-        setPlayKind(kind);
-        setEmbedUrl(
-          kind === "hls"
-            ? url
-            : `${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`
-        );
+        const url = data.embedUrl as string;
+        setEmbedUrl(`${url}${url.includes("?") ? "&" : "?"}_r=${Date.now()}`);
         setPlaying(true);
       } catch {
         setError("Error de red.");
@@ -246,23 +238,15 @@ export default function AnimeAv1DetailClient({
               {error}
             </div>
           ) : embedUrl ? (
-            playKind === "hls" ? (
-              <HlsVideoPlayer
-                key={`hls-${anime.slug}-${episode}-${embedUrl}`}
-                src={embedUrl}
-                title={`${anime.title} episodio ${episode}`}
-              />
-            ) : (
-              <iframe
-                key={embedUrl}
-                src={embedUrl}
-                title={`${anime.title} episodio ${episode}`}
-                className="absolute inset-0 h-full w-full border-0"
-                allowFullScreen
-                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            )
+            <iframe
+              key={embedUrl}
+              src={embedUrl}
+              title={`${anime.title} episodio ${episode}`}
+              className="absolute inset-0 h-full w-full border-0"
+              allowFullScreen
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-white/60">
               Cargando…

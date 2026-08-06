@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
-import { isAnimeAv1HlsUrl, resolveAnimeAv1Embed } from "@/lib/animeav1";
+import { resolveAnimeAv1Embed } from "@/lib/animeav1";
 import { isSourceEnabled } from "@/lib/sources/types";
 
 /**
@@ -56,14 +56,12 @@ export async function GET(request: Request) {
   }
 
   const maxRes = session.user.planMaxResolution || 1080;
-  const hls = isAnimeAv1HlsUrl(embed.url);
 
   return NextResponse.json({
     source: "animeav1",
     label: "VeoTV",
     embedUrl: embed.url,
-    streamUrl: hls ? embed.url : undefined,
-    playKind: hls ? "hls" : "iframe",
+    playKind: "iframe",
     server: embed.server,
     lang: embed.lang,
     maxResolution: maxRes,

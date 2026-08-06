@@ -25,29 +25,37 @@ export type AnimeAv1Embed = {
   lang: "SUB" | "DUB";
 };
 
+/** Embeds HTML reproducibles en iframe. Evitar HLS/Zilla (Cloudflare + 403 en segmentos). */
 const PREFERRED_SERVERS = [
-  "hls",
-  "mp4upload",
+  "upnshare",
+  "mega",
   "streamtape",
   "vidhide",
   "yourupload",
-  "mega",
-  "upnshare",
+  "voe",
+  "filemoon",
+  "dood",
+  "mp4upload",
 ];
 
-/** Detecta streams HLS directos (p. ej. zilla-networks) para player nativo fullscreen. */
+/** URLs Zilla (/play o /m3u8) no sirven en iframe ni con hls.js desde nuestro dominio. */
+export function isAnimeAv1ZillaUrl(url: string): boolean {
+  return /zilla-networks\.com\/(m3u8|play)\//i.test(url);
+}
+
+/** @deprecated Usar isAnimeAv1ZillaUrl; ya no forzamos HLS nativo. */
 export function isAnimeAv1HlsUrl(url: string): boolean {
-  const u = url.toLowerCase();
-  return (
-    u.includes("application/x-mpegurl") ||
-    u.includes(".m3u8") ||
-    u.includes("/m3u8/") ||
-    u.includes("zilla-networks.com")
-  );
+  return isAnimeAv1ZillaUrl(url);
 }
 
 function rankEmbed(e: AnimeAv1Embed): number {
   const name = e.server.toLowerCase();
+  // Zilla/HLS: solo como último recurso (casi nunca reproduce fuera de animeav1.com)
+  if (name === "hls" || isAnimeAv1ZillaUrl(e.url)) {
+    let score = 1;
+    if (e.lang === "SUB") score += 2;
+    return score;
+  }
   const idx = PREFERRED_SERVERS.findIndex(
     (s) => name === s || name.includes(s)
   );
@@ -193,6 +201,12 @@ export async function resolveAnimeAv1Embed(opts: {
   }
 
   if (!embeds.length) return null;
-  embeds.sort((a, b) => rankEmbed(b) - rankEmbed(a));
-  return embeds[0];
+
+  // Preferir mirrors embebibles; Zilla/HLS casi nunca reproduce fuera de animeav1.com
+  const playable = embeds.filter(
+    (e) => e.server.toLowerCase() !== "hls" && !isAnimeAv1ZillaUrl(e.url)
+  );
+  const pool = playable.length ? playable : embeds;
+  pool.sort((a, b) => rankEmbed(b) - rankEmbed(a));
+  return pool[0];
 }
