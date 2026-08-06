@@ -30,7 +30,7 @@ function ActionButton({
   href?: string;
 }) {
   const className =
-    "mt-8 inline-flex items-center justify-center rounded-full bg-red-500 px-8 py-3 font-semibold text-white shadow-lg transition-colors hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75";
+    "brand-button mt-8 inline-flex items-center justify-center rounded-full px-8 py-3 font-semibold transition focus:outline-none focus:ring-2 focus:ring-teal-300/50";
 
   if (href) {
     return (

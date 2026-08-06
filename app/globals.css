@@ -1,20 +1,33 @@
 @import "tailwindcss";
 
+/**
+ * Paleta VeoTV
+ * — Fondo navy profundo
+ * — Marca / CTA: teal
+ * — Acento secundario: violeta suave
+ * — Rojo solo para errores / destructivo
+ */
 :root {
-  --background: #070b14;
-  --foreground: #f4f7fb;
-  --brand: #c026d3;
-  --brand-strong: #a21caf;
-  --accent: #7c3aed;
-  --surface: #0d1424;
-  --surface-strong: #111b2e;
-  --muted: #91a0b8;
+  --background: #06080f;
+  --foreground: #f2f5fa;
+  --brand: #2dd4bf;
+  --brand-strong: #14b8a6;
+  --brand-ink: #07111d;
+  --accent: #a78bfa;
+  --accent-strong: #8b5cf6;
+  --surface: #0c1220;
+  --surface-strong: #121a2c;
+  --muted: #8b9bb3;
   --line: rgba(148, 163, 184, 0.14);
+  --danger: #f87171;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -32,14 +45,15 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   background-image:
-    radial-gradient(circle at 8% -10%, rgba(45, 212, 191, 0.12), transparent 32rem),
-    radial-gradient(circle at 92% 8%, rgba(139, 92, 246, 0.1), transparent 30rem);
+    radial-gradient(circle at 12% -8%, rgba(45, 212, 191, 0.14), transparent 34rem),
+    radial-gradient(circle at 88% 12%, rgba(167, 139, 250, 0.1), transparent 32rem),
+    radial-gradient(circle at 50% 100%, rgba(20, 184, 166, 0.06), transparent 28rem);
   background-attachment: fixed;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--brand) 55%, transparent);
-  color: #07111d;
+  background: color-mix(in srgb, var(--brand) 45%, transparent);
+  color: var(--brand-ink);
 }
 
 .scrollbar-hide {
@@ -70,14 +84,14 @@ select {
 
 .glass-panel {
   border: 1px solid var(--line);
-  background: rgba(13, 20, 36, 0.72);
+  background: rgba(12, 18, 32, 0.78);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(20px);
 }
 
 .surface-panel {
   border: 1px solid var(--line);
-  background: linear-gradient(145deg, rgba(17, 27, 46, 0.92), rgba(9, 15, 27, 0.92));
+  background: linear-gradient(145deg, rgba(18, 26, 44, 0.94), rgba(8, 12, 22, 0.94));
 }
 
 .eyebrow {
@@ -89,14 +103,25 @@ select {
 }
 
 .brand-button {
-  color: #fff;
-  background: linear-gradient(90deg, #7c3aed, #d946ef);
-  box-shadow: 0 12px 34px rgba(192, 38, 211, 0.28);
+  color: var(--brand-ink);
+  background: linear-gradient(90deg, #2dd4bf, #5eead4);
+  box-shadow: 0 12px 34px rgba(45, 212, 191, 0.28);
 }
 
 .brand-button:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.06);
   transform: translateY(-1px);
+}
+
+.brand-button-ghost {
+  color: #fff;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  background: rgba(45, 212, 191, 0.08);
+}
+
+.brand-button-ghost:hover {
+  background: rgba(45, 212, 191, 0.16);
+  border-color: rgba(45, 212, 191, 0.55);
 }
 
 .focus-ring:focus-visible {
@@ -190,7 +215,6 @@ html.tv-mode .group\/row:focus-within .tv-row-chevron {
   opacity: 1;
 }
 
-/* En TV, chevrons de fila siempre semi-visibles al estar en la sección */
 html.tv-mode .tv-row-chevron {
   opacity: 0.35;
 }

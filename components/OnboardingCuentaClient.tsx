@@ -77,7 +77,7 @@ export default function OnboardingCuentaClient() {
           "Disfruta VeoTV en todos tus dispositivos.",
         ].map((t) => (
           <li key={t} className="flex gap-2">
-            <span className="text-fuchsia-400">✓</span>
+            <span className="text-teal-300">✓</span>
             {t}
           </li>
         ))}
@@ -90,14 +90,14 @@ export default function OnboardingCuentaClient() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
-          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-fuchsia-400/50"
+          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-teal-300/50"
         />
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Nombre (opcional)"
-          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-fuchsia-400/50"
+          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-teal-300/50"
         />
         <input
           type="password"
@@ -106,14 +106,14 @@ export default function OnboardingCuentaClient() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Crea una contraseña (mínimo 8 caracteres)"
-          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-fuchsia-400/50"
+          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-teal-300/50"
         />
         {error && <p className="text-sm text-red-300">{error}</p>}
         {info && <p className="text-sm text-emerald-300">{info}</p>}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 py-3 text-sm font-bold disabled:opacity-60"
+          className="brand-button w-full rounded-lg py-3 text-sm font-bold disabled:opacity-60"
         >
           {loading ? "Creando…" : "Siguiente"}
         </button>

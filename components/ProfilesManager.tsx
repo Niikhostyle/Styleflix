@@ -94,7 +94,7 @@ export default function ProfilesManager() {
           <button
             type="submit"
             disabled={busy}
-            className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            className="brand-button rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
           >
             {busy ? "…" : "Agregar"}
           </button>

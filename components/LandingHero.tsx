@@ -40,7 +40,7 @@ export default function LandingHero({
           <BrandMark className="text-2xl md:text-3xl" />
           <Link
             href="/login"
-            className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+            className="brand-button rounded-full px-4 py-2 text-sm font-semibold"
           >
             Iniciar sesión
           </Link>
@@ -58,11 +58,11 @@ export default function LandingHero({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="min-h-12 flex-1 rounded-full border border-white/25 bg-black/60 px-5 text-base text-white outline-none placeholder:text-white/40 focus:border-red-400/70"
+            className="min-h-12 flex-1 rounded-full border border-white/20 bg-black/55 px-5 text-base text-white outline-none placeholder:text-white/40 focus:border-teal-300/60"
           />
           <button
             type="submit"
-            className="min-h-12 rounded-full bg-red-500 px-7 text-base font-semibold text-white transition hover:bg-red-600"
+            className="brand-button min-h-12 rounded-full px-7 text-base font-semibold"
           >
             Comenzar
           </button>

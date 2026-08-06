@@ -78,7 +78,7 @@ export default function OnboardingListoClient() {
               setMessage("Verificando…");
               window.location.reload();
             }}
-            className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-500 px-4 py-2 text-sm font-semibold"
+            className="brand-button rounded-lg px-4 py-2 text-sm font-semibold"
           >
             Actualizar estado
           </button>

@@ -179,7 +179,7 @@ export default function LoginForm({
   }
 
   const inputClass =
-    "w-full rounded-xl border border-white/15 bg-black/50 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-fuchsia-400/50";
+    "w-full rounded-xl border border-white/15 bg-black/50 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-teal-300/50";
 
   if (status === "authenticated" || status === "loading") {
     return (
@@ -232,7 +232,7 @@ export default function LoginForm({
             }}
             className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
               mode === "login"
-                ? "bg-red-500 text-white"
+                ? "bg-teal-300 text-[#07111d]"
                 : "text-white/50 hover:text-white"
             }`}
           >
@@ -248,7 +248,7 @@ export default function LoginForm({
             }}
             className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
               mode === "register"
-                ? "bg-red-500 text-white"
+                ? "bg-teal-300 text-[#07111d]"
                 : "text-white/50 hover:text-white"
             }`}
           >
@@ -334,7 +334,7 @@ export default function LoginForm({
             type="submit"
             disabled={loading}
             data-tv-focus
-            className="w-full rounded-full bg-red-500 py-3 text-sm font-extrabold transition hover:bg-red-600 disabled:opacity-60"
+            className="brand-button w-full rounded-full py-3 text-sm font-extrabold transition disabled:opacity-60"
           >
             {loading
               ? mode === "login"

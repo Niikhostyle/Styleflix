@@ -17,7 +17,7 @@ export default function BrandMark({
       {!compact && (
         <span className="font-[family-name:var(--font-display)] text-xl font-extrabold tracking-[0.04em] text-white md:text-2xl">
           VEO
-          <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-teal-300 to-violet-400 bg-clip-text text-transparent">
             TV
           </span>
         </span>

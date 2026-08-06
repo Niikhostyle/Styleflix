@@ -281,7 +281,7 @@ export default function AdminSettingsClient() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+          className="brand-button rounded-xl px-5 py-2.5 text-sm font-bold disabled:opacity-60"
         >
           {busy ? "Guardando…" : "Guardar ajustes"}
         </button>
