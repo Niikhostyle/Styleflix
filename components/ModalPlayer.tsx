@@ -10,6 +10,7 @@ import { useSession } from "next-auth/react";
 import { isBackKey } from "@/lib/tv";
 import type { MediaType } from "@/lib/tmdb";
 import HlsVideoPlayer from "@/components/HlsVideoPlayer";
+import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 
 export type SeasonMeta = {
   seasonNumber: number;
@@ -314,14 +315,10 @@ export default function ModalPlayer({
       title={title}
     />
   ) : playKind === "video" ? (
-    <video
+    <NativeVideoPlayer
       key={`video-${mediaId}-${season}-${episode}-${frameNonce}`}
       src={embedPath}
       title={title}
-      controls
-      playsInline
-      autoPlay
-      className="absolute inset-0 h-full w-full bg-black object-contain"
     />
   ) : (
     <iframe

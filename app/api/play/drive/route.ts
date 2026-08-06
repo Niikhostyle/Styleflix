@@ -45,41 +45,26 @@ export async function GET(request: Request) {
   const range = request.headers.get("range");
 
   try {
-    const { response: upstream, contentType } = await openGoogleDriveStream({
-      fileId,
-      range,
-    });
-
-    if (!upstream.ok && upstream.status !== 206) {
-      console.error("[drive] upstream", upstream.status, fileId);
-      return NextResponse.json(
-        { error: `Drive respondió ${upstream.status}` },
-        { status: 502 }
-      );
-    }
+    const upstream = await openGoogleDriveStream({ fileId, range });
 
     const headers = new Headers();
-    headers.set("Content-Type", contentType);
+    headers.set("Content-Type", upstream.contentType);
     headers.set("Cache-Control", "private, max-age=0, no-store");
-    headers.set("Accept-Ranges", "bytes");
-
-    const pass = [
-      "content-length",
-      "content-range",
-      "accept-ranges",
-    ] as const;
-    for (const name of pass) {
-      const v = upstream.headers.get(name);
-      if (v) headers.set(name, v);
+    headers.set("Accept-Ranges", upstream.acceptRanges || "bytes");
+    if (upstream.contentLength) {
+      headers.set("Content-Length", upstream.contentLength);
+    }
+    if (upstream.contentRange) {
+      headers.set("Content-Range", upstream.contentRange);
     }
 
     return new NextResponse(upstream.body, {
-      status: upstream.status === 206 ? 206 : 200,
+      status: upstream.status,
       headers,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Proxy Drive falló";
-    console.error("[drive]", msg);
+    console.error("[drive]", fileId, msg);
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
