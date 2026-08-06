@@ -7,7 +7,8 @@ import {
   vimeusHasTmdbId,
 } from "@/lib/vimeus";
 import { findPlutoMatch, resolvePlutoHlsUrl } from "@/lib/pluto";
-import { findAnimeAv1Match, isAnimeAv1HlsUrl, animeAv1M3u8Url, resolveAnimeAv1Embed } from "@/lib/animeav1";
+import { findAnimeAv1Match, isAnimeAv1HlsUrl, animeAv1M3u8Url, animeAv1ZillaHash, resolveAnimeAv1Embed } from "@/lib/animeav1";
+import { signAnimeAv1StreamToken } from "@/lib/animeav1-token";
 import { findArchiveMatch } from "@/lib/sources/archive";
 import { findCustomStream } from "@/lib/sources/custom";
 import { isSourceEnabled } from "@/lib/sources/types";
@@ -117,16 +118,35 @@ export async function GET(request: Request) {
         if (embed?.url) {
           const origin = new URL(request.url).origin;
           const hls = isAnimeAv1HlsUrl(embed.url);
-          const m3u8 = hls ? animeAv1M3u8Url(embed.url) : null;
+          if (hls) {
+            const hash = animeAv1ZillaHash(embed.url);
+            const m3u8 = animeAv1M3u8Url(embed.url);
+            const t = hash
+              ? signAnimeAv1StreamToken({
+                  hash,
+                  userId: session.user!.id,
+                })
+              : "";
+            const streamUrl = `${origin}/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+            const embedUrl = hash
+              ? `${origin}/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
+              : streamUrl;
+            return NextResponse.json(
+              withPlanMeta({
+                source: "animeav1",
+                label: "VeoTV",
+                embedUrl,
+                streamUrl,
+                playKind: "iframe",
+              })
+            );
+          }
           return NextResponse.json(
             withPlanMeta({
               source: "animeav1",
               label: "VeoTV",
               embedUrl: embed.url,
-              streamUrl: m3u8
-                ? `${origin}/api/play/animeav1-hls?u=${encodeURIComponent(m3u8)}`
-                : undefined,
-              playKind: hls ? "hls" : "iframe",
+              playKind: "iframe",
             })
           );
         }

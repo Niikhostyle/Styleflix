@@ -15,6 +15,9 @@ function isPublicPath(pathname: string) {
   if (pathname === "/api/billing/webhook") return true;
   if (pathname === "/api/pricing") return true;
   if (pathname === "/api/settings/preview") return true;
+  // HLS Zilla: auth por token firmado (si middleware redirige a /login, hls.js rompe)
+  if (pathname === "/api/play/animeav1-hls") return true;
+  if (pathname === "/api/play/animeav1-embed") return true;
   if (pathname.startsWith("/onboarding")) return true;
   return false;
 }

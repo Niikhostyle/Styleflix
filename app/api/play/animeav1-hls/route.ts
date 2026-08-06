@@ -2,38 +2,53 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
 import {
+  animeAv1ZillaHash,
   fetchZillaUpstream,
   isAnimeAv1ZillaStreamUrl,
   rewriteZillaPlaylist,
 } from "@/lib/animeav1";
+import { verifyAnimeAv1StreamToken } from "@/lib/animeav1-token";
 
 /**
- * Proxy HLS Zilla (segmentos exigen Referer/Sec-Fetch de su player).
- * GET /api/play/animeav1-hls?u=<urlencoded https://player.zilla-networks.com/...>
+ * Proxy HLS Zilla (igual que el stream de animeav1.com / JWPlayer+hlsjs).
+ * Auth: sesión con membresía O token firmado `t` (para fragmentos HLS).
+ * GET /api/play/animeav1-hls?u=...&t=...
  */
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
-  }
-  if (
-    !hasActiveMembership({
-      role: session.user.role,
-      subscriptionStatus: session.user.subscriptionStatus,
-      currentPeriodEnd: session.user.currentPeriodEnd,
-    })
-  ) {
-    return NextResponse.json({ error: "Membresía requerida." }, { status: 403 });
-  }
+  const { searchParams } = new URL(request.url);
+  const src = searchParams.get("u");
+  const token = searchParams.get("t");
 
-  const src = new URL(request.url).searchParams.get("u");
   if (!src || !isAnimeAv1ZillaStreamUrl(src)) {
     return NextResponse.json({ error: "URL inválida." }, { status: 400 });
+  }
+
+  const hash = animeAv1ZillaHash(src);
+  const tokenOk = verifyAnimeAv1StreamToken(token, hash || undefined);
+
+  if (!tokenOk.ok) {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+    if (
+      !hasActiveMembership({
+        role: session.user.role,
+        subscriptionStatus: session.user.subscriptionStatus,
+        currentPeriodEnd: session.user.currentPeriodEnd,
+      })
+    ) {
+      return NextResponse.json(
+        { error: "Membresía requerida." },
+        { status: 403 }
+      );
+    }
   }
 
   try {
     const upstream = await fetchZillaUpstream(src);
     if (!upstream.ok) {
+      console.error("[animeav1-hls] upstream", upstream.status, src.slice(0, 80));
       return NextResponse.json(
         { error: `Upstream ${upstream.status}` },
         { status: 502 }
@@ -43,7 +58,14 @@ export async function GET(request: Request) {
     const ctype = (upstream.headers.get("content-type") || "").toLowerCase();
     const buf = Buffer.from(await upstream.arrayBuffer());
     const origin = new URL(request.url).origin;
-    const proxyBase = `${origin}/api/play/animeav1-hls?u=`;
+
+    // Conservar token en URLs reescritas de la playlist
+    const tokenQ = tokenOk.ok
+      ? `t=${encodeURIComponent(token!)}&`
+      : token
+        ? `t=${encodeURIComponent(token)}&`
+        : "";
+    const proxyBase = `${origin}/api/play/animeav1-hls?${tokenQ}u=`;
 
     const isPlaylist =
       ctype.includes("mpegurl") ||
@@ -64,12 +86,22 @@ export async function GET(request: Request) {
       });
     }
 
-    // Segmentos fMP4 disfrazados de .html
+    // fMP4 (init/segs) aunque el CDN diga text/html
+    const looksFmp4 =
+      buf.length > 8 &&
+      (buf.slice(4, 8).toString("utf8") === "ftyp" ||
+        buf.slice(4, 8).toString("utf8") === "styp" ||
+        buf.slice(4, 8).toString("utf8") === "moof");
+
     return new NextResponse(buf, {
       status: 200,
       headers: {
-        "Content-Type": "video/mp4",
-        "Cache-Control": "public, max-age=60",
+        "Content-Type": looksFmp4
+          ? "video/mp4"
+          : ctype.includes("html")
+            ? "application/octet-stream"
+            : ctype || "application/octet-stream",
+        "Cache-Control": "public, max-age=120",
         "Access-Control-Allow-Origin": origin,
       },
     });

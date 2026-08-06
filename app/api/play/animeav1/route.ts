@@ -3,16 +3,17 @@ import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
 import {
   animeAv1M3u8Url,
+  animeAv1ZillaHash,
   isAnimeAv1HlsUrl,
   listAnimeAv1Embeds,
   resolveAnimeAv1Embed,
 } from "@/lib/animeav1";
+import { signAnimeAv1StreamToken } from "@/lib/animeav1-token";
 import { isSourceEnabled } from "@/lib/sources/types";
 
 /**
- * Reproduce un episodio scrapado de AnimeAV1.
- * HLS → proxy nativo; otros → iframe.
- * GET /api/play/animeav1?slug=...&ep=1&server=HLS
+ * Scrapea embeds de AnimeAV1.
+ * HLS → iframe a nuestro JWPlayer (/animeav1-embed) + proxy Zilla (como animeav1.com).
  */
 export async function GET(request: Request) {
   const session = await auth();
@@ -80,31 +81,47 @@ export async function GET(request: Request) {
 
   const maxRes = session.user.planMaxResolution || 1080;
   const origin = new URL(request.url).origin;
-  const hls = isAnimeAv1HlsUrl(picked.url);
-  const m3u8 = hls ? animeAv1M3u8Url(picked.url) : null;
-  const streamUrl = m3u8
-    ? `${origin}/api/play/animeav1-hls?u=${encodeURIComponent(m3u8)}`
-    : undefined;
+
+  function mapEmbed(e: { server: string; url: string }) {
+    const hls = isAnimeAv1HlsUrl(e.url);
+    if (!hls) {
+      return {
+        server: e.server,
+        url: e.url,
+        playKind: "iframe" as const,
+      };
+    }
+    const hash = animeAv1ZillaHash(e.url);
+    const m3u8 = animeAv1M3u8Url(e.url);
+    const t = hash
+      ? signAnimeAv1StreamToken({ hash, userId: session!.user!.id })
+      : "";
+    const streamUrl = `${origin}/api/play/animeav1-hls?t=${encodeURIComponent(t)}&u=${encodeURIComponent(m3u8)}`;
+    const embedUrl = hash
+      ? `${origin}/api/play/animeav1-embed?hash=${hash}&t=${encodeURIComponent(t)}`
+      : streamUrl;
+    return {
+      server: e.server,
+      url: embedUrl,
+      streamUrl,
+      playKind: "iframe" as const, // JWPlayer en iframe (igual AnimeAV1)
+      hls: true,
+    };
+  }
+
+  const mapped = embeds.map(mapEmbed);
+  const pickedMapped =
+    mapped.find((e) => e.server.toLowerCase() === picked.server.toLowerCase()) ||
+    mapped[0];
 
   return NextResponse.json({
     source: "animeav1",
     label: "VeoTV",
-    embedUrl: picked.url,
-    streamUrl,
-    playKind: hls ? "hls" : "iframe",
-    server: picked.server,
-    embeds: embeds.map((e) => {
-      const eHls = isAnimeAv1HlsUrl(e.url);
-      const eM3u8 = eHls ? animeAv1M3u8Url(e.url) : null;
-      return {
-        server: e.server,
-        url: e.url,
-        playKind: eHls ? "hls" : "iframe",
-        streamUrl: eM3u8
-          ? `${origin}/api/play/animeav1-hls?u=${encodeURIComponent(eM3u8)}`
-          : undefined,
-      };
-    }),
+    embedUrl: pickedMapped.url,
+    streamUrl: pickedMapped.streamUrl,
+    playKind: "iframe",
+    server: pickedMapped.server,
+    embeds: mapped,
     maxResolution: maxRes,
     ...(maxRes <= 720
       ? { notice: "Tu plan Estándar reproduce hasta 720p." }

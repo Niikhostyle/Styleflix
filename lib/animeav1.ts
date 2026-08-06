@@ -301,19 +301,19 @@ export function rewriteZillaPlaylist(
   proxyBase: string
 ): string {
   const base = new URL(playlistUrl);
+  const wrap = (abs: string) => `${proxyBase}${encodeURIComponent(abs)}`;
   return text
     .split("\n")
     .map((line) => {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) {
-        // #EXT-X-MAP:URI="..."
         return line.replace(/URI="([^"]+)"/gi, (_, uri: string) => {
           const abs = new URL(uri, base).toString();
-          return `URI="${proxyBase}${encodeURIComponent(abs)}"`;
+          return `URI="${wrap(abs)}"`;
         });
       }
       const abs = new URL(trimmed, base).toString();
-      return `${proxyBase}${encodeURIComponent(abs)}`;
+      return wrap(abs);
     })
     .join("\n");
 }

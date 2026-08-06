@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Play, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import { useSession } from "next-auth/react";
 import { mediaImageUrl } from "@/lib/media-links";
 
@@ -55,7 +54,6 @@ export default function AnimeAv1DetailClient({
 
   const [episode, setEpisode] = useState(1);
   const [embedUrl, setEmbedUrl] = useState("");
-  const [playKind, setPlayKind] = useState<"hls" | "iframe">("iframe");
   const [servers, setServers] = useState<ServerOpt[]>([]);
   const [activeServer, setActiveServer] = useState("");
   const [error, setError] = useState("");
@@ -85,11 +83,9 @@ export default function AnimeAv1DetailClient({
       : null;
 
   const applyServer = useCallback((opt: ServerOpt) => {
-    const kind = opt.playKind === "hls" || Boolean(opt.streamUrl) ? "hls" : "iframe";
-    const raw = kind === "hls" ? opt.streamUrl || opt.url : opt.url;
+    // HLS → iframe a /api/play/animeav1-embed (JWPlayer), igual que animeav1 → /play/
     setActiveServer(opt.server);
-    setPlayKind(kind);
-    setEmbedUrl(kind === "hls" ? raw : withCacheBust(raw));
+    setEmbedUrl(withCacheBust(opt.url));
     setError("");
   }, []);
 
@@ -110,7 +106,7 @@ export default function AnimeAv1DetailClient({
         if (server) params.set("server", server);
         const res = await fetch(`/api/play/animeav1?${params}`);
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !(data.streamUrl || data.embedUrl)) {
+        if (!res.ok || !data.embedUrl) {
           setError(data.error || "No se pudo cargar el episodio.");
           setServers([]);
           setActiveServer("");
@@ -125,24 +121,19 @@ export default function AnimeAv1DetailClient({
               {
                 server: data.server || "HLS",
                 url: data.embedUrl as string,
-                playKind: data.playKind === "hls" ? "hls" : "iframe",
+                playKind: "iframe",
                 streamUrl: data.streamUrl as string | undefined,
               },
             ];
 
-        // HLS primero (como AnimeAV1)
+        // HLS primero (como en animeav1.com)
         const picked =
           (server
             ? serversList.find(
                 (s) => s.server.toLowerCase() === server.toLowerCase()
               )
             : null) ||
-          serversList.find(
-            (s) =>
-              s.server.toLowerCase() === "hls" ||
-              s.playKind === "hls" ||
-              Boolean(s.streamUrl)
-          ) ||
+          serversList.find((s) => s.server.toLowerCase() === "hls") ||
           serversList[0];
 
         setServers(serversList);
@@ -196,23 +187,15 @@ export default function AnimeAv1DetailClient({
                   )}
                 </div>
               ) : embedUrl ? (
-                playKind === "hls" ? (
-                  <HlsVideoPlayer
-                    key={`hls-${anime.slug}-${episode}-${activeServer}-${embedUrl}`}
-                    src={embedUrl}
-                    title={`${anime.title} episodio ${episode}`}
-                  />
-                ) : (
-                  <iframe
-                    key={embedUrl}
-                    src={embedUrl}
-                    title={`${anime.title} episodio ${episode}`}
-                    className="absolute inset-0 h-full w-full border-0"
-                    allowFullScreen
-                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                )
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  title={`${anime.title} episodio ${episode}`}
+                  className="absolute inset-0 h-full w-full border-0"
+                  allowFullScreen
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               ) : (
                 <button
                   type="button"
