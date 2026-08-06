@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRef } from "react";
 import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 import {
-  IMAGE_POSTER_URL,
   getDisplayTitle,
   getReleaseYear,
   type MediaType,
 } from "@/lib/tmdb";
 import type { CatalogItem } from "@/lib/sources/types";
+import { catalogItemHref, mediaImageUrl } from "@/lib/media-links";
 
 interface MediaRowProps {
   title: string;
@@ -80,8 +80,8 @@ export default function MediaRow({
 
             return (
               <Link
-                key={`${type}-${item.id}`}
-                href={`/titulo/${type}/${item.id}`}
+                key={`${type}-${item.id}-${item.animeAv1Slug || ""}`}
+                href={catalogItemHref(item)}
                 data-tv-focus
                 onFocus={(e) => {
                   e.currentTarget.scrollIntoView({
@@ -94,13 +94,14 @@ export default function MediaRow({
               >
                 {item.poster_path ? (
                   <Image
-                    src={`${IMAGE_POSTER_URL}${item.poster_path}`}
+                    src={mediaImageUrl(item.poster_path, "poster")}
                     alt={name}
                     fill
                     sizes="(max-width: 768px) 128px, (max-width: 1024px) 158px, 174px"
                     className="object-cover transition duration-500 group-hover/card:scale-[1.04]"
                     priority={priority}
                     loading={priority ? "eager" : "lazy"}
+                    unoptimized={/^https?:\/\//i.test(item.poster_path)}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-zinc-800 p-2 text-center text-xs text-neutral-400">

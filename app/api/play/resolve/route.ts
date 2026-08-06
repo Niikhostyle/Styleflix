@@ -118,8 +118,10 @@ export async function GET(request: Request) {
           return NextResponse.json(
             withPlanMeta({
               source: "animeav1",
-              label: "VeoTV",
+              label: "AnimeAV1",
               embedUrl: embed.url,
+              credit: "Reproducción vía AnimeAV1 (animeav1.com)",
+              notice: "Reproducción vía AnimeAV1 · animeav1.com",
             })
           );
         }

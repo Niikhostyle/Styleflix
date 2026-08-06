@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Animes | VeoTV",
-  description: "Animes en VeoTV",
+  description: "Catálogo de animes de AnimeAV1 en VeoTV",
 };
 
 export default async function AnimesPage() {
@@ -14,7 +14,7 @@ export default async function AnimesPage() {
   return (
     <CatalogClient
       pageTitle="Animes"
-      subtitle="Catálogo de animes listo para ver."
+      subtitle="Catálogo scrapado de AnimeAV1 — reproducción con créditos a animeav1.com."
       featured={featured}
       defaultMediaType="tv"
       rows={rows}

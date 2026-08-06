@@ -4,17 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { Play, Info, Sparkles } from "lucide-react";
 import {
-  IMAGE_BACKDROP_URL,
-  IMAGE_POSTER_URL,
   getDisplayTitle,
   getMatchPercentage,
   getReleaseYear,
-  type MediaItem,
   type MediaType,
 } from "@/lib/tmdb";
+import type { CatalogItem } from "@/lib/sources/types";
+import { catalogItemHref, mediaImageUrl } from "@/lib/media-links";
 
 interface HeroProps {
-  item: MediaItem;
+  item: CatalogItem;
   mediaType?: MediaType;
 }
 
@@ -24,16 +23,16 @@ function truncate(text: string, maxLength: number) {
 }
 
 export default function Hero({ item, mediaType = "movie" }: HeroProps) {
-  const type = item.media_type ?? mediaType;
   const title = getDisplayTitle(item);
-  const detailHref = `/titulo/${type}/${item.id}`;
+  const detailHref = catalogItemHref(item);
   const year = getReleaseYear(item);
   const match = getMatchPercentage(item.vote_average);
 
   const backdropPath = item.backdrop_path || item.poster_path;
-  const backdrop = backdropPath
-    ? `${item.backdrop_path ? IMAGE_BACKDROP_URL : IMAGE_POSTER_URL}${backdropPath}`
-    : "";
+  const backdrop = mediaImageUrl(
+    backdropPath,
+    item.backdrop_path ? "backdrop" : "poster"
+  );
 
   return (
     <section className="relative h-[82vh] min-h-[620px] w-full overflow-hidden md:h-[88vh]">
@@ -45,6 +44,7 @@ export default function Hero({ item, mediaType = "movie" }: HeroProps) {
           priority
           sizes="100vw"
           className="scale-[1.01] object-cover object-center"
+          unoptimized={/^https?:\/\//i.test(backdropPath || "")}
         />
       )}
 
@@ -56,7 +56,7 @@ export default function Hero({ item, mediaType = "movie" }: HeroProps) {
         <div className="max-w-2xl">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-teal-200 backdrop-blur-md">
             <Sparkles className="h-3.5 w-3.5" />
-            Selección VeoTV
+            Selección VeoTV{item.animeAv1Slug ? " · AnimeAV1" : ""}
           </div>
 
           <h1 className="mb-5 max-w-xl text-5xl font-black leading-[0.92] tracking-[-0.055em] text-white drop-shadow-lg md:text-7xl lg:text-[5.25rem]">

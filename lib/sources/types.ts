@@ -23,7 +23,7 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   jikan: "MyAnimeList",
   pluto: "Pluto TV",
   archive: "Archive.org",
-  animeav1: "VeoTV Anime",
+  animeav1: "AnimeAV1",
 };
 
 /**
@@ -35,6 +35,8 @@ export type CatalogItem = MediaItem & {
   sources?: SourceId[];
   /** true = stream confirmado; false = solo ficha y tráiler. */
   playable?: boolean;
+  /** Slug en AnimeAV1 (catálogo /anime/[slug]). */
+  animeAv1Slug?: string;
 };
 
 export type CatalogRow = {
@@ -125,6 +127,7 @@ export function mergeCatalogItems(
         release_date: existing.release_date ?? item.release_date,
         first_air_date: existing.first_air_date ?? item.first_air_date,
         genre_ids: existing.genre_ids ?? item.genre_ids,
+        animeAv1Slug: existing.animeAv1Slug || item.animeAv1Slug,
       });
     }
   }
