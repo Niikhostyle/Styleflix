@@ -3,6 +3,13 @@ import { normalizeTitle, scoreTitleMatch, yearFrom } from "@/lib/sources/match";
 const BASE_URL = "https://api.themoviedb.org/3";
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
+/**
+ * Español latino (MX): títulos/sinopsis como en Chile y LatAm
+ * (ej. Moana, no el doblaje/título de España).
+ */
+export const TMDB_LANGUAGE = "es-MX";
+const TMDB_VIDEO_LANGS = "es-MX,es-ES,en-US,en,null";
+
 /** Posters nítidos en pantallas Retina y tarjetas ampliadas. */
 export const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 /** Alias explícito para posters. */
@@ -98,7 +105,7 @@ interface TMDBListResponse {
 
 function buildUrl(endpoint: string, extraParams = "") {
   const separator = endpoint.includes("?") ? "&" : "?";
-  return `${BASE_URL}${endpoint}${separator}api_key=${API_KEY}&language=es-ES${extraParams}`;
+  return `${BASE_URL}${endpoint}${separator}api_key=${API_KEY}&language=${TMDB_LANGUAGE}${extraParams}`;
 }
 
 function assertApiKey() {
@@ -174,7 +181,7 @@ async function fetchDetails(
   const res = await fetch(
     buildUrl(
       `/${type}/${id}`,
-      "&append_to_response=credits,videos&include_video_language=es-ES,en-US,en,null"
+      `&append_to_response=credits,videos&include_video_language=${TMDB_VIDEO_LANGS}`
     ),
     { next: { revalidate: 7200, tags: ["tmdb", `tmdb-${type}-${id}`] } }
   );

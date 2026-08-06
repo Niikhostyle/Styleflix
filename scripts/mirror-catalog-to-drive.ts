@@ -370,7 +370,7 @@ async function fetchTmdbList(
 ): Promise<TmdbMovieHit[]> {
   const key = tmdbApiKey();
   const sep = path.includes("?") ? "&" : "?";
-  const url = `https://api.themoviedb.org/3${path}${sep}api_key=${key}&language=es-ES&page=${page}`;
+  const url = `https://api.themoviedb.org/3${path}${sep}api_key=${key}&language=es-MX&page=${page}`;
   const data = (await fetchJson(url)) as { results?: TmdbMovieHit[] };
   return Array.isArray(data.results) ? data.results : [];
 }

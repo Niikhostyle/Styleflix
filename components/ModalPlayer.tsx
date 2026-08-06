@@ -232,6 +232,17 @@ export default function ModalPlayer({
 
         const url = (data.streamUrl || data.embedUrl || "") as string;
         if (!res.ok || !url) {
+          // Liberar lock si no hay stream (evita bloquear el perfil ~45s+)
+          const lock = lockRef.current;
+          lockRef.current = null;
+          if (lock) {
+            void fetch("/api/playback/lock", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(lock),
+              keepalive: true,
+            }).catch(() => undefined);
+          }
           setLockConflict(res.status === 409);
           setResolveError(
             data.error || "Este título todavía no está disponible."
@@ -263,6 +274,16 @@ export default function ModalPlayer({
         setNotice(data.notice || "");
       } catch {
         if (!cancelled) {
+          const lock = lockRef.current;
+          lockRef.current = null;
+          if (lock) {
+            void fetch("/api/playback/lock", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(lock),
+              keepalive: true,
+            }).catch(() => undefined);
+          }
           setResolveError("No se pudo resolver la reproducción.");
         }
       } finally {

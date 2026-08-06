@@ -46,19 +46,6 @@ function authSecret() {
   return raw.trim().replace(/^["']|["']$/g, "") || undefined;
 }
 
-function hasSessionCookie(request: NextRequest) {
-  for (const c of request.cookies.getAll()) {
-    const n = c.name.toLowerCase();
-    if (
-      n.includes("authjs.session-token") ||
-      n.includes("next-auth.session-token")
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
 async function readToken(request: NextRequest) {
   const secret = authSecret();
   if (!secret) return null;
@@ -77,11 +64,9 @@ async function readToken(request: NextRequest) {
   });
 }
 
-function isLoggedIn(
-  token: Awaited<ReturnType<typeof readToken>>,
-  request: NextRequest
-) {
-  return Boolean(token) || hasSessionCookie(request);
+function isLoggedIn(token: Awaited<ReturnType<typeof readToken>>) {
+  // Solo token JWT válido (cookie sola sin payload = sesión muerta)
+  return Boolean(token?.sub || token?.id);
 }
 
 function hasAccess(
@@ -89,9 +74,16 @@ function hasAccess(
 ): boolean {
   if (!token) return false;
   if (token.role === "SUPER_ADMIN") return true;
-  // No confiar en demoActive/catalogAccess stale del JWT: la demo se vence
-  // por timestamp aunque el token aún diga demoActive=true.
-  if (token.membershipActive) return true;
+
+  // Membresía: evaluar fecha de vencimiento (no confiar solo en membershipActive stale)
+  const periodEnd = token.currentPeriodEnd as string | null | undefined;
+  if (periodEnd && new Date(periodEnd).getTime() > Date.now()) {
+    const status = String(token.subscriptionStatus || "");
+    if (status === "ACTIVE" || status === "CANCELLED" || token.membershipActive) {
+      return true;
+    }
+  }
+
   const exp = token.demoExpiresAt as string | null | undefined;
   if (exp && new Date(exp).getTime() > Date.now()) return true;
   return false;
@@ -150,7 +142,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = await readToken(request);
-  const loggedIn = isLoggedIn(token, request);
+  const loggedIn = isLoggedIn(token);
   const catalogAccess = hasAccess(token);
 
   if (pathname === "/") {

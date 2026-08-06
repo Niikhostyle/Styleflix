@@ -257,7 +257,7 @@ async function loadMangaEsItems() {
   return withTimeout(getMangaEsItems(), SLOW_TIMEOUT_MS, [], "mangadex:items");
 }
 
-async function loadMangaEsRows() {
+async function loadMangaEsRows(): Promise<LoadedRow[]> {
   if (!enabledSources().includes("mangadex")) return [];
   return withTimeout(getMangaEsRows(), SLOW_TIMEOUT_MS, [], "mangadex:rows");
 }

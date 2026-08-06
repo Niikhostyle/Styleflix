@@ -22,6 +22,11 @@ type Metrics = {
   onlineWindowMinutes: number;
   hours: number;
   live: { sessions: number; users: number; ips: number };
+  today?: {
+    registrations: number;
+    ips: number;
+    usersSeen: number;
+  };
   window: {
     sessions: number;
     users: number;
@@ -385,18 +390,49 @@ export default function AdminSecurityClient() {
               accent="text-cyan-300"
             />
             <MetricCard
+              label="IPs hoy"
+              value={m?.today?.ips ?? m?.window.ips ?? 0}
+              hint={`${m?.today?.usersSeen ?? m?.window.usersToday ?? 0} usuarios vistos hoy`}
+              icon={Globe2}
+              accent="text-violet-300"
+            />
+            <MetricCard
+              label="Registros hoy"
+              value={m?.today?.registrations ?? 0}
+              hint={`${m?.platform.totalUsers ?? 0} cuentas totales · ${m?.platform.membersActive ?? 0} membresías`}
+              icon={Users}
+              accent="text-teal-300"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
               label="Usuarios activos (ventana)"
               value={m?.window.users ?? 0}
-              hint={`${m?.window.usersToday ?? 0} vistos hoy · ${m?.window.ips ?? 0} IPs`}
+              hint={`${m?.window.ips ?? 0} IPs en ${hours} h`}
               icon={Users}
               accent="text-violet-300"
             />
             <MetricCard
               label="Membresías activas"
               value={m?.platform.membersActive ?? 0}
-              hint={`${m?.platform.demosActive ?? 0} demos · ${m?.platform.totalUsers ?? 0} cuentas`}
+              hint={`${m?.platform.demosActive ?? 0} demos vigentes`}
               icon={Globe2}
               accent="text-teal-300"
+            />
+            <MetricCard
+              label="Cuentas totales"
+              value={m?.platform.totalUsers ?? 0}
+              hint="Sin contar admins"
+              icon={Users}
+              accent="text-cyan-200"
+            />
+            <MetricCard
+              label="Sesiones en ventana"
+              value={m?.window.sessions ?? 0}
+              hint={`Últimas ${hours} h`}
+              icon={Activity}
+              accent="text-emerald-200"
             />
           </div>
 

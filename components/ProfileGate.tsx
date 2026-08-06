@@ -64,7 +64,10 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
         }
         setReady(true);
       } catch {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          const next = encodeURIComponent(pathname || "/");
+          router.replace(`/perfiles?next=${next}`);
+        }
       }
     })();
 

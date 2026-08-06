@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { hasActiveMembership } from "@/lib/access";
 import OnboardingShell from "@/components/OnboardingShell";
 import PlanPicker from "@/components/PlanPicker";
 
@@ -14,7 +15,14 @@ export default async function OnboardingPlanesPage({
   if (!session?.user) {
     redirect("/login?callbackUrl=/onboarding/planes");
   }
-  if (session.user.membershipActive) {
+  // Evaluar por fecha real (JWT membershipActive puede estar stale)
+  if (
+    hasActiveMembership({
+      role: session.user.role,
+      subscriptionStatus: session.user.subscriptionStatus,
+      currentPeriodEnd: session.user.currentPeriodEnd,
+    })
+  ) {
     redirect("/");
   }
 

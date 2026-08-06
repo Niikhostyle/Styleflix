@@ -115,6 +115,8 @@ export async function activateMembership(opts: {
       },
     });
     if (existing) {
+      // Pago ya consumido: solo reparar entitlements si la membresía sigue vigente.
+      // NUNCA re-extender meses con un pago viejo (evita membresía gratis al vencer).
       if (
         user.subscriptionStatus === "ACTIVE" &&
         user.currentPeriodEnd &&
@@ -138,27 +140,13 @@ export async function activateMembership(opts: {
         });
         return fixed;
       }
-      const reactivated = await prisma.user.update({
-        where: { id: opts.userId },
-        data: {
-          subscriptionStatus: "ACTIVE",
-          currentPeriodEnd: addMonths(now, months),
-          membershipStartedAt: user.membershipStartedAt ?? now,
-          cancelledAt: null,
-          planSource: user.planSource || "DIRECT",
-          prepaidDays: null,
-          ...entitlementData,
-          ...(opts.mpPreapprovalId
-            ? { mpPreapprovalId: opts.mpPreapprovalId }
-            : {}),
-        },
-      });
+      // Membresía vencida o inactiva + mismo paymentId → no reactivar
       await ensurePrimaryProfile({
         userId: opts.userId,
         name: user.name,
         maxProfiles: entitlements.planMaxProfiles,
       });
-      return reactivated;
+      return user;
     }
   }
 

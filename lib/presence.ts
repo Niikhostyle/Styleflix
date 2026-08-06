@@ -100,11 +100,36 @@ function sinceDate(msAgo: number) {
   return new Date(Date.now() - msAgo);
 }
 
+function startOfTodaySantiago(): Date {
+  // Medianoche aproximada Chile (UTC-4 / -3): usamos offset local del servidor
+  // y también una ventana de 24h desde 00:00 America/Santiago via Intl.
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Santiago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = fmt.formatToParts(new Date());
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const d = parts.find((p) => p.type === "day")?.value;
+    // Interpretar medianoche Santiago como UTC+0 provisional; ajustamos con offset
+    const guess = new Date(`${y}-${m}-${d}T04:00:00.000Z`); // ~00:00 CLT/CLST
+    return guess;
+  } catch {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+}
+
 export async function getPlatformMetrics(hours = 24) {
   const now = Date.now();
   const onlineSince = sinceDate(PRESENCE_ONLINE_MS);
   const windowSince = sinceDate(hours * 3600_000);
   const daySince = sinceDate(24 * 3600_000);
+  const todayStart = startOfTodaySantiago();
 
   const [
     onlineSessions,
@@ -118,6 +143,9 @@ export async function getPlatformMetrics(hours = 24) {
     totalUsers,
     demoUsers,
     presenceRows,
+    registrationsToday,
+    ipsTodayRows,
+    usersSeenCalendarToday,
   ] = await Promise.all([
     prisma.presenceSession.count({
       where: { lastSeenAt: { gte: onlineSince } },
@@ -209,6 +237,20 @@ export async function getPlatformMetrics(hours = 24) {
         },
       },
     }),
+    prisma.user.count({
+      where: {
+        role: { not: "SUPER_ADMIN" },
+        createdAt: { gte: todayStart },
+      },
+    }),
+    prisma.presenceSession.findMany({
+      where: { lastSeenAt: { gte: todayStart } },
+      select: { ip: true },
+      distinct: ["ip"],
+    }),
+    prisma.user.count({
+      where: { lastSeenAt: { gte: todayStart } },
+    }),
   ]);
 
   const membersActive = membershipUsers.filter((u) =>
@@ -265,6 +307,11 @@ export async function getPlatformMetrics(hours = 24) {
       sessions: onlineSessions,
       users: onlineUsersDistinct.length,
       ips: activeIpsOnline.length,
+    },
+    today: {
+      registrations: registrationsToday,
+      ips: ipsTodayRows.length,
+      usersSeen: usersSeenCalendarToday,
     },
     window: {
       sessions: sessionsInWindow,

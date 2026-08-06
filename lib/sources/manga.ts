@@ -3,7 +3,7 @@
  */
 
 import { getMangaEsCatalog } from "@/lib/manga-es";
-import type { CatalogItem, CatalogRow } from "@/lib/sources/types";
+import type { CatalogItem } from "@/lib/sources/types";
 
 /** Offset de ids para no chocar con TMDB / AnimeAV1. */
 const ID_BASE = 900_000_000;
@@ -33,7 +33,9 @@ export async function getMangaEsItems(limit = 36): Promise<CatalogItem[]> {
   }));
 }
 
-export async function getMangaEsRows(): Promise<CatalogRow[]> {
+export async function getMangaEsRows(): Promise<
+  { title: string; mediaType: "tv"; items: CatalogItem[] }[]
+> {
   const items = await getMangaEsItems(48);
   if (!items.length) return [];
 
@@ -41,12 +43,12 @@ export async function getMangaEsRows(): Promise<CatalogRow[]> {
   return [
     {
       title: "Mangas populares en español",
-      mediaType: "tv",
+      mediaType: "tv" as const,
       items: items.slice(0, half),
     },
     {
       title: "Más mangas para leer",
-      mediaType: "tv",
+      mediaType: "tv" as const,
       items: items.slice(half),
     },
   ].filter((r) => r.items.length > 0);

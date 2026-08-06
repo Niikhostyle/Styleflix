@@ -236,9 +236,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Firma solo informativa: IPN legacy no envía x-signature.
+  // Sin x-signature (IPN legacy / prueba MP): se acepta.
+  // Con x-signature inválida: rechazar (no procesar).
   if (!verifyWebhookSignature(request)) {
-    console.warn("[billing/webhook] firma inválida; se ack igual para no romper IPN");
+    console.warn("[billing/webhook] firma inválida; se rechaza");
+    return NextResponse.json({ error: "invalid signature" }, { status: 401 });
   }
 
   const body = await readBody(request);

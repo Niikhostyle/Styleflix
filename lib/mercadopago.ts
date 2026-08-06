@@ -391,6 +391,24 @@ export async function assertApprovedMembershipPayment(opts: {
   }
 
   const ref = (opts.payment.external_reference || "").trim();
+  const metaUserId =
+    opts.payment.metadata &&
+    typeof opts.payment.metadata === "object" &&
+    "user_id" in opts.payment.metadata
+      ? String(
+          (opts.payment.metadata as { user_id?: unknown }).user_id || ""
+        ).trim()
+      : "";
+  const belongsToUser =
+    (ref && ref === opts.userId) ||
+    (metaUserId && metaUserId === opts.userId);
+  if (!belongsToUser) {
+    return {
+      ok: false,
+      reason:
+        "El pago no está vinculado a esta cuenta (falta o no coincide external_reference).",
+    };
+  }
   if (ref && ref !== opts.userId) {
     return { ok: false, reason: "El pago no corresponde a esta cuenta." };
   }
