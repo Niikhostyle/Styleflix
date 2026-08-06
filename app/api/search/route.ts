@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { searchMulti } from "@/lib/tmdb";
+import { searchCatalog } from "@/lib/search-catalog";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,8 +10,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const items = await searchMulti(q);
-    return NextResponse.json({ items: items.slice(0, 24) });
+    const items = await searchCatalog(q);
+    return NextResponse.json({ items: items.slice(0, 28) });
   } catch {
     return NextResponse.json(
       { error: "No se pudo buscar", items: [] },
