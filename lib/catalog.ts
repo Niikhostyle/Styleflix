@@ -350,3 +350,66 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     activeSources: collectSources(allRows),
   };
 }
+
+function posterUrl(path: string): string {
+  if (path.startsWith("http")) return path;
+  return `https://image.tmdb.org/t/p/w342${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+/**
+ * Top posters reproducibles del catálogo (películas + series), para login/landing.
+ * Se refresca cada hora vía caché de Next.
+ */
+export async function getPopularCatalogPosters(limit = 16): Promise<string[]> {
+  const { unstable_cache } = await import("next/cache");
+
+  const load = unstable_cache(
+    async () => {
+      const { featured, rows } = await getHomeCatalog();
+      const byId = new Map<string, CatalogItem>();
+
+      for (const item of featured) {
+        const key = `${item.media_type ?? "movie"}-${item.id}`;
+        if (!byId.has(key)) byId.set(key, item);
+      }
+      for (const row of rows) {
+        for (const item of row.items) {
+          const key = `${item.media_type ?? row.mediaType ?? "movie"}-${item.id}`;
+          if (!byId.has(key)) byId.set(key, item);
+        }
+      }
+
+      const ranked = [...byId.values()]
+        .filter((item) => item.playable && item.poster_path)
+        .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0));
+
+      const movies = ranked.filter((i) => (i.media_type ?? "movie") === "movie");
+      const series = ranked.filter((i) => i.media_type === "tv");
+      const mixed: CatalogItem[] = [];
+      const max = Math.max(movies.length, series.length);
+      for (let i = 0; i < max && mixed.length < limit; i++) {
+        if (movies[i]) mixed.push(movies[i]);
+        if (series[i] && mixed.length < limit) mixed.push(series[i]);
+      }
+
+      const urls = mixed
+        .map((item) => posterUrl(item.poster_path!))
+        .filter(Boolean);
+
+      if (urls.length < 8) {
+        for (const item of ranked.length ? ranked : featured) {
+          if (!item.poster_path) continue;
+          const url = posterUrl(item.poster_path);
+          if (!urls.includes(url)) urls.push(url);
+          if (urls.length >= limit) break;
+        }
+      }
+
+      return urls.slice(0, limit);
+    },
+    ["popular-catalog-posters", String(limit)],
+    { revalidate: 3600 }
+  );
+
+  return load();
+}
