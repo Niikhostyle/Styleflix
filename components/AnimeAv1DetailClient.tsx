@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Play, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import { useSession } from "next-auth/react";
 import { mediaImageUrl } from "@/lib/media-links";
 
@@ -24,7 +25,23 @@ export type AnimeAv1Detail = {
   episodes: { id: number; number: number }[];
 };
 
-type ServerOpt = { server: string; url: string };
+type ServerOpt = {
+  server: string;
+  url: string;
+  playKind?: "hls" | "iframe";
+  streamUrl?: string;
+};
+
+/** Cache-bust sin romper #hash de UPNShare/Mega. */
+function withCacheBust(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("_r", String(Date.now()));
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
 
 export default function AnimeAv1DetailClient({
   anime,
@@ -38,6 +55,7 @@ export default function AnimeAv1DetailClient({
 
   const [episode, setEpisode] = useState(1);
   const [embedUrl, setEmbedUrl] = useState("");
+  const [playKind, setPlayKind] = useState<"hls" | "iframe">("iframe");
   const [servers, setServers] = useState<ServerOpt[]>([]);
   const [activeServer, setActiveServer] = useState("");
   const [error, setError] = useState("");
@@ -66,6 +84,15 @@ export default function AnimeAv1DetailClient({
       ? episodes[epIndex + 1]
       : null;
 
+  const applyServer = useCallback((opt: ServerOpt) => {
+    const kind = opt.playKind === "hls" || Boolean(opt.streamUrl) ? "hls" : "iframe";
+    const raw = kind === "hls" ? opt.streamUrl || opt.url : opt.url;
+    setActiveServer(opt.server);
+    setPlayKind(kind);
+    setEmbedUrl(kind === "hls" ? raw : withCacheBust(raw));
+    setError("");
+  }, []);
+
   const loadEpisode = useCallback(
     async (ep: number, server?: string) => {
       if (!canPlay) {
@@ -83,7 +110,7 @@ export default function AnimeAv1DetailClient({
         if (server) params.set("server", server);
         const res = await fetch(`/api/play/animeav1?${params}`);
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.embedUrl) {
+        if (!res.ok || !(data.streamUrl || data.embedUrl)) {
           setError(data.error || "No se pudo cargar el episodio.");
           setServers([]);
           setActiveServer("");
@@ -92,11 +119,18 @@ export default function AnimeAv1DetailClient({
         const list: ServerOpt[] = Array.isArray(data.embeds)
           ? data.embeds.filter((e: ServerOpt) => e?.server && e?.url)
           : [];
-        const serversList = list.length
+        const serversList: ServerOpt[] = list.length
           ? list
-          : [{ server: data.server || "VeoTV", url: data.embedUrl as string }];
+          : [
+              {
+                server: data.server || "HLS",
+                url: data.embedUrl as string,
+                playKind: data.playKind === "hls" ? "hls" : "iframe",
+                streamUrl: data.streamUrl as string | undefined,
+              },
+            ];
 
-        // Evitar Zilla/HLS por defecto (suele rechazar la conexión en iframe)
+        // HLS primero (como AnimeAV1)
         const picked =
           (server
             ? serversList.find(
@@ -105,58 +139,24 @@ export default function AnimeAv1DetailClient({
             : null) ||
           serversList.find(
             (s) =>
-              s.server.toLowerCase() !== "hls" &&
-              !/zilla-networks\.com/i.test(s.url)
+              s.server.toLowerCase() === "hls" ||
+              s.playKind === "hls" ||
+              Boolean(s.streamUrl)
           ) ||
           serversList[0];
 
         setServers(serversList);
-        setActiveServer(picked.server);
-        setEmbedUrl(
-          `${picked.url}${picked.url.includes("?") ? "&" : "?"}_r=${Date.now()}`
-        );
         setEpisode(ep);
+        applyServer(picked);
       } catch {
         setError("Error de red.");
       } finally {
         setLoading(false);
       }
     },
-    [anime.slug, canPlay]
+    [anime.slug, canPlay, applyServer]
   );
 
-  const selectServer = useCallback((opt: ServerOpt) => {
-    setActiveServer(opt.server);
-    setEmbedUrl(
-      `${opt.url}${opt.url.includes("?") ? "&" : "?"}_r=${Date.now()}`
-    );
-    setError("");
-  }, []);
-
-  // Si el servidor activo es HLS/Zilla, avisar y ofrecer el siguiente mirror
-  useEffect(() => {
-    if (!embedUrl || !servers.length) return;
-    const isZilla =
-      activeServer.toLowerCase() === "hls" ||
-      /zilla-networks\.com/i.test(embedUrl);
-    if (!isZilla) return;
-    const t = window.setTimeout(() => {
-      const next = servers.find(
-        (s) =>
-          s.server.toLowerCase() !== "hls" &&
-          !/zilla-networks\.com/i.test(s.url)
-      );
-      if (next && next.server !== activeServer) {
-        setError(
-          "HLS no cargó en este navegador. Cambiando a " + next.server + "…"
-        );
-        selectServer(next);
-      }
-    }, 2500);
-    return () => window.clearTimeout(t);
-  }, [embedUrl, activeServer, servers, selectServer]);
-
-  // Cargar ep. 1 al entrar si puede reproducir
   useEffect(() => {
     if (status !== "authenticated" || !canPlay) return;
     void loadEpisode(1);
@@ -177,9 +177,7 @@ export default function AnimeAv1DetailClient({
         </Link>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_300px]">
-          {/* Columna principal */}
           <div className="min-w-0">
-            {/* Player */}
             <div className="relative aspect-video overflow-hidden rounded-xl border border-white/[0.08] bg-black shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
               {loading ? (
                 <div className="flex h-full items-center justify-center text-sm text-white/50">
@@ -198,15 +196,23 @@ export default function AnimeAv1DetailClient({
                   )}
                 </div>
               ) : embedUrl ? (
-                <iframe
-                  key={embedUrl}
-                  src={embedUrl}
-                  title={`${anime.title} episodio ${episode}`}
-                  className="absolute inset-0 h-full w-full border-0"
-                  allowFullScreen
-                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
+                playKind === "hls" ? (
+                  <HlsVideoPlayer
+                    key={`hls-${anime.slug}-${episode}-${activeServer}-${embedUrl}`}
+                    src={embedUrl}
+                    title={`${anime.title} episodio ${episode}`}
+                  />
+                ) : (
+                  <iframe
+                    key={embedUrl}
+                    src={embedUrl}
+                    title={`${anime.title} episodio ${episode}`}
+                    className="absolute inset-0 h-full w-full border-0"
+                    allowFullScreen
+                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                )
               ) : (
                 <button
                   type="button"
@@ -230,7 +236,6 @@ export default function AnimeAv1DetailClient({
               )}
             </div>
 
-            {/* Anterior / Siguiente */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -252,7 +257,6 @@ export default function AnimeAv1DetailClient({
               </button>
             </div>
 
-            {/* Servidores (sin SUB) */}
             {servers.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2.5">
                 {servers.map((s) => {
@@ -263,7 +267,7 @@ export default function AnimeAv1DetailClient({
                       key={s.server}
                       type="button"
                       disabled={loading}
-                      onClick={() => selectServer(s)}
+                      onClick={() => applyServer(s)}
                       className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-50 ${
                         active
                           ? "bg-teal-400 text-black shadow-md shadow-teal-400/25"
@@ -277,7 +281,6 @@ export default function AnimeAv1DetailClient({
               </div>
             )}
 
-            {/* Meta */}
             <div className="mt-6">
               <p className="text-sm font-semibold text-teal-300">{anime.title}</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-white md:text-3xl">
@@ -328,7 +331,6 @@ export default function AnimeAv1DetailClient({
             </div>
           </div>
 
-          {/* Sidebar episodios */}
           <aside className="rounded-xl border border-white/[0.08] bg-[#0c1018] p-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
             <p className="text-xs font-medium uppercase tracking-wider text-white/40">
               Estás viendo
