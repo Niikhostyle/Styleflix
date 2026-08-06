@@ -24,10 +24,30 @@ export default function OnboardingBienvenidaClient() {
         setLoading(null);
         return;
       }
-      await update();
-      router.replace("/");
+
+      if (data.alreadyMember) {
+        window.location.assign("/");
+        return;
+      }
+
+      // update() a veces no resuelve en Auth.js — no bloquear la entrada al catálogo
+      try {
+        await Promise.race([
+          update({
+            demoExpiresAt: data.demoExpiresAt ?? null,
+            demoActive: true,
+            catalogAccess: true,
+          }),
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
+      } catch {
+        /* ignore */
+      }
+
+      // Navegación dura para que middleware lea el JWT nuevo
+      window.location.assign("/");
     } catch {
-      setError("Error de red.");
+      setError("Error de red. Intenta de nuevo.");
       setLoading(null);
     }
   }

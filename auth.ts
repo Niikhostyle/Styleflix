@@ -182,7 +182,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id!;
         token.role = user.role;
@@ -199,59 +199,93 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.planCanDownload = user.planCanDownload;
       }
 
-      if ((trigger === "update" || user) && token.id) {
-        let dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: {
-            id: true,
-            role: true,
-            name: true,
-            email: true,
-            subscriptionStatus: true,
-            currentPeriodEnd: true,
-            demoExpiresAt: true,
-            planTier: true,
-            planMaxProfiles: true,
-            planMaxResolution: true,
-            planFeatures: true,
-          },
-        });
-
-        if (dbUser?.subscriptionStatus === "PREPAID") {
-          const activated = await activatePrepaidOnFirstUse(dbUser.id);
-          if (activated) {
-            dbUser = {
-              id: activated.id,
-              role: activated.role,
-              name: activated.name,
-              email: activated.email,
-              subscriptionStatus: activated.subscriptionStatus,
-              currentPeriodEnd: activated.currentPeriodEnd,
-              demoExpiresAt: activated.demoExpiresAt,
-              planTier: activated.planTier,
-              planMaxProfiles: activated.planMaxProfiles,
-              planMaxResolution: activated.planMaxResolution,
-              planFeatures: activated.planFeatures,
-            };
-          }
+      // Demo / membresía: aplicar payload del cliente de inmediato (evita cuelgues).
+      if (trigger === "update" && session && typeof session === "object") {
+        const s = session as {
+          demoExpiresAt?: string | null;
+          demoActive?: boolean;
+          catalogAccess?: boolean;
+          membershipActive?: boolean;
+        };
+        if (s.demoExpiresAt !== undefined) {
+          token.demoExpiresAt = s.demoExpiresAt;
+          token.demoActive =
+            s.demoActive ??
+            Boolean(
+              s.demoExpiresAt && new Date(s.demoExpiresAt).getTime() > Date.now()
+            );
+          token.catalogAccess = Boolean(
+            s.catalogAccess ?? (token.membershipActive || token.demoActive)
+          );
         }
+        if (typeof s.catalogAccess === "boolean") {
+          token.catalogAccess = s.catalogAccess;
+        }
+        if (typeof s.demoActive === "boolean") {
+          token.demoActive = s.demoActive;
+        }
+        if (typeof s.membershipActive === "boolean") {
+          token.membershipActive = s.membershipActive;
+        }
+      }
 
-        if (dbUser) {
-          const membership = membershipFromUser(dbUser);
-          token.role = membership.role;
-          token.name = dbUser.name;
-          token.email = dbUser.email;
-          token.subscriptionStatus = membership.subscriptionStatus;
-          token.currentPeriodEnd = membership.currentPeriodEnd;
-          token.membershipActive = membership.membershipActive;
-          token.demoExpiresAt = membership.demoExpiresAt;
-          token.demoActive = membership.demoActive;
-          token.catalogAccess = membership.catalogAccess;
-          token.planTier = membership.planTier;
-          token.planMaxProfiles = membership.planMaxProfiles;
-          token.planMaxResolution = membership.planMaxResolution;
-          token.planCanRequest = membership.planCanRequest;
-          token.planCanDownload = membership.planCanDownload;
+      if ((trigger === "update" || user) && token.id) {
+        try {
+          let dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: {
+              id: true,
+              role: true,
+              name: true,
+              email: true,
+              subscriptionStatus: true,
+              currentPeriodEnd: true,
+              demoExpiresAt: true,
+              planTier: true,
+              planMaxProfiles: true,
+              planMaxResolution: true,
+              planFeatures: true,
+            },
+          });
+
+          if (dbUser?.subscriptionStatus === "PREPAID") {
+            const activated = await activatePrepaidOnFirstUse(dbUser.id);
+            if (activated) {
+              dbUser = {
+                id: activated.id,
+                role: activated.role,
+                name: activated.name,
+                email: activated.email,
+                subscriptionStatus: activated.subscriptionStatus,
+                currentPeriodEnd: activated.currentPeriodEnd,
+                demoExpiresAt: activated.demoExpiresAt,
+                planTier: activated.planTier,
+                planMaxProfiles: activated.planMaxProfiles,
+                planMaxResolution: activated.planMaxResolution,
+                planFeatures: activated.planFeatures,
+              };
+            }
+          }
+
+          if (dbUser) {
+            const membership = membershipFromUser(dbUser);
+            token.role = membership.role;
+            token.name = dbUser.name;
+            token.email = dbUser.email;
+            token.subscriptionStatus = membership.subscriptionStatus;
+            token.currentPeriodEnd = membership.currentPeriodEnd;
+            token.membershipActive = membership.membershipActive;
+            token.demoExpiresAt = membership.demoExpiresAt;
+            token.demoActive = membership.demoActive;
+            token.catalogAccess = membership.catalogAccess;
+            token.planTier = membership.planTier;
+            token.planMaxProfiles = membership.planMaxProfiles;
+            token.planMaxResolution = membership.planMaxResolution;
+            token.planCanRequest = membership.planCanRequest;
+            token.planCanDownload = membership.planCanDownload;
+          }
+        } catch (err) {
+          console.error("[auth] jwt refresh", err);
         }
       }
 
