@@ -29,6 +29,10 @@ cd "C:\Users\NICOLAS FIGUEROA\Documents\styleflix\netflix-clone"
 npm run mirror:catalog -- --out "G:\Mi unidad\veotv"
 npm run mirror:download -- --out "G:\Mi unidad\veotv" --only-movies --cartelera --concurrency 1
 npm run mirror:download -- --out "G:\Mi unidad\veotv" --tmdb 1081003 --title Supergirl --concurrency 1
+
+# Series (prioridad: emisión → populares → top/trending → resto)
+npm run mirror:series:catalog -- --out "G:\Mi unidad\veotv"
+npm run mirror:series -- --out "G:\Mi unidad\veotv"
 ```
 
 ## Registrar links en VeoTV (automático)

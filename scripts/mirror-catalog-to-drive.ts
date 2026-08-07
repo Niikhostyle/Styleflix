@@ -3,6 +3,7 @@
  *
  *   npm run mirror:catalog
  *   npm run mirror:download -- --out "G:\\Mi unidad\\veotv" --concurrency 1
+ *   npm run mirror:series -- --out "G:\\Mi unidad\\veotv"   # emisión→pop→top→resto
  *
  * Flujo Vimeus (mismo botón "descarga" del player):
  *   1) Embed vimeus.com → JSON embeds[]
@@ -537,6 +538,229 @@ async function listCarteleraMovies(): Promise<CatalogEntry[]> {
   return entries;
 }
 
+type TmdbTvHit = {
+  id: number;
+  name?: string;
+  original_name?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+  popularity?: number;
+  vote_average?: number;
+  vote_count?: number;
+};
+
+async function fetchTmdbTvList(
+  path: string,
+  page: number
+): Promise<TmdbTvHit[]> {
+  const key = tmdbApiKey();
+  const sep = path.includes("?") ? "&" : "?";
+  const url = `https://api.themoviedb.org/3${path}${sep}api_key=${key}&language=es-MX&page=${page}`;
+  const data = (await fetchJson(url)) as { results?: TmdbTvHit[] };
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+/**
+ * Series por prioridad:
+ *  1) En emisión (on_the_air)
+ *  2) Populares
+ *  3) Más vistas / top (top_rated + trending)
+ *  4) Resto (discover por año)
+ * Luego se baja por tmdbId vía player Vimeus.
+ */
+async function listCarteleraSeries(): Promise<CatalogEntry[]> {
+  const viewKey = process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY || "";
+  const yearTo = Number(arg("year-to", "2026")) || 2026;
+  const yearFrom = Number(arg("year-from", "2000")) || 2000;
+  const pagesPopular = Number(arg("tmdb-pages", "12")) || 12;
+  const pagesPerYear = Number(arg("year-pages", "3")) || 3;
+  const pagesAiring = Number(arg("airing-pages", "8")) || 8;
+
+  type Tier = "airing" | "popular" | "top" | "rest";
+  const TIER_BOOST: Record<Tier, number> = {
+    airing: 4_000_000,
+    popular: 2_500_000,
+    top: 1_200_000,
+    rest: 0,
+  };
+  const tierRank: Record<Tier, number> = {
+    airing: 0,
+    popular: 1,
+    top: 2,
+    rest: 3,
+  };
+
+  const byId = new Map<
+    number,
+    {
+      tmdbId: number;
+      title: string;
+      year: number | null;
+      posterUrl: string | null;
+      popularity: number;
+      voteAverage: number;
+      voteCount: number;
+      unreleased: boolean;
+      tier: Tier;
+    }
+  >();
+
+  const addHits = (hits: TmdbTvHit[], tag: string, tier: Tier) => {
+    let n = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    for (const m of hits) {
+      const id = Number(m.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const air = m.first_air_date || "";
+      const year = air ? Number(air.slice(0, 4)) || null : null;
+      if (year != null && (year > yearTo || year < yearFrom)) continue;
+      const unreleased = Boolean(air && air > today);
+      const title = String(m.name || m.original_name || `tmdb-${id}`).trim();
+      const popularity = Number(m.popularity) || 0;
+      const voteAverage = Number(m.vote_average) || 0;
+      const voteCount = Number(m.vote_count) || 0;
+      if (
+        tier === "rest" &&
+        !unreleased &&
+        voteCount < 40 &&
+        popularity < 40
+      ) {
+        continue;
+      }
+      const prev = byId.get(id);
+      const keepTier =
+        !prev || tierRank[tier] < tierRank[prev.tier] ? tier : prev.tier;
+      if (
+        !prev ||
+        tierRank[tier] < tierRank[prev.tier] ||
+        popularity > prev.popularity ||
+        voteCount > prev.voteCount
+      ) {
+        byId.set(id, {
+          tmdbId: id,
+          title,
+          year,
+          posterUrl: tmdbPoster(m.poster_path),
+          popularity: Math.max(popularity, prev?.popularity || 0),
+          voteAverage: voteAverage || prev?.voteAverage || 0,
+          voteCount: Math.max(voteCount, prev?.voteCount || 0),
+          unreleased,
+          tier: keepTier,
+        });
+      }
+      n++;
+    }
+    if (n) log(`TMDB TV ${tag}: +${n} (únicas ${byId.size})`);
+  };
+
+  log(
+    `series TMDB prioridad: emisión → populares → top/trending → resto (${yearTo}→${yearFrom})`
+  );
+
+  // 1) En emisión
+  for (let page = 1; page <= pagesAiring; page++) {
+    addHits(
+      await fetchTmdbTvList("/tv/on_the_air", page),
+      `on_the_air p${page}`,
+      "airing"
+    );
+    await sleep(120);
+  }
+  for (let page = 1; page <= Math.min(4, pagesAiring); page++) {
+    addHits(
+      await fetchTmdbTvList("/tv/airing_today", page),
+      `airing_today p${page}`,
+      "airing"
+    );
+    await sleep(120);
+  }
+
+  // 2) Populares
+  for (let page = 1; page <= pagesPopular; page++) {
+    addHits(
+      await fetchTmdbTvList("/tv/popular", page),
+      `popular p${page}`,
+      "popular"
+    );
+    await sleep(120);
+  }
+
+  // 3) Más vistas / top críticas + trending
+  for (let page = 1; page <= Math.min(pagesPopular, 10); page++) {
+    addHits(
+      await fetchTmdbTvList("/tv/top_rated", page),
+      `top_rated p${page}`,
+      "top"
+    );
+    await sleep(120);
+  }
+  for (let page = 1; page <= 5; page++) {
+    addHits(
+      await fetchTmdbTvList("/trending/tv/week", page),
+      `trending p${page}`,
+      "top"
+    );
+    await sleep(120);
+  }
+
+  // 4) Resto por año
+  for (let year = yearTo; year >= yearFrom; year--) {
+    for (let page = 1; page <= pagesPerYear; page++) {
+      addHits(
+        await fetchTmdbTvList(
+          `/discover/tv?first_air_date_year=${year}&sort_by=popularity.desc&include_null_first_air_dates=false`,
+          page
+        ),
+        `año ${year} popular p${page}`,
+        "rest"
+      );
+      await sleep(100);
+    }
+    for (let page = 1; page <= Math.min(2, pagesPerYear); page++) {
+      addHits(
+        await fetchTmdbTvList(
+          `/discover/tv?first_air_date_year=${year}&sort_by=vote_average.desc&vote_count.gte=200`,
+          page
+        ),
+        `año ${year} críticas p${page}`,
+        "rest"
+      );
+      await sleep(100);
+    }
+  }
+
+  const entries: CatalogEntry[] = [...byId.values()]
+    .map((m) => {
+      const rankScore = TIER_BOOST[m.tier] + rankScoreOf(m);
+      return {
+        key: `series-vimeus-${m.tmdbId}`,
+        category: "series" as const,
+        source: "vimeus" as const,
+        mediaType: "tv" as const,
+        tmdbId: m.tmdbId,
+        title: m.title,
+        year: m.year,
+        posterUrl: m.posterUrl,
+        embedUrl: viewKey
+          ? playerEmbedUrl("series", m.tmdbId, viewKey)
+          : null,
+        seasonsHint: null,
+        popularity: m.popularity,
+        voteAverage: m.voteAverage,
+        voteCount: m.voteCount,
+        rankScore,
+      };
+    })
+    .sort((a, b) => (b.rankScore || 0) - (a.rankScore || 0));
+
+  const counts = { airing: 0, popular: 0, top: 0, rest: 0 };
+  for (const m of byId.values()) counts[m.tier] += 1;
+  log(
+    `series lista: ${entries.length} (emisión≈${counts.airing}, pop≈${counts.popular}, top≈${counts.top}, resto≈${counts.rest}) · 1ª: ${entries[0] ? entryLabel(entries[0]) : "—"}`
+  );
+  return entries;
+}
+
 /** Lee embeds[] del player Vimeus (script#data). */
 async function fetchPlayerEmbeds(
   category: Category,
@@ -921,6 +1145,7 @@ async function main() {
   const postersOnly = hasFlag("posters-only");
   const catalogOnly = hasFlag("catalog-only");
   const onlyMovies = hasFlag("only-movies");
+  const onlySeries = hasFlag("only-series");
   const expandEpisodes = !hasFlag("no-episodes");
 
   ensureDir(outRoot);
@@ -944,13 +1169,16 @@ async function main() {
   );
 
   const tmdbOnly = Number(arg("tmdb", "0")) || 0;
-  const cartelera =
+  const carteleraMovies =
     hasFlag("cartelera") || (onlyMovies && !hasFlag("all-vimeus"));
+  const carteleraSeries =
+    hasFlag("cartelera-series") || (onlySeries && !hasFlag("all-vimeus"));
   let entries: CatalogEntry[] = [];
 
   if (tmdbOnly > 0) {
     // Atajo: no inventariar todo el catálogo
-    const category = (arg("category", "peliculas") || "peliculas") as Category;
+    const category = (arg("category", onlySeries ? "series" : "peliculas") ||
+      "peliculas") as Category;
     const viewKey = process.env.NEXT_PUBLIC_VIMEUS_VIEW_KEY || "";
     entries = [
       {
@@ -969,18 +1197,25 @@ async function main() {
       },
     ];
     log(`modo --tmdb ${tmdbOnly} (${category})`);
-  } else if (cartelera) {
+  } else if (carteleraSeries) {
+    entries = await listCarteleraSeries();
+    log(
+      `modo cartelera-series: ${entries.length} títulos (emisión→populares→top→resto)`
+    );
+  } else if (carteleraMovies) {
     entries = await listCarteleraMovies();
     log(
       `modo cartelera: ${entries.length} títulos ordenados por popularidad/críticas/año`
     );
   } else {
     const [movies, series, animes] = await Promise.all([
-      listAllVimeus("movies", "peliculas"),
+      onlySeries
+        ? Promise.resolve([] as CatalogEntry[])
+        : listAllVimeus("movies", "peliculas"),
       onlyMovies
         ? Promise.resolve([] as CatalogEntry[])
         : listAllVimeus("series", "series"),
-      onlyMovies
+      onlyMovies || onlySeries
         ? Promise.resolve([] as CatalogEntry[])
         : listAllVimeus("animes", "anime"),
     ]);
@@ -1004,7 +1239,13 @@ async function main() {
       {
         at: new Date().toISOString(),
         outRoot,
-        mode: cartelera ? "cartelera" : tmdbOnly ? "tmdb" : "vimeus-listing",
+        mode: carteleraSeries
+          ? "cartelera-series"
+          : carteleraMovies
+            ? "cartelera"
+            : tmdbOnly
+              ? "tmdb"
+              : "vimeus-listing",
         counts: {
           total: entries.length,
           peliculas: entries.filter((e) => e.category === "peliculas").length,
