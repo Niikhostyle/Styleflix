@@ -11,6 +11,8 @@
  * Reporta: RPS, latencia p50/p95, errores, y el umbral donde falla >5%.
  */
 
+export {};
+
 const UA =
   "VeoTV-LoadTest/1.0 (+capacity-check; contact=soporte@veotv.cloud)";
 

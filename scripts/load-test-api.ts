@@ -2,6 +2,9 @@
  * Load test solo API liviana (/api/pricing) para comparar vs SSR.
  *   npx tsx scripts/load-test-api.ts --concurrency=25,50,100,150
  */
+
+export {};
+
 function argValue(name: string, fallback: string) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.slice(name.length + 3) : fallback;
