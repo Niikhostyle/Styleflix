@@ -18,6 +18,8 @@
     "animeav1:airing": "npx tsx scripts/scrape-animeav1.ts --only-airing",
     "animeav1:fast": "npx tsx scripts/scrape-animeav1.ts --fast",
     "animeav1:full": "npx tsx scripts/scrape-animeav1.ts --fast --all-episodes",
+    "animeav1:watch": "npx tsx scripts/scrape-animeav1.ts --watch --fast",
+    "animeav1:watch:once": "npx tsx scripts/scrape-animeav1.ts --watch --fast --once",
     "mirror:catalog": "npx tsx scripts/mirror-catalog-to-drive.ts --catalog-only",
     "mirror:download": "npx tsx scripts/mirror-catalog-to-drive.ts",
     "mirror:drive-auth": "npx tsx scripts/drive-oauth-setup.ts",

@@ -8,6 +8,7 @@ export default function OnboardingShell({
   subtitle,
   children,
   backHref,
+  backLabel = "Volver",
   signOutOnBack = false,
   wide = false,
 }: {
@@ -17,6 +18,7 @@ export default function OnboardingShell({
   subtitle?: string;
   children: React.ReactNode;
   backHref?: string;
+  backLabel?: string;
   /** Cierra sesión antes de navegar (evita rebote a /onboarding/planes). */
   signOutOnBack?: boolean;
   /** Layout ancho para pasos como planes */
@@ -27,8 +29,15 @@ export default function OnboardingShell({
       <div className="pointer-events-none absolute inset-0 bg-[url('https://image.tmdb.org/t/p/w1280/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg')] bg-cover bg-center opacity-25 blur-sm" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/85 to-[#050508]" />
 
-      <header className="relative z-10 px-5 py-5 md:px-10">
+      <header className="relative z-10 flex items-center justify-between gap-4 px-5 py-5 md:px-10">
         <BrandMark className="text-2xl" />
+        {backHref && (
+          <OnboardingBackLink
+            href={backHref}
+            label={backLabel}
+            signOutFirst={signOutOnBack}
+          />
+        )}
       </header>
 
       <main
@@ -70,11 +79,6 @@ export default function OnboardingShell({
             )}
           </div>
           {children}
-          {backHref && (
-            <div className="mt-8 text-center">
-              <OnboardingBackLink href={backHref} signOutFirst={signOutOnBack} />
-            </div>
-          )}
         </div>
       </main>
     </div>

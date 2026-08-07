@@ -35,8 +35,9 @@ export default async function OnboardingPlanesPage({
       step={2}
       title="Elige tu plan"
       subtitle="Sin compromisos. Cancela cuando quieras. Cambia de plan en cualquier momento."
-      backHref={demoExpired ? undefined : "/onboarding/bienvenida"}
-      signOutOnBack={!demoExpired}
+      backHref={demoExpired ? "/login" : "/onboarding/bienvenida"}
+      backLabel={demoExpired ? "Volver al inicio de sesión" : "Volver"}
+      signOutOnBack
       wide
     >
       {demoExpired && (

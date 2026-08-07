@@ -29,6 +29,32 @@ npm run animeav1:full -- --slug one-piece --out "G:\Mi unidad\veotv"
 
 Sin `--max-episodes` (o con `--all-episodes` / `max-episodes 0`) baja **todos** los capítulos. Reanudable si se corta.
 
+## Watcher automático (todo el día)
+
+Escucha animes **en emisión**, prioriza los recién actualizados y solo baja **capítulos que falten** (tope red 150 Mbps por defecto).
+
+```powershell
+# Dejar corriendo (revisa cada 15 min)
+npm run animeav1:watch -- --out "G:\Mi unidad\veotv" --interval 15
+
+# Una pasada (útil para Programador de tareas diario)
+npm run animeav1:watch:once -- --out "G:\Mi unidad\veotv"
+
+# Atajo Windows: doble clic
+.\scripts\animeav1-watch.cmd
+
+# Arranque al iniciar sesión (una vez)
+powershell -ExecutionPolicy Bypass -File .\scripts\register-animeav1-watch-task.ps1
+```
+
+| Flag watch | Default | Qué hace |
+|------------|---------|----------|
+| `--watch` | — | Modo daemon (emisión + new-only) |
+| `--interval N` | 15 | Minutos entre revisiones |
+| `--once` | — | Un ciclo y sale |
+| `--new-only` | (implícito en watch) | Solo caps que no están en disco |
+| `--verbose` | — | Loguea también los que ya están al día |
+
 ## Flags útiles
 
 | Flag | Qué hace |
@@ -38,7 +64,11 @@ Sin `--max-episodes` (o con `--all-episodes` / `max-episodes 0`) baja **todos** 
 | `--limit N` | Máx. animes a procesar |
 | `--all-episodes` | Todos los capítulos (default si no hay `--max-episodes`) |
 | `--max-episodes N` | Tope por anime (`0` = todos) |
+| `--new-only` | Solo episodios faltantes en disco |
+| `--watch` | Daemon: emisión + new-only en loop |
 | `--fast` | Preset velocidad: segs×24, eps×2, animes×2 |
+| `--max-mbps N` | Techo de red en **Mbps** (default **150** ≈ 18.8 MB/s; `0` = sin límite). Deja ~350 Mbps libres en un plan de 500. |
+| `--max-mbs N` | Techo en **MB/s** (alternativa; si lo pasás, pisa `--max-mbps`) |
 | `--seg-concurrency N` | Segmentos HLS en paralelo (default 12; con `--fast` 24) |
 | `--ep-concurrency N` | Episodios del mismo anime en paralelo |
 | `--concurrency N` | Animes distintos en paralelo |

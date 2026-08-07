@@ -21,8 +21,11 @@ export default function OnboardingBackLink({
 
   if (!signOutFirst) {
     return (
-      <Link href={href} className="text-sm text-white/45 hover:text-white">
-        {label}
+      <Link
+        href={href}
+        className="text-sm text-white/55 transition hover:text-white"
+      >
+        ← {label}
       </Link>
     );
   }
@@ -39,9 +42,9 @@ export default function OnboardingBackLink({
           window.location.assign(href);
         }
       }}
-      className="text-sm text-white/45 hover:text-white disabled:opacity-50"
+      className="text-sm text-white/55 transition hover:text-white disabled:opacity-50"
     >
-      {busy ? "Saliendo…" : label}
+      {busy ? "Saliendo…" : `← ${label}`}
     </button>
   );
 }

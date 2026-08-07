@@ -11,14 +11,16 @@
  *   npx tsx scripts/scrape-animeav1.ts --out "G:\\Mi unidad\\veotv" --limit 20
  *   npx tsx scripts/scrape-animeav1.ts --only-airing --max-episodes 12
  *   npx tsx scripts/scrape-animeav1.ts --slug one-piece --max-episodes 3
- *   npx tsx scripts/scrape-animeav1.ts --fast --all-episodes --limit 10
- *   npm run animeav1:full -- --out "G:\\Mi unidad\\veotv" --limit 10
+ *   npx tsx scripts/scrape-animeav1.ts --watch --fast --interval 15
+ *   npm run animeav1:watch -- --out "G:\\Mi unidad\\veotv"
  *
  * Velocidad (fibra ~500 Mbps):
  *   --fast                  → segs 24 + eps 2 + animes 2
  *   --seg-concurrency 32    → segmentos HLS en paralelo (lo que más importa)
  *   --ep-concurrency 3      → episodios del mismo anime en paralelo
  *   --concurrency 2         → animes distintos en paralelo
+ *   --max-mbps 150          → techo de red (Mbps, default 150 ≈ 18.8 MB/s; 0 = sin límite)
+ *   --max-mbs N             → techo en MB/s (alternativa; pisa --max-mbps)
  *
  * Descarga vía HLS Zilla (mismas cabeceras que el player). Reanudable.
  * Opcional: si hay ffmpeg en PATH, remuxea a MP4 limpio (--ffmpeg).
@@ -28,6 +30,7 @@ import {
   createWriteStream,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
   unlinkSync,
@@ -63,6 +66,64 @@ function setupHttpPool(maxConnections: number) {
     })
   );
 }
+
+/**
+ * Limita el throughput agregado (todos los segmentos/episodios).
+ * bytesPerSec <= 0 → sin límite.
+ */
+class BandwidthLimiter {
+  private tokens: number;
+  private last = Date.now();
+  private chain: Promise<void> = Promise.resolve();
+  private transferred = 0;
+  private windowStart = Date.now();
+
+  constructor(private bytesPerSec: number) {
+    this.tokens = bytesPerSec > 0 ? bytesPerSec : 0;
+  }
+
+  get enabled() {
+    return this.bytesPerSec > 0;
+  }
+
+  /** Espera lo necesario para no superar el techo tras `bytes` recibidos. */
+  take(bytes: number): Promise<void> {
+    if (!this.enabled || bytes <= 0) return Promise.resolve();
+    this.chain = this.chain.then(async () => {
+      this.transferred += bytes;
+      while (true) {
+        const now = Date.now();
+        const elapsed = Math.max(0, (now - this.last) / 1000);
+        this.last = now;
+        this.tokens = Math.min(
+          this.bytesPerSec * 1.5,
+          this.tokens + elapsed * this.bytesPerSec
+        );
+        if (this.tokens >= bytes) {
+          this.tokens -= bytes;
+          return;
+        }
+        const need = bytes - this.tokens;
+        const waitMs = Math.ceil((need / this.bytesPerSec) * 1000);
+        await sleep(Math.min(Math.max(waitMs, 5), 200));
+      }
+    });
+    return this.chain;
+  }
+
+  /** MB/s reales en la ventana reciente (para logs). */
+  recentMBs(): number {
+    const secs = Math.max(0.2, (Date.now() - this.windowStart) / 1000);
+    const rate = this.transferred / 1e6 / secs;
+    if (secs > 8) {
+      this.transferred = 0;
+      this.windowStart = Date.now();
+    }
+    return rate;
+  }
+}
+
+let bandwidthLimiter = new BandwidthLimiter((150 * 1e6) / 8); // 150 Mbps
 
 type Bucket = "airing" | "popular" | "rest";
 
@@ -212,6 +273,7 @@ async function fetchSegBuffer(
       ) {
         throw new Error("HTML/bloqueado");
       }
+      await bandwidthLimiter.take(buf.length);
       return buf;
     } catch (err) {
       lastErr = err;
@@ -476,12 +538,11 @@ async function downloadHlsFmp4(
     finished++;
     if (Date.now() - lastLog > 4_000) {
       lastLog = Date.now();
-      const elapsed = (Date.now() - started) / 1000;
-      const mbApprox = (finished * 1.8) / elapsed; // ~1.8MB/seg tipico
+      const mbApprox = bandwidthLimiter.recentMBs();
       log(
         `bajando «${label}»: ${finished}/${segments.length} (${Math.round(
           (finished / segments.length) * 100
-        )}%) ~${mbApprox.toFixed(0)} MB/s est.`
+        )}%) ~${mbApprox.toFixed(0)} MB/s`
       );
     }
     return buf;
@@ -564,6 +625,27 @@ function pickEpisodes(
   return nums.slice(0, maxEpisodes);
 }
 
+function episodeFile(dir: string, epNum: number) {
+  return join(dir, `E${String(epNum).padStart(3, "0")}.mp4`);
+}
+
+function isGoodEpisode(file: string) {
+  return existsSync(file) && statSync(file).size > 200_000;
+}
+
+/** Episodios ya bajados en la carpeta del anime. */
+function localEpisodeSet(dir: string): Set<number> {
+  const out = new Set<number>();
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const m = name.match(/^E(\d+)\.mp4$/i);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (isGoodEpisode(join(dir, name))) out.add(n);
+  }
+  return out;
+}
+
 async function processAnime(
   outRoot: string,
   item: InventoryItem,
@@ -577,6 +659,8 @@ async function processAnime(
     force: boolean;
     segConcurrency: number;
     epConcurrency: number;
+    /** Solo episodios que faltan en disco (ideal para el watcher diario). */
+    newOnly: boolean;
   }
 ) {
   const dir = join(outRoot, "anime", folderName(item));
@@ -649,22 +733,45 @@ async function processAnime(
     return;
   }
 
-  const latestFirst = item.bucket === "airing";
-  const episodes = pickEpisodes(detail, opts.maxEpisodes, latestFirst);
-  log(
-    `${item.bucket} · ${item.title} · ${episodes.length}/${detail.episodesCount || detail.episodes.length} eps · ep×${opts.epConcurrency} seg×${opts.segConcurrency}`
-  );
+  const latestFirst = item.bucket === "airing" && !opts.newOnly;
+  let episodes = pickEpisodes(detail, opts.maxEpisodes, latestFirst);
+
+  if (opts.newOnly && !opts.force) {
+    const have = localEpisodeSet(dir);
+    const missing = episodes.filter((n) => !have.has(n));
+    if (!missing.length) {
+      if (hasFlag("verbose")) {
+        const localMax = [...have].reduce((a, b) => Math.max(a, b), 0);
+        log(
+          `al día · ${item.title} (${have.size} eps${
+            localMax ? `, último E${localMax}` : ""
+          })`
+        );
+      }
+      return;
+    }
+    episodes = missing;
+    const preview =
+      missing.length <= 8
+        ? `E${missing.join(", E")}`
+        : `E${missing.slice(0, 5).join(", E")} … E${missing[missing.length - 1]}`;
+    log(`nuevos · ${item.title} · +${missing.length} cap(s): ${preview}`);
+  } else {
+    log(
+      `${item.bucket} · ${item.title} · ${episodes.length}/${detail.episodesCount || detail.episodes.length} eps · ep×${opts.epConcurrency} seg×${opts.segConcurrency}`
+    );
+  }
 
   await mapPool(episodes, opts.epConcurrency, async (epNum) => {
     const key = episodeKey(item.slug, epNum);
-    const epFile = join(dir, `E${String(epNum).padStart(3, "0")}.mp4`);
+    const epFile = episodeFile(dir, epNum);
     const label = `${item.title} E${epNum}`;
 
-    if (!opts.force && progress.doneKeys.includes(key) && existsSync(epFile)) {
+    if (!opts.force && progress.doneKeys.includes(key) && isGoodEpisode(epFile)) {
       progress.stats.skipped++;
       return;
     }
-    if (!opts.force && existsSync(epFile) && statSync(epFile).size > 200_000) {
+    if (!opts.force && isGoodEpisode(epFile)) {
       if (!progress.doneKeys.includes(key)) progress.doneKeys.push(key);
       progress.stats.skipped++;
       return;
@@ -738,6 +845,25 @@ async function main() {
     1,
     Number(arg("ep-concurrency", fast ? "2" : "1")) || 1
   );
+  // Techo por defecto 150 Mbps (~18.8 MB/s) para no saturar la red compartida.
+  // --max-mbps N  → megabits/s (como el plan del ISP)
+  // --max-mbs N   → megabytes/s (pisa max-mbps si se pasa)
+  // 0 = sin límite
+  const maxMbsArg = arg("max-mbs");
+  const maxMbps = Math.max(0, Number(arg("max-mbps", "150")) || 0);
+  const maxMBs =
+    maxMbsArg != null ? Math.max(0, Number(maxMbsArg) || 0) : null;
+  const bytesPerSec =
+    maxMBs != null ? maxMBs * 1e6 : (maxMbps * 1e6) / 8;
+  bandwidthLimiter = new BandwidthLimiter(bytesPerSec);
+  const limitLabel =
+    maxMBs != null
+      ? maxMBs > 0
+        ? `máx ${maxMBs} MB/s`
+        : "sin tope"
+      : maxMbps > 0
+        ? `máx ${maxMbps} Mbps (~${(maxMbps / 8).toFixed(1)} MB/s)`
+        : "sin tope";
   const limit = Math.max(0, Number(arg("limit", "0")) || 0);
   const maxPages = Math.max(1, Number(arg("pages", "8")) || 8);
   const maxEpisodesRaw = arg("max-episodes", "0");
@@ -751,8 +877,16 @@ async function main() {
   const onlyPopular = hasFlag("only-popular");
   const useFfmpeg = hasFlag("ffmpeg");
   const force = hasFlag("force");
+  const newOnly = hasFlag("new-only");
   const slugFilter = arg("slug");
   const category = arg("category") || undefined; // tv-anime | pelicula | ova | especial
+
+  // Watcher: por defecto solo emisión + solo faltantes + todos los caps
+  const watchMode = hasFlag("watch");
+  const effectiveOnlyAiring = onlyAiring || watchMode;
+  const effectiveNewOnly = newOnly || watchMode;
+  const effectiveMaxEpisodes =
+    watchMode && !arg("max-episodes") && !allEpisodes ? 0 : maxEpisodes;
 
   const poolSize = Math.max(
     32,
@@ -771,133 +905,202 @@ async function main() {
   const progress = loadProgress(progressPath);
 
   log(`salida: ${outRoot}`);
-  log(
-    `modo: ${
-      catalogOnly
-        ? "solo inventario"
-        : postersOnly
-          ? "meta+pósters"
-          : "meta+pósters+HLS"
-    }${fast ? " · FAST" : ""}`
-  );
+  if (watchMode) {
+    log(
+      `modo: WATCH (emisión · solo caps nuevos · intervalo ${Number(arg("interval", "15")) || 15} min)`
+    );
+  } else {
+    log(
+      `modo: ${
+        catalogOnly
+          ? "solo inventario"
+          : postersOnly
+            ? "meta+pósters"
+            : "meta+pósters+HLS"
+      }${fast ? " · FAST" : ""}${effectiveNewOnly ? " · new-only" : ""}`
+    );
+  }
   if (!catalogOnly && !postersOnly) {
     log(
       `velocidad: animes×${concurrency} · eps×${epConcurrency} · segs×${segConcurrency} (pool ${poolSize})`
     );
+    log(`límite red: ${limitLabel}`);
     log(
-      maxEpisodes > 0
-        ? `episodios: máx ${maxEpisodes} por anime`
+      effectiveMaxEpisodes > 0
+        ? `episodios: máx ${effectiveMaxEpisodes} por anime`
         : `episodios: TODOS los capítulos de cada anime`
     );
   }
 
-  let inventory: InventoryItem[] = [];
+  const runCycle = async (cycle: number) => {
+    if (watchMode) log(`—— ciclo #${cycle} ${new Date().toLocaleString()} ——`);
 
-  if (slugFilter) {
-    inventory = [
-      {
-        id: 0,
-        slug: slugFilter,
-        title: slugFilter,
-        poster: null,
-        type: null,
-        typeSlug: null,
-        synopsis: "",
-        bucket: "airing",
-        rank: 1,
-      },
-    ];
-    try {
-      const a = await getAnime(slugFilter);
-      if (a) {
-        inventory[0] = {
-          id: a.id,
-          slug: a.slug,
-          title: a.title,
-          poster: absolutePoster(a.poster),
-          type: a.category?.name || null,
-          typeSlug: a.category?.slug || null,
-          synopsis: a.synopsis || "",
-          bucket: a.status === 2 ? "airing" : "popular",
+    let inventory: InventoryItem[] = [];
+
+    if (slugFilter) {
+      inventory = [
+        {
+          id: 0,
+          slug: slugFilter,
+          title: slugFilter,
+          poster: null,
+          type: null,
+          typeSlug: null,
+          synopsis: "",
+          bucket: "airing",
           rank: 1,
-        };
+        },
+      ];
+      try {
+        const a = await getAnime(slugFilter);
+        if (a) {
+          inventory[0] = {
+            id: a.id,
+            slug: a.slug,
+            title: a.title,
+            poster: absolutePoster(a.poster),
+            type: a.category?.name || null,
+            typeSlug: a.category?.slug || null,
+            synopsis: a.synopsis || "",
+            bucket: a.status === 2 ? "airing" : "popular",
+            rank: 1,
+          };
+        }
+      } catch {
+        /* keep slug stub */
       }
-    } catch {
-      /* keep slug stub */
+    } else {
+      inventory = await buildInventory({
+        maxPages,
+        onlyAiring: effectiveOnlyAiring,
+        onlyPopular,
+        category,
+      });
     }
-  } else {
-    inventory = await buildInventory({
-      maxPages,
-      onlyAiring,
-      onlyPopular,
-      category,
-    });
-  }
 
-  if (limit > 0) inventory = inventory.slice(0, limit);
-  progress.stats.inventoried = inventory.length;
+    if (limit > 0) inventory = inventory.slice(0, limit);
+    progress.stats.inventoried = inventory.length;
 
-  const catalogFile = {
-    source: "animeav1",
-    scrapedAt: new Date().toISOString(),
-    order: ["airing", "popular", "rest"],
-    count: inventory.length,
-    buckets: {
-      airing: inventory.filter((i) => i.bucket === "airing").length,
-      popular: inventory.filter((i) => i.bucket === "popular").length,
-      rest: inventory.filter((i) => i.bucket === "rest").length,
-    },
-    items: inventory,
-  };
+    // En watch: priorizar títulos con actividad reciente
+    if (watchMode || effectiveOnlyAiring) {
+      try {
+        const recent = await fetchCatalogPages({
+          order: "latest_released",
+          status: "emision",
+          category,
+          maxPages: Math.min(2, maxPages),
+          label: "recién-emitidos",
+        });
+        const bySlug = new Map(inventory.map((i) => [i.slug, i]));
+        let boost = 0;
+        for (const r of recent) {
+          if (!r?.slug || !r.id) continue;
+          const hit = bySlug.get(r.slug);
+          if (hit) {
+            hit.rank = -(recent.length - boost);
+            boost++;
+          } else {
+            boost++;
+            inventory.unshift({
+              id: r.id,
+              slug: r.slug,
+              title: r.title,
+              poster: absolutePoster(r.poster),
+              type: r.type || null,
+              typeSlug: r.typeSlug || null,
+              synopsis: r.synopsis || "",
+              bucket: "airing",
+              rank: -boost,
+            });
+          }
+        }
+        inventory.sort((a, b) => a.rank - b.rank);
+      } catch (err) {
+        log("recién-emitidos fail", String(err));
+      }
+    }
 
-  writeFileSync(
-    join(CACHE_DIR, "catalog.json"),
-    JSON.stringify(catalogFile, null, 2),
-    "utf8"
-  );
-  writeFileSync(manifestPath, JSON.stringify(catalogFile, null, 2), "utf8");
-  for (const item of inventory) {
+    const catalogFile = {
+      source: "animeav1",
+      scrapedAt: new Date().toISOString(),
+      order: ["airing", "popular", "rest"],
+      count: inventory.length,
+      buckets: {
+        airing: inventory.filter((i) => i.bucket === "airing").length,
+        popular: inventory.filter((i) => i.bucket === "popular").length,
+        rest: inventory.filter((i) => i.bucket === "rest").length,
+      },
+      items: inventory,
+    };
+
     writeFileSync(
-      join(CACHE_DIR, "by-slug", `${item.slug}.json`),
-      JSON.stringify(item, null, 2),
+      join(CACHE_DIR, "catalog.json"),
+      JSON.stringify(catalogFile, null, 2),
       "utf8"
     );
-  }
+    writeFileSync(manifestPath, JSON.stringify(catalogFile, null, 2), "utf8");
 
-  log(
-    `inventario: ${inventory.length} (emisión ${catalogFile.buckets.airing}, populares ${catalogFile.buckets.popular}, resto ${catalogFile.buckets.rest})`
-  );
-  log(`caché → ${join(CACHE_DIR, "catalog.json")}`);
+    log(
+      `inventario: ${inventory.length} (emisión ${catalogFile.buckets.airing}, populares ${catalogFile.buckets.popular}, resto ${catalogFile.buckets.rest})`
+    );
 
-  if (catalogOnly) {
-    saveProgress(progressPath, progress);
+    if (catalogOnly) {
+      await saveProgressSafe(progressPath, progress);
+      return;
+    }
+
+    const epsBefore = progress.stats.episodes;
+    await mapPool(inventory, concurrency, async (item, idx) => {
+      if (!effectiveNewOnly) {
+        log(`[${idx + 1}/${inventory.length}] ${item.bucket} · ${item.title}`);
+      }
+      try {
+        await processAnime(outRoot, item, progress, progressPath, {
+          downloadVideo: !postersOnly,
+          postersOnly,
+          maxEpisodes: effectiveMaxEpisodes,
+          useFfmpeg,
+          force,
+          segConcurrency,
+          epConcurrency,
+          newOnly: effectiveNewOnly,
+        });
+      } catch (err) {
+        progress.failed[item.slug] = String(err);
+        progress.stats.errors++;
+        log(`anime fail ${item.slug}`, String(err));
+        await saveProgressSafe(progressPath, progress);
+      }
+    });
+
+    await saveProgressSafe(progressPath, progress);
+    const gained = progress.stats.episodes - epsBefore;
+    log(
+      `ciclo ok · +${gained} eps · total eps ${progress.stats.episodes} · skip ${progress.stats.skipped} · err ${progress.stats.errors}`
+    );
+  };
+
+  if (watchMode) {
+    const intervalMin = Math.max(1, Number(arg("interval", "15")) || 15);
+    const once = hasFlag("once");
+    let cycle = 0;
+    log(`WATCH activo cada ${intervalMin} min · Ctrl+C para salir`);
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      cycle += 1;
+      try {
+        await runCycle(cycle);
+      } catch (err) {
+        log("ciclo error", String(err));
+      }
+      if (once) break;
+      log(`próxima revisión en ${intervalMin} min…`);
+      await sleep(intervalMin * 60_000);
+    }
     return;
   }
 
-  await mapPool(inventory, concurrency, async (item, idx) => {
-    log(`[${idx + 1}/${inventory.length}] ${item.bucket} · ${item.title}`);
-    try {
-      await processAnime(outRoot, item, progress, progressPath, {
-        downloadVideo: !postersOnly,
-        postersOnly,
-        maxEpisodes,
-        useFfmpeg,
-        force,
-        segConcurrency,
-        epConcurrency,
-      });
-    } catch (err) {
-      progress.failed[item.slug] = String(err);
-      progress.stats.errors++;
-      log(`anime fail ${item.slug}`, String(err));
-      await saveProgressSafe(progressPath, progress);
-    }
-  });
-
-  await saveProgressSafe(progressPath, progress);
-  log(
-    `listo · eps ${progress.stats.episodes} · skip ${progress.stats.skipped} · err ${progress.stats.errors}`
-  );
+  await runCycle(1);
 }
 
 main().catch((err) => {
