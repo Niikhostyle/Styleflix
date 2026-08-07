@@ -11,7 +11,7 @@
 import { enrichWithTmdb, getVimeusAvailability, getVimeusAnimes, getVimeusMovies, getVimeusSeries } from "@/lib/vimeus";
 import { getTmdbAnimeRows, getTmdbMovieRows, getTmdbSeriesRows } from "@/lib/sources/tmdbSource";
 import { getJikanAnimeRows } from "@/lib/sources/jikan";
-import { getAnimeAv1Rows, getAnimeAv1Items } from "@/lib/sources/animeav1";
+import { getAnimeAv1Rows, getAnimeAv1Items, getAnimeAv1HomeItems } from "@/lib/sources/animeav1";
 import { getMangaEsItems, getMangaEsRows } from "@/lib/sources/manga";
 import { getPlutoMovies, getPlutoSeries } from "@/lib/sources/plutoSource";
 import { getArchiveRows } from "@/lib/sources/archive";
@@ -253,6 +253,16 @@ async function loadAnimeAv1Items(): Promise<CatalogItem[]> {
   return withTimeout(getAnimeAv1Items(), SLOW_TIMEOUT_MS, [], "animeav1:items");
 }
 
+async function loadAnimeAv1HomeItems(): Promise<CatalogItem[]> {
+  if (!enabledSources().includes("animeav1")) return [];
+  return withTimeout(
+    getAnimeAv1HomeItems(24),
+    FAST_TIMEOUT_MS,
+    [],
+    "animeav1:home"
+  );
+}
+
 async function loadMangaEsItems() {
   if (!enabledSources().includes("mangadex")) return [];
   return withTimeout(getMangaEsItems(), MANGA_TIMEOUT_MS, [], "mangadex:items");
@@ -308,9 +318,10 @@ export async function getAnimeCatalog(): Promise<CatalogPage> {
 }
 
 /**
- * Home: prioriza populares, más vistas y estrenos; luego reproducibles y géneros.
+ * Home: prioriza populares, más vistas y estrenos; luego reproducibles ligeros.
+ * Evita Pluto/Archive/AnimeAV1 completo (eran la mayor causa de lentitud/RAM).
  */
-export async function getHomeCatalog(): Promise<CatalogPage> {
+async function buildHomeCatalog(): Promise<CatalogPage> {
   const [
     vimeusMovies,
     vimeusSeries,
@@ -319,23 +330,15 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     tmdbMovieRows,
     tmdbSeriesRows,
     tmdbAnimeRows,
-    plutoMovies,
-    plutoSeries,
-    archiveRows,
-    jikanRows,
     mostViewedRow,
   ] = await Promise.all([
-    loadVimeus("movies", [1, 2]),
-    loadVimeus("series", [1, 2]),
-    loadAnimeAv1Items(),
+    loadVimeus("movies", [1]),
+    loadVimeus("series", [1]),
+    loadAnimeAv1HomeItems(),
     loadMangaEsItems(),
     loadTmdbRows("movies", [1]),
     loadTmdbRows("series", [1]),
     loadTmdbRows("anime", [1]),
-    loadPluto("movies"),
-    loadPluto("series"),
-    loadArchiveRows(),
-    loadJikanRows(),
     loadMostViewedRow(),
   ]);
 
@@ -354,14 +357,10 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
       mediaType: "tv",
       items: mangaEsItems,
     },
-    { title: "Películas destacadas", mediaType: "movie", items: plutoMovies },
-    { title: "Series destacadas", mediaType: "tv", items: plutoSeries },
-    ...archiveRows.slice(0, 2),
   ];
 
   const available = buildAvailabilityIndex(await loadAvailability(), playableRows);
 
-  // Populares + tendencias + estrenos primero (índices 0–4 / 0–3 tras reorder TMDB)
   const highlightDiscovery = applyAvailability(
     [
       ...tmdbMovieRows.slice(0, 5),
@@ -371,29 +370,33 @@ export async function getHomeCatalog(): Promise<CatalogPage> {
     available
   );
 
-  const extraDiscovery = applyAvailability(
-    [...jikanRows.slice(0, 2)],
-    available
-  );
-
   const mostViewed = mostViewedRow
     ? applyAvailability([mostViewedRow], available)
     : [];
 
-  const allRows = [
-    ...mostViewed,
-    ...highlightDiscovery,
-    ...playableRows,
-    ...extraDiscovery,
-  ];
+  const allRows = [...mostViewed, ...highlightDiscovery, ...playableRows];
 
   return {
     featured: await pickFeatured(
-      highlightDiscovery.length ? highlightDiscovery : playableRows.length ? playableRows : allRows
+      highlightDiscovery.length
+        ? highlightDiscovery
+        : playableRows.length
+          ? playableRows
+          : allRows
     ),
     rows: finishRows(allRows),
     activeSources: collectSources(allRows),
   };
+}
+
+/** Caché 3 min: el home no debe martillar AnimeAV1/TMDB/Vimeus en cada visita. */
+export async function getHomeCatalog(): Promise<CatalogPage> {
+  const { unstable_cache } = await import("next/cache");
+  const cached = unstable_cache(buildHomeCatalog, ["veotv-home-catalog-v3"], {
+    revalidate: 180,
+    tags: ["home-catalog"],
+  });
+  return cached();
 }
 
 /** Agrega lo más visto en VeoTV a partir del historial global. */

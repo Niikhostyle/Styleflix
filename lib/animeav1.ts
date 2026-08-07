@@ -43,6 +43,13 @@ const PREFERRED_SERVERS = [
 const ZILLA_HASH_RE =
   /zilla-networks\.com\/(?:m3u8|play)\/([a-f0-9]{32})\/?/i;
 
+/** Si AnimeAV1 responde basura/HTML, no martillar cada request del home. */
+let av1CooldownUntil = 0;
+const AV1_FAIL_COOLDOWN_MS = 5 * 60 * 1000;
+const av1PageCache = new Map<string, { at: number; items: Av1CatalogItem[] }>();
+const AV1_PAGE_CACHE_MS = 20 * 60 * 1000;
+
+
 export function isAnimeAv1ZillaUrl(url: string): boolean {
   return ZILLA_HASH_RE.test(url);
 }
@@ -103,10 +110,19 @@ export async function fetchAnimeAv1CatalogPages(opts?: {
   order?: "popular" | "latest_added" | "score" | "latest_released";
   category?: string;
 }): Promise<Av1CatalogItem[]> {
+  if (Date.now() < av1CooldownUntil) return [];
+
   const pages = Math.max(1, opts?.pages ?? 3);
   const order = opts?.order ?? "popular";
+  const cacheKey = `${order}|${opts?.category || ""}|${pages}`;
+  const cached = av1PageCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < AV1_PAGE_CACHE_MS) {
+    return cached.items;
+  }
+
   const out: Av1CatalogItem[] = [];
   const seen = new Set<number>();
+  let emptyPages = 0;
 
   for (let page = 1; page <= pages; page++) {
     try {
@@ -115,16 +131,28 @@ export async function fetchAnimeAv1CatalogPages(opts?: {
         order,
         ...(opts?.category ? { category: opts.category } : {}),
       });
+      if (!items?.length) {
+        emptyPages += 1;
+        continue;
+      }
       for (const item of items || []) {
         if (!item?.id || seen.has(item.id)) continue;
         seen.add(item.id);
         out.push(item);
       }
-      if (!items?.length) break;
     } catch (err) {
-      console.error(`[animeav1] catalog page ${page}`, err);
-      break;
+      emptyPages += 1;
+      console.warn("[animeav1] catalog page failed", page, err);
     }
+  }
+
+  if (out.length === 0 && emptyPages > 0) {
+    av1CooldownUntil = Date.now() + AV1_FAIL_COOLDOWN_MS;
+    console.warn(
+      `[animeav1] catálogo vacío; cooldown ${AV1_FAIL_COOLDOWN_MS / 1000}s`
+    );
+  } else if (out.length > 0) {
+    av1PageCache.set(cacheKey, { at: Date.now(), items: out });
   }
 
   return out;

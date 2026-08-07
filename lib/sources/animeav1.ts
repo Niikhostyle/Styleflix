@@ -137,3 +137,15 @@ export async function getAnimeAv1Items(): Promise<CatalogItem[]> {
   }
   return [...byKey.values()];
 }
+
+/**
+ * Home: 1 página popular, sin match TMDB (barato).
+ * Evita 11 fetches + N búsquedas TMDB en cada SSR.
+ */
+export async function getAnimeAv1HomeItems(limit = 24): Promise<CatalogItem[]> {
+  const popular = await fetchAnimeAv1CatalogPages({
+    pages: 1,
+    order: "popular",
+  });
+  return popular.slice(0, limit).map(fromAv1Only);
+}

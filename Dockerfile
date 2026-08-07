@@ -37,7 +37,8 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    NODE_OPTIONS=--max-old-space-size=768
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
