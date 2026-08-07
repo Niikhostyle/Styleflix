@@ -12,7 +12,7 @@ import { enrichWithTmdb, getVimeusAvailability, getVimeusAnimes, getVimeusMovies
 import { getTmdbAnimeRows, getTmdbMovieRows, getTmdbSeriesRows } from "@/lib/sources/tmdbSource";
 import { getJikanAnimeRows } from "@/lib/sources/jikan";
 import { getAnimeAv1Rows, getAnimeAv1Items, getAnimeAv1HomeItems } from "@/lib/sources/animeav1";
-import { getMangaEsItems, getMangaEsRows } from "@/lib/sources/manga";
+import { getMangaEsHomeItems, getMangaEsRows } from "@/lib/sources/manga";
 import { getPlutoMovies, getPlutoSeries } from "@/lib/sources/plutoSource";
 import { getArchiveRows } from "@/lib/sources/archive";
 import { withTimeout } from "@/lib/sources/match";
@@ -28,8 +28,10 @@ import {
 import type { MediaItem, MediaType } from "@/lib/tmdb";
 
 /** Las fuentes de descubrimiento son rápidas; las que mapean títulos, no. */
-const FAST_TIMEOUT_MS = 8000;
-const SLOW_TIMEOUT_MS = 15000;
+const FAST_TIMEOUT_MS = 6000;
+const SLOW_TIMEOUT_MS = 12000;
+/** Home: nunca esperar YupManga live (curl); solo caché en disco. */
+const MANGA_HOME_TIMEOUT_MS = 2500;
 const MANGA_TIMEOUT_MS = 45000;
 
 export type CatalogPage = {
@@ -77,7 +79,7 @@ function buildAvailabilityIndex(
   return index;
 }
 
-function finishRows(rows: LoadedRow[], limit = 40): CatalogRow[] {
+function finishRows(rows: LoadedRow[], limit = 28): CatalogRow[] {
   return rows
     .filter((row) => row.items.length > 0)
     .map((row) => ({
@@ -270,7 +272,13 @@ async function loadMangaEsItems() {
   ) {
     return [];
   }
-  return withTimeout(getMangaEsItems(), MANGA_TIMEOUT_MS, [], "manga:items");
+  // Solo caché disco/memoria — el scrape YupManga live tumba el origen bajo concurrencia
+  return withTimeout(
+    getMangaEsHomeItems(18),
+    MANGA_HOME_TIMEOUT_MS,
+    [],
+    "manga:home-cache"
+  );
 }
 
 async function loadMangaEsRows(): Promise<LoadedRow[]> {
@@ -402,14 +410,24 @@ async function buildHomeCatalog(): Promise<CatalogPage> {
   };
 }
 
-/** Caché 3 min: el home no debe martillar AnimeAV1/TMDB/Vimeus en cada visita. */
+/** Caché proceso + Next: evita stampede de catálogo en cada visita concurrente. */
+let homeMem: { at: number; data: CatalogPage } | null = null;
+const HOME_MEM_TTL_MS = 90_000;
+
+/** Caché 10 min: el home no debe martillar AnimeAV1/TMDB/Vimeus en cada visita. */
 export async function getHomeCatalog(): Promise<CatalogPage> {
+  if (homeMem && Date.now() - homeMem.at < HOME_MEM_TTL_MS) {
+    return homeMem.data;
+  }
+
   const { unstable_cache } = await import("next/cache");
-  const cached = unstable_cache(buildHomeCatalog, ["veotv-home-catalog-v3"], {
-    revalidate: 180,
+  const cached = unstable_cache(buildHomeCatalog, ["veotv-home-catalog-v4"], {
+    revalidate: 600,
     tags: ["home-catalog"],
   });
-  return cached();
+  const data = await cached();
+  homeMem = { at: Date.now(), data };
+  return data;
 }
 
 /** Agrega lo más visto en VeoTV a partir del historial global. */

@@ -122,6 +122,35 @@ async function mdGet<T>(url: string, retries = 2): Promise<T | null> {
   return null;
 }
 
+/** Solo memoria/disco — sin live YupManga/MangaDex (para home bajo carga). */
+export async function getMangaEsCatalogCachedOnly(
+  limit = 24
+): Promise<MangaCatalogEntry[]> {
+  if (
+    catalogMem &&
+    Date.now() - catalogMem.at < CATALOG_MEM_TTL_MS &&
+    catalogMem.items.length
+  ) {
+    return catalogMem.items.slice(0, limit);
+  }
+
+  const cached = await readJson<CatalogFile>(
+    path.join(CACHE_DIR, "catalog.json")
+  );
+  if (cached?.items?.length) {
+    const items: MangaCatalogEntry[] = cached.items.map((m) => ({
+      ...m,
+      source:
+        cached.source === "mangadex" || m.source === "mangadex"
+          ? ("mangadex" as const)
+          : ("yupmanga" as const),
+    }));
+    catalogMem = { at: Date.now(), items };
+    return items.slice(0, limit);
+  }
+  return [];
+}
+
 /** Catálogo: YupManga primero; fallback MangaDex (caché o live). */
 export async function getMangaEsCatalog(
   limit = 48
