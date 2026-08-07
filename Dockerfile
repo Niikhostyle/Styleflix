@@ -1,7 +1,8 @@
 # Coolify / VPS sin BuildKit — no usa --mount=type=cache (Nixpacks falla ahí).
 # Mirror público de la imagen oficial (evita TLS timeout a registry-1.docker.io).
-# Runner: i5-4460 (4c/4t) → heap Node 2GB + UV_THREADPOOL_SIZE=4.
-# En Coolify asigná ≥3 GB RAM al contenedor (el heap no es toda la RAM del proceso).
+# Host tipico: i5-4460 (4c/4t) + 8 GB RAM.
+# Runner: heap Node 4GB + UV_THREADPOOL_SIZE=4. Dejá ≥6 GB al contenedor en Coolify
+# (heap ≠ RAM total: buffers, native, Prisma, OS necesitan margen).
 ARG NODE_IMAGE=public.ecr.aws/docker/library/node:22-bookworm-slim
 
 FROM ${NODE_IMAGE} AS deps
@@ -29,7 +30,7 @@ ENV NEXT_PUBLIC_TMDB_API_KEY=$NEXT_PUBLIC_TMDB_API_KEY \
     NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=$NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production \
-    NODE_OPTIONS=--max-old-space-size=3072
+    NODE_OPTIONS=--max-old-space-size=4096
 
 RUN npm run build
 
@@ -40,7 +41,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     UV_THREADPOOL_SIZE=4 \
-    NODE_OPTIONS=--max-old-space-size=2048
+    NODE_OPTIONS=--max-old-space-size=4096
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates curl \
