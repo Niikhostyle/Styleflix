@@ -264,21 +264,34 @@ async function loadAnimeAv1HomeItems(): Promise<CatalogItem[]> {
 }
 
 async function loadMangaEsItems() {
-  if (!enabledSources().includes("mangadex")) return [];
-  return withTimeout(getMangaEsItems(), MANGA_TIMEOUT_MS, [], "mangadex:items");
+  if (
+    !enabledSources().includes("yupmanga") &&
+    !enabledSources().includes("mangadex")
+  ) {
+    return [];
+  }
+  return withTimeout(getMangaEsItems(), MANGA_TIMEOUT_MS, [], "manga:items");
 }
 
 async function loadMangaEsRows(): Promise<LoadedRow[]> {
-  if (!enabledSources().includes("mangadex")) return [];
-  return withTimeout(getMangaEsRows(), MANGA_TIMEOUT_MS, [], "mangadex:rows");
+  if (
+    !enabledSources().includes("yupmanga") &&
+    !enabledSources().includes("mangadex")
+  ) {
+    return [];
+  }
+  return withTimeout(getMangaEsRows(), MANGA_TIMEOUT_MS, [], "manga:rows");
 }
 
 export async function getMangaCatalog(): Promise<CatalogPage> {
   const mangaRows = await loadMangaEsRows();
+  const src: SourceId = enabledSources().includes("yupmanga")
+    ? "yupmanga"
+    : "mangadex";
   return {
     featured: mangaRows[0]?.items?.slice(0, 8) || [],
     rows: finishRows(mangaRows),
-    activeSources: mangaRows.length ? (["mangadex"] as SourceId[]) : [],
+    activeSources: mangaRows.length ? ([src] as SourceId[]) : [],
   };
 }
 

@@ -1,15 +1,16 @@
 /**
- * Mangas populares en español (MangaDex).
- * Preferencia: caché de `scripts/scrape-mangas-es.ts` → fallback live API.
+ * Mangas populares en español.
+ * Preferencia: YupManga → fallback MangaDex (caché scrape / live API).
  */
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { getYupMangaBySlug, getYupMangaCatalog } from "@/lib/yupmanga";
 
 const API = "https://api.mangadex.org";
 const CACHE_DIR = path.join(process.cwd(), "data", "mangas-es");
 
-/** Memoria de proceso: evita re-validar feeds ES en cada request. */
+/** Memoria de proceso: evita reconsultar catálogo en cada request. */
 let catalogMem:
   | { at: number; items: MangaCatalogEntry[] }
   | null = null;
@@ -37,6 +38,7 @@ export type MangaDetail = {
   lastChapter: string | null;
   chapters: MangaChapter[];
   scrapedAt?: string;
+  source?: "yupmanga" | "mangadex";
 };
 
 export type MangaCatalogEntry = {
@@ -51,12 +53,19 @@ export type MangaCatalogEntry = {
   genres: string[];
   lastChapter: string | null;
   chapterCount: number | null;
+  source?: "yupmanga" | "mangadex";
 };
 
 type CatalogFile = {
   scrapedAt?: string;
   items: MangaCatalogEntry[];
+  source?: string;
 };
+
+/** UUID de capítulo MangaDex (at-home). */
+export function isMangaDexChapterId(id: string): boolean {
+  return /^[a-f0-9-]{36}$/i.test(id);
+}
 
 function pickLocalized(
   map: Record<string, string> | undefined,
@@ -113,7 +122,7 @@ async function mdGet<T>(url: string, retries = 2): Promise<T | null> {
   return null;
 }
 
-/** Catálogo: caché local o MangaDex live. Solo títulos con capítulos ES reales. */
+/** Catálogo: YupManga primero; fallback MangaDex (caché o live). */
 export async function getMangaEsCatalog(
   limit = 48
 ): Promise<MangaCatalogEntry[]> {
@@ -125,60 +134,58 @@ export async function getMangaEsCatalog(
     return catalogMem.items.slice(0, limit);
   }
 
+  try {
+    const yup = await getYupMangaCatalog(limit);
+    if (yup.length) {
+      const items: MangaCatalogEntry[] = yup.map((m) => ({
+        id: m.id,
+        slug: m.slug,
+        title: m.title,
+        titleEs: m.titleEs,
+        poster: m.poster,
+        synopsis: m.synopsis,
+        status: m.status,
+        year: m.year,
+        genres: m.genres,
+        lastChapter: m.lastChapter,
+        chapterCount: m.chapterCount,
+        source: "yupmanga" as const,
+      }));
+      catalogMem = { at: Date.now(), items };
+      return items.slice(0, limit);
+    }
+  } catch {
+    /* fallback MangaDex */
+  }
+
   const cached = await readJson<CatalogFile>(
     path.join(CACHE_DIR, "catalog.json")
   );
-  const raw =
-    cached?.items?.length
-      ? cached.items.slice(0, Math.max(limit * 3, 64))
-      : await fetchLiveCatalog(Math.max(limit * 3, 64));
+  // Caché YupManga no sirve como fallback MangaDex
+  const fromCache =
+    cached?.items?.length && cached.source !== "yupmanga"
+      ? cached.items.slice(0, Math.max(limit * 2, 64)).map((m) => ({
+          ...m,
+          source: "mangadex" as const,
+        }))
+      : null;
 
-  // Caché scrape / API pueden marcar ES sin feed real (p. ej. Solo Leveling)
-  const withChapters = await filterWithSpanishChapters(raw);
-  catalogMem = { at: Date.now(), items: withChapters };
-  return withChapters.slice(0, limit);
-}
+  const items =
+    fromCache ||
+    (await fetchLiveCatalog(Math.max(limit * 2, 64))).map((m) => ({
+      ...m,
+      source: "mangadex" as const,
+    }));
 
-/** MangaDex a veces marca `es` disponible sin capítulos reales en el feed. */
-async function hasSpanishChapters(mangaId: string): Promise<boolean> {
-  const params = new URLSearchParams();
-  params.set("limit", "1");
-  params.append("translatedLanguage[]", "es");
-  params.append("translatedLanguage[]", "es-la");
-  params.set("order[chapter]", "desc");
-  params.set("includeFutureUpdates", "0");
-  params.append("contentRating[]", "safe");
-  params.append("contentRating[]", "suggestive");
-  params.append("contentRating[]", "erotica");
-
-  const data = await mdGet<{ total?: number; data?: unknown[] }>(
-    `${API}/manga/${mangaId}/feed?${params}`,
-    1
-  );
-  return (data?.total || data?.data?.length || 0) > 0;
-}
-
-async function filterWithSpanishChapters(
-  entries: MangaCatalogEntry[],
-  concurrency = 6
-): Promise<MangaCatalogEntry[]> {
-  const ok: MangaCatalogEntry[] = [];
-  for (let i = 0; i < entries.length; i += concurrency) {
-    const batch = entries.slice(i, i + concurrency);
-    const flags = await Promise.all(batch.map((e) => hasSpanishChapters(e.id)));
-    batch.forEach((e, idx) => {
-      if (flags[idx]) ok.push(e);
-    });
-  }
-  return ok;
+  catalogMem = { at: Date.now(), items };
+  return items.slice(0, limit);
 }
 
 async function fetchLiveCatalog(limit: number): Promise<MangaCatalogEntry[]> {
   const candidates: MangaCatalogEntry[] = [];
   let offset = 0;
   const pageSize = 32;
-  // Pedimos de más: varios “populares” no tienen capítulos ES reales
-  const candidateCap = Math.min(120, Math.max(limit * 3, 64));
+  const candidateCap = Math.min(120, Math.max(limit * 2, 64));
 
   while (candidates.length < candidateCap && offset < 160) {
     const params = new URLSearchParams();
@@ -247,6 +254,7 @@ async function fetchLiveCatalog(limit: number): Promise<MangaCatalogEntry[]> {
           .slice(0, 10),
         lastChapter: m.attributes.lastChapter || null,
         chapterCount: null,
+        source: "mangadex",
       });
       if (candidates.length >= candidateCap) break;
     }
@@ -264,19 +272,53 @@ export async function getMangaEsBySlug(
   const safe = slug.replace(/[^a-z0-9-]/gi, "");
   if (!safe) return null;
 
+  // YupManga primero (sobre todo slugs `yup-*`)
+  try {
+    const yup = await getYupMangaBySlug(safe);
+    if (yup?.id) {
+      return {
+        id: yup.id,
+        slug: yup.slug,
+        title: yup.title,
+        titleEs: yup.titleEs,
+        synopsis: yup.synopsis,
+        poster: yup.poster,
+        status: yup.status,
+        year: yup.year,
+        genres: yup.genres,
+        contentRating: yup.contentRating,
+        lastChapter: yup.lastChapter,
+        chapters: yup.chapters || [],
+        scrapedAt: yup.scrapedAt,
+        source: "yupmanga",
+      };
+    }
+  } catch {
+    /* fallback MangaDex */
+  }
+
+  if (safe.startsWith("yup-")) return null;
+
   const cached = await readJson<MangaDetail>(
     path.join(CACHE_DIR, "by-slug", `${safe}.json`)
   );
-  if (cached?.id) {
+  if (cached?.id && cached.source !== "yupmanga") {
     if (!cached.chapters?.length) {
       const chapters = await fetchChaptersLive(cached.id);
-      return { ...cached, chapters };
+      return { ...cached, chapters, source: "mangadex" };
     }
-    return { ...cached, chapters: cached.chapters || [] };
+    return { ...cached, chapters: cached.chapters || [], source: "mangadex" };
   }
 
-  const catalog = await getMangaEsCatalog(80);
-  const hit = catalog.find((m) => m.slug === safe);
+  // No usar getMangaEsCatalog aquí: puede estar cacheado como YupManga
+  const mdCatalogFile = await readJson<CatalogFile>(
+    path.join(CACHE_DIR, "catalog.json")
+  );
+  const mdCandidates =
+    mdCatalogFile?.items?.length && mdCatalogFile.source !== "yupmanga"
+      ? mdCatalogFile.items
+      : await fetchLiveCatalog(80);
+  const hit = mdCandidates.find((m) => m.slug === safe);
   if (!hit) return null;
 
   const chapters = await fetchChaptersLive(hit.id);
@@ -293,6 +335,7 @@ export async function getMangaEsBySlug(
     contentRating: null,
     lastChapter: hit.lastChapter,
     chapters,
+    source: "mangadex",
   };
 }
 
@@ -356,7 +399,7 @@ export async function getMangaChapterPages(chapterId: string): Promise<{
   dataSaver: string[];
 } | null> {
   const id = chapterId.replace(/[^a-f0-9-]/gi, "");
-  if (!id) return null;
+  if (!id || !isMangaDexChapterId(id)) return null;
 
   const data = await mdGet<{
     baseUrl: string;
@@ -383,12 +426,14 @@ export function mangaChapterImageUrls(
   );
 }
 
-/** Hosts permitidos para proxy de imágenes MangaDex. */
+/** Hosts permitidos para proxy de imágenes (MangaDex + YupManga). */
 export function isAllowedMangaImageHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   return (
     h.endsWith(".mangadex.network") ||
     h === "uploads.mangadex.org" ||
-    h.endsWith(".mangadex.org")
+    h.endsWith(".mangadex.org") ||
+    h === "www.yupmanga.com" ||
+    h === "yupmanga.com"
   );
 }

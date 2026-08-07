@@ -1,30 +1,35 @@
-# Mangas en español (MangaDex)
+# Mangas en español (YupManga)
 
-Fuente oficial: **MangaDex** (capítulos `translatedLanguage=es`). Sin API key.
+Fuente primaria: **[YupManga](https://www.yupmanga.com/)** (español).  
+Fallback opcional: MangaDex si YupManga no responde.
 
-## Script (caché local)
+Requiere **curl** en el PATH (Cloudflare bloquea el `fetch` de Node).
+
+## Script (caché + descarga)
 
 ```bash
-# Catálogo popular ES (rápido, ~40 títulos)
+# Catálogo popular (rápido)
 npm run mangas:scrape
 
-# Con lista de capítulos por manga (más lento)
+# Con lista de capítulos por manga
 npm run mangas:scrape:full
+
+# Descargar páginas a disco
+npm run mangas:download -- --out "G:\Mi unidad\veotv" --limit=10 --max-chapters=5
 ```
 
-Salida: `data/mangas-es/catalog.json` + `data/mangas-es/by-slug/*.json`
-
-Si no hay caché, la app consulta MangaDex en vivo (con reintentos y paginación).
+Salida:
+- `data/mangas-es/catalog.json` (`source: "yupmanga"`)
+- `data/mangas-es/by-slug/*.json`
+- Con `--download`: `{out}/manga/yup-…/cap-N/001.jpg`
 
 ## En la app
 
-- Nav: **Mangas**
-- `/mangas` — biblioteca con grid de lectura (no player)
-- `/manga/[slug]` — ficha + lector vertical (proxy de imágenes, progreso)
-- Home: fila «Mangas en español»
-- Apagar: `CATALOG_DISABLE=mangadex`
-- Activar en Coolify: incluir `mangadex` en `CATALOG_SOURCES` (o dejar vacío)
+- Nav: **Mangas** → `/mangas`
+- `/manga/[slug]` — ficha + lector vertical
+- Apagar: `CATALOG_DISABLE=yupmanga`
+- Coolify: incluir `yupmanga` en `CATALOG_SOURCES` (o dejar el default)
 
 ## Deploy
 
-Tras deploy, `node scripts/db-setup.cjs` aplica el modelo `MangaReadProgress`.
+La imagen Docker instala `curl` (necesario para catálogo/proxy YupManga en el VPS).

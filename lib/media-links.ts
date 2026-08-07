@@ -1,18 +1,20 @@
-/** Hosts MangaDex (espejo de isAllowedMangaImageHost; sin importar manga-es/fs en cliente). */
-function isMangaDexImageHost(hostname: string): boolean {
+/** Hosts de imágenes manga (proxy same-origin; sin importar manga-es/fs en cliente). */
+function isMangaImageHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   return (
     h.endsWith(".mangadex.network") ||
     h === "uploads.mangadex.org" ||
-    h.endsWith(".mangadex.org")
+    h.endsWith(".mangadex.org") ||
+    h === "www.yupmanga.com" ||
+    h === "yupmanga.com"
   );
 }
 
-/** MangaDex bloquea hotlink en el navegador → proxy same-origin. */
-function proxyMangaDexIfNeeded(absoluteUrl: string): string {
+/** MangaDex / YupManga bloquean hotlink en el navegador → proxy same-origin. */
+function proxyMangaImageIfNeeded(absoluteUrl: string): string {
   try {
     const u = new URL(absoluteUrl);
-    if (isMangaDexImageHost(u.hostname)) {
+    if (isMangaImageHost(u.hostname)) {
       return `/api/manga/image?u=${encodeURIComponent(absoluteUrl)}`;
     }
   } catch {
@@ -27,9 +29,9 @@ export function mediaImageUrl(
   kind: "poster" | "backdrop" = "poster"
 ): string {
   if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return proxyMangaDexIfNeeded(path);
+  if (/^https?:\/\//i.test(path)) return proxyMangaImageIfNeeded(path);
   if (path.startsWith("//")) {
-    return proxyMangaDexIfNeeded(`https:${path}`);
+    return proxyMangaImageIfNeeded(`https:${path}`);
   }
   const base =
     kind === "backdrop"

@@ -149,7 +149,7 @@ async function searchMangaHits(
   queryNorm: string,
   tokens: string[]
 ): Promise<ScoredHit[]> {
-  if (!isSourceEnabled("mangadex")) return [];
+  if (!isSourceEnabled("yupmanga") && !isSourceEnabled("mangadex")) return [];
   try {
     const catalog = await getMangaEsCatalog(120);
     const hits: ScoredHit[] = [];

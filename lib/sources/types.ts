@@ -7,6 +7,7 @@ export type SourceId =
   | "pluto"
   | "archive"
   | "animeav1"
+  | "yupmanga"
   | "mangadex";
 
 export const ALL_SOURCES: SourceId[] = [
@@ -16,6 +17,7 @@ export const ALL_SOURCES: SourceId[] = [
   "pluto",
   "archive",
   "animeav1",
+  "yupmanga",
   "mangadex",
 ];
 
@@ -26,7 +28,8 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   pluto: "Pluto TV",
   archive: "Archive.org",
   animeav1: "VeoTV",
-  mangadex: "Mangas ES",
+  yupmanga: "YupManga",
+  mangadex: "MangaDex",
 };
 
 /**
@@ -63,7 +66,7 @@ export function enabledSources(): SourceId[] {
         .split(",")
         .map((s) => s.trim().toLowerCase())
         .filter((s): s is SourceId => ALL_SOURCES.includes(s as SourceId))
-    : ALL_SOURCES.filter((id) => id !== "jikan");
+    : ALL_SOURCES.filter((id) => id !== "jikan" && id !== "mangadex");
 
   const disabled = new Set(
     (process.env.CATALOG_DISABLE || "")
@@ -79,13 +82,15 @@ export function enabledSources(): SourceId[] {
       return Boolean(process.env.NEXT_PUBLIC_TMDB_API_KEY);
     }
     if (id === "animeav1") return true;
+    if (id === "yupmanga") return true;
     if (id === "mangadex") return true;
     return true;
   });
 
   // Secciones propias: si CATALOG_SOURCES está seteado sin ellas, igual se
-  // mantienen activas (salvo CATALOG_DISABLE).
-  for (const id of ["mangadex", "animeav1"] as const) {
+  // mantienen activas (salvo CATALOG_DISABLE). YupManga es primario; MangaDex
+  // queda opcional (no se auto-incluye).
+  for (const id of ["yupmanga", "animeav1"] as const) {
     if (!disabled.has(id) && !list.includes(id)) list.push(id);
   }
 

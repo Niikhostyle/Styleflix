@@ -1,9 +1,9 @@
 /**
- * Fuente de mangas en español (MangaDex / caché scrape-mangas-es).
+ * Fuente de mangas en español (YupManga primario / MangaDex fallback).
  */
 
 import { getMangaEsCatalog } from "@/lib/manga-es";
-import type { CatalogItem } from "@/lib/sources/types";
+import type { CatalogItem, SourceId } from "@/lib/sources/types";
 
 /** Offset de ids para no chocar con TMDB / AnimeAV1. */
 const ID_BASE = 900_000_000;
@@ -18,19 +18,23 @@ function hashId(uuid: string): number {
 
 export async function getMangaEsItems(limit = 36): Promise<CatalogItem[]> {
   const entries = await getMangaEsCatalog(limit);
-  return entries.map((m) => ({
-    id: hashId(m.id),
-    title: m.title,
-    name: m.title,
-    overview: m.synopsis || "",
-    poster_path: m.poster,
-    backdrop_path: m.poster,
-    media_type: "tv" as const,
-    sources: ["mangadex" as const],
-    playable: true,
-    mangaSlug: m.slug,
-    mangaDexId: m.id,
-  }));
+  return entries.map((m) => {
+    const source: SourceId =
+      m.source === "mangadex" ? "mangadex" : "yupmanga";
+    return {
+      id: hashId(m.id),
+      title: m.title,
+      name: m.title,
+      overview: m.synopsis || "",
+      poster_path: m.poster,
+      backdrop_path: m.poster,
+      media_type: "tv" as const,
+      sources: [source],
+      playable: true,
+      mangaSlug: m.slug,
+      mangaDexId: m.id,
+    };
+  });
 }
 
 export async function getMangaEsRows(): Promise<

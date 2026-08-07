@@ -47,7 +47,7 @@ export default function MangaCatalogClient({
           Mangas
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/55 md:text-base">
-          Capítulos en español vía MangaDex. Lectura vertical, progreso guardado
+          Capítulos en español vía YupManga. Lectura vertical, progreso guardado
           y catálogo pensado para leer — no para “reproducir”.
         </p>
 
@@ -143,9 +143,9 @@ export default function MangaCatalogClient({
         </h2>
         {!allItems.length ? (
           <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-8 text-center text-sm text-amber-100">
-            No se pudo cargar el catálogo MangaDex ahora. Reintenta en unos
+            No se pudo cargar el catálogo YupManga ahora. Reintenta en unos
             minutos o asegúrate de que{" "}
-            <code className="text-orange-200">mangadex</code> no esté en{" "}
+            <code className="text-orange-200">yupmanga</code> no esté en{" "}
             <code className="text-orange-200">CATALOG_DISABLE</code>.
           </div>
         ) : (

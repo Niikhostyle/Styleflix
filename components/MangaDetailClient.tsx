@@ -95,29 +95,32 @@ export default function MangaDetailClient({ manga }: { manga: MangaPayload }) {
     [canRead, current, manga]
   );
 
-  const loadPages = useCallback(async (id: string) => {
-    if (!id) return;
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(
-        `/api/manga/pages?chapterId=${encodeURIComponent(id)}`
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "No se pudo cargar el capítulo.");
+  const loadPages = useCallback(
+    async (id: string) => {
+      if (!id) return;
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(
+          `/api/manga/pages?chapterId=${encodeURIComponent(id)}&seriesId=${encodeURIComponent(manga.id)}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "No se pudo cargar el capítulo.");
+          setImages([]);
+          return;
+        }
+        setImages(data.images || []);
+        setScrollPct(0);
+      } catch {
+        setError("Error de red.");
         setImages([]);
-        return;
+      } finally {
+        setLoading(false);
       }
-      setImages(data.images || []);
-      setScrollPct(0);
-    } catch {
-      setError("Error de red.");
-      setImages([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [manga.id]
+  );
 
   useEffect(() => {
     if (!reading || !chapterId || !canRead) return;
