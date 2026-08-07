@@ -30,7 +30,7 @@ import type { MediaItem, MediaType } from "@/lib/tmdb";
 /** Las fuentes de descubrimiento son rápidas; las que mapean títulos, no. */
 const FAST_TIMEOUT_MS = 8000;
 const SLOW_TIMEOUT_MS = 15000;
-const MANGA_TIMEOUT_MS = 28000;
+const MANGA_TIMEOUT_MS = 45000;
 
 export type CatalogPage = {
   featured: CatalogItem[];

@@ -126,16 +126,29 @@ export async function fetchAnimeAv1CatalogPages(opts?: {
 
   for (let page = 1; page <= pages; page++) {
     try {
-      const { items } = await getCatalog({
-        page,
-        order,
-        ...(opts?.category ? { category: opts.category } : {}),
-      });
+      // animeav1-api loguea "Failed to parse catalog data" aunque el HTML fallback funcione
+      const prevErr = console.error;
+      console.error = (...args: unknown[]) => {
+        const msg = String(args[0] ?? "");
+        if (msg.includes("Failed to parse catalog data")) return;
+        prevErr.apply(console, args as Parameters<typeof console.error>);
+      };
+      let items: Av1CatalogItem[] = [];
+      try {
+        const res = await getCatalog({
+          page,
+          order,
+          ...(opts?.category ? { category: opts.category } : {}),
+        });
+        items = res.items || [];
+      } finally {
+        console.error = prevErr;
+      }
       if (!items?.length) {
         emptyPages += 1;
         continue;
       }
-      for (const item of items || []) {
+      for (const item of items) {
         if (!item?.id || seen.has(item.id)) continue;
         seen.add(item.id);
         out.push(item);

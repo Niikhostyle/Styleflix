@@ -24,6 +24,8 @@ function isPublicPath(pathname: string) {
   // HLS Zilla: auth por token firmado (si middleware redirige a /login, hls.js rompe)
   if (pathname === "/api/play/animeav1-hls") return true;
   if (pathname === "/api/play/animeav1-embed") return true;
+  // Portadas/páginas MangaDex: host allowlist en la route (img no manda bien auth)
+  if (pathname === "/api/manga/image") return true;
   if (pathname.startsWith("/onboarding")) return true;
   if (pathname === "/perfiles") return true;
   return false;

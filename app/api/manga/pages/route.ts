@@ -34,9 +34,9 @@ export async function GET(request: Request) {
 
   const saver = new URL(request.url).searchParams.get("hq") !== "1";
   const urls = mangaChapterImageUrls(pages, saver);
-  const origin = new URL(request.url).origin;
+  // Relative: evita origin interno del contenedor detrás de Coolify/CF
   const proxied = urls.map(
-    (u) => `${origin}/api/manga/image?u=${encodeURIComponent(u)}`
+    (u) => `/api/manga/image?u=${encodeURIComponent(u)}`
   );
   return NextResponse.json({
     images: proxied,

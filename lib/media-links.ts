@@ -1,11 +1,36 @@
+/** Hosts MangaDex (espejo de isAllowedMangaImageHost; sin importar manga-es/fs en cliente). */
+function isMangaDexImageHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return (
+    h.endsWith(".mangadex.network") ||
+    h === "uploads.mangadex.org" ||
+    h.endsWith(".mangadex.org")
+  );
+}
+
+/** MangaDex bloquea hotlink en el navegador → proxy same-origin. */
+function proxyMangaDexIfNeeded(absoluteUrl: string): string {
+  try {
+    const u = new URL(absoluteUrl);
+    if (isMangaDexImageHost(u.hostname)) {
+      return `/api/manga/image?u=${encodeURIComponent(absoluteUrl)}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return absoluteUrl;
+}
+
 /** Resuelve URL de póster/backdrop (TMDB relativo o URL absoluta p.ej. AnimeAV1). */
 export function mediaImageUrl(
   path: string | null | undefined,
   kind: "poster" | "backdrop" = "poster"
 ): string {
   if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return path;
-  if (path.startsWith("//")) return `https:${path}`;
+  if (/^https?:\/\//i.test(path)) return proxyMangaDexIfNeeded(path);
+  if (path.startsWith("//")) {
+    return proxyMangaDexIfNeeded(`https:${path}`);
+  }
   const base =
     kind === "backdrop"
       ? "https://image.tmdb.org/t/p/original"

@@ -388,8 +388,10 @@ export default function MangaDetailClient({ manga }: { manga: MangaPayload }) {
                 Empezar por el cap. {chapters[0].chapter}
               </button>
             ) : (
-              <p className="mt-6 text-sm text-white/45">
-                Aún no hay capítulos en español indexados.
+              <p className="mt-6 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/55">
+                MangaDex no tiene capítulos en español disponibles para este
+                título ahora (a veces el catálogo marca ES sin feed). Probá otro
+                manga del listado.
               </p>
             )}
           </div>
@@ -401,7 +403,9 @@ export default function MangaDetailClient({ manga }: { manga: MangaPayload }) {
           </h2>
           <div className="max-h-[32rem] overflow-y-auto rounded-2xl border border-white/10 bg-black/20">
             {chapters.length === 0 && (
-              <p className="p-6 text-sm text-white/40">Sin capítulos.</p>
+              <p className="p-6 text-sm text-white/40">
+                Sin capítulos en español en MangaDex para este título.
+              </p>
             )}
             <ul>
               {chapters.map((c) => (

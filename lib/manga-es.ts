@@ -9,6 +9,12 @@ import path from "node:path";
 const API = "https://api.mangadex.org";
 const CACHE_DIR = path.join(process.cwd(), "data", "mangas-es");
 
+/** Memoria de proceso: evita re-validar feeds ES en cada request. */
+let catalogMem:
+  | { at: number; items: MangaCatalogEntry[] }
+  | null = null;
+const CATALOG_MEM_TTL_MS = 30 * 60 * 1000;
+
 export type MangaChapter = {
   id: string;
   chapter: string;
@@ -107,30 +113,81 @@ async function mdGet<T>(url: string, retries = 2): Promise<T | null> {
   return null;
 }
 
-/** Catálogo: caché local o MangaDex live. */
+/** Catálogo: caché local o MangaDex live. Solo títulos con capítulos ES reales. */
 export async function getMangaEsCatalog(
   limit = 48
 ): Promise<MangaCatalogEntry[]> {
+  if (
+    catalogMem &&
+    Date.now() - catalogMem.at < CATALOG_MEM_TTL_MS &&
+    catalogMem.items.length
+  ) {
+    return catalogMem.items.slice(0, limit);
+  }
+
   const cached = await readJson<CatalogFile>(
     path.join(CACHE_DIR, "catalog.json")
   );
-  if (cached?.items?.length) {
-    return cached.items.slice(0, limit);
+  const raw =
+    cached?.items?.length
+      ? cached.items.slice(0, Math.max(limit * 3, 64))
+      : await fetchLiveCatalog(Math.max(limit * 3, 64));
+
+  // Caché scrape / API pueden marcar ES sin feed real (p. ej. Solo Leveling)
+  const withChapters = await filterWithSpanishChapters(raw);
+  catalogMem = { at: Date.now(), items: withChapters };
+  return withChapters.slice(0, limit);
+}
+
+/** MangaDex a veces marca `es` disponible sin capítulos reales en el feed. */
+async function hasSpanishChapters(mangaId: string): Promise<boolean> {
+  const params = new URLSearchParams();
+  params.set("limit", "1");
+  params.append("translatedLanguage[]", "es");
+  params.append("translatedLanguage[]", "es-la");
+  params.set("order[chapter]", "desc");
+  params.set("includeFutureUpdates", "0");
+  params.append("contentRating[]", "safe");
+  params.append("contentRating[]", "suggestive");
+  params.append("contentRating[]", "erotica");
+
+  const data = await mdGet<{ total?: number; data?: unknown[] }>(
+    `${API}/manga/${mangaId}/feed?${params}`,
+    1
+  );
+  return (data?.total || data?.data?.length || 0) > 0;
+}
+
+async function filterWithSpanishChapters(
+  entries: MangaCatalogEntry[],
+  concurrency = 6
+): Promise<MangaCatalogEntry[]> {
+  const ok: MangaCatalogEntry[] = [];
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency);
+    const flags = await Promise.all(batch.map((e) => hasSpanishChapters(e.id)));
+    batch.forEach((e, idx) => {
+      if (flags[idx]) ok.push(e);
+    });
   }
-  return fetchLiveCatalog(limit);
+  return ok;
 }
 
 async function fetchLiveCatalog(limit: number): Promise<MangaCatalogEntry[]> {
-  const out: MangaCatalogEntry[] = [];
+  const candidates: MangaCatalogEntry[] = [];
   let offset = 0;
   const pageSize = 32;
+  // Pedimos de más: varios “populares” no tienen capítulos ES reales
+  const candidateCap = Math.min(120, Math.max(limit * 3, 64));
 
-  while (out.length < limit && offset < 96) {
+  while (candidates.length < candidateCap && offset < 160) {
     const params = new URLSearchParams();
     params.set("limit", String(pageSize));
     params.set("offset", String(offset));
     params.set("order[followedCount]", "desc");
+    params.set("hasAvailableChapters", "true");
     params.append("availableTranslatedLanguage[]", "es");
+    params.append("availableTranslatedLanguage[]", "es-la");
     params.append("includes[]", "cover_art");
     params.append("contentRating[]", "safe");
     params.append("contentRating[]", "suggestive");
@@ -173,7 +230,7 @@ async function fetchLiveCatalog(limit: number): Promise<MangaCatalogEntry[]> {
       const poster = fileName
         ? `https://uploads.mangadex.org/covers/${m.id}/${fileName}.512.jpg`
         : null;
-      out.push({
+      candidates.push({
         id: m.id,
         slug: slugifyManga(title, m.id),
         title,
@@ -191,14 +248,14 @@ async function fetchLiveCatalog(limit: number): Promise<MangaCatalogEntry[]> {
         lastChapter: m.attributes.lastChapter || null,
         chapterCount: null,
       });
-      if (out.length >= limit) break;
+      if (candidates.length >= candidateCap) break;
     }
 
     if (data.data.length < pageSize) break;
     offset += pageSize;
   }
 
-  return out.slice(0, limit);
+  return candidates;
 }
 
 export async function getMangaEsBySlug(
@@ -248,9 +305,13 @@ async function fetchChaptersLive(mangaId: string): Promise<MangaChapter[]> {
     const params = new URLSearchParams();
     params.set("limit", "100");
     params.set("offset", String(offset));
-    params.set("translatedLanguage[]", "es");
+    params.append("translatedLanguage[]", "es");
+    params.append("translatedLanguage[]", "es-la");
     params.set("order[chapter]", "asc");
     params.set("includeFutureUpdates", "0");
+    params.append("contentRating[]", "safe");
+    params.append("contentRating[]", "suggestive");
+    params.append("contentRating[]", "erotica");
 
     const data = await mdGet<{
       data: Array<{
