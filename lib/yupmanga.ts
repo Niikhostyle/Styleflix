@@ -244,13 +244,42 @@ async function ensureSeriesSession(seriesId: string): Promise<{
 }
 
 export async function fetchYupPopular(limit = 48): Promise<YupMangaEntry[]> {
-  const all = await fetchYupAllCatalog();
-  return all.slice(0, limit);
+  // Liviano para runtime (home/mangas). El scrape completo es solo scripts.
+  const byId = new Map<string, YupMangaEntry>();
+  const pages = Math.max(1, Math.ceil(limit / 36));
+
+  for (let p = 1; p <= pages; p++) {
+    const res = yupRequest({
+      url: p === 1 ? `${YUP_BASE}/` : `${YUP_BASE}/?page=${p}`,
+    });
+    if (!res.ok) break;
+    if (/just a moment|cf-browser-verification|challenge-platform/i.test(res.body)) {
+      break;
+    }
+    for (const m of parseComicCards(res.body)) {
+      if (!byId.has(m.id)) byId.set(m.id, m);
+    }
+    if (parseComicCards(res.body).length === 0) break;
+  }
+
+  if (byId.size < limit) {
+    const top = yupRequest({ url: `${YUP_BASE}/top` });
+    if (
+      top.ok &&
+      !/just a moment|cf-browser-verification|challenge-platform/i.test(top.body)
+    ) {
+      for (const m of parseComicCards(top.body)) {
+        if (!byId.has(m.id)) byId.set(m.id, m);
+      }
+    }
+  }
+
+  return [...byId.values()].slice(0, limit);
 }
 
 /**
  * Catálogo completo: /all + home paginado + /top + búsquedas.
- * Deduplica por series id.
+ * Deduplica por series id. Solo para scripts offline (`mangas:scrape`).
  */
 export async function fetchYupAllCatalog(
   onProgress?: (msg: string) => void
@@ -595,6 +624,9 @@ type CatalogFile = {
 
 let mem: { at: number; items: YupMangaEntry[] } | null = null;
 const MEM_TTL = 20 * 60 * 1000;
+/** Si CF bloquea / scrape vacío, no reintentar live en cada request. */
+let yupFailCooldownUntil = 0;
+const YUP_FAIL_COOLDOWN_MS = 15 * 60 * 1000;
 
 export async function getYupMangaCatalog(
   limit = 48
@@ -614,8 +646,14 @@ export async function getYupMangaCatalog(
     /* live */
   }
 
+  if (Date.now() < yupFailCooldownUntil) return [];
+
   const live = await fetchYupPopular(limit);
-  if (live.length) mem = { at: Date.now(), items: live };
+  if (live.length) {
+    mem = { at: Date.now(), items: live };
+  } else {
+    yupFailCooldownUntil = Date.now() + YUP_FAIL_COOLDOWN_MS;
+  }
   return live.slice(0, limit);
 }
 

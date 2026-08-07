@@ -87,11 +87,15 @@ export function enabledSources(): SourceId[] {
     return true;
   });
 
-  // Secciones propias: si CATALOG_SOURCES está seteado sin ellas, igual se
-  // mantienen activas (salvo CATALOG_DISABLE). YupManga es primario; MangaDex
-  // queda opcional (no se auto-incluye).
-  for (const id of ["yupmanga", "animeav1"] as const) {
-    if (!disabled.has(id) && !list.includes(id)) list.push(id);
+  // Solo auto-incluir AnimeAV1 si CATALOG_SOURCES no está seteado.
+  // YupManga en Coolify suele chocar con Cloudflare → no forzar si el admin
+  // ya eligió fuentes (p.ej. mangadex). Desactivar: CATALOG_DISABLE=yupmanga
+  if (!raw) {
+    for (const id of ["yupmanga", "animeav1"] as const) {
+      if (!disabled.has(id) && !list.includes(id)) list.push(id);
+    }
+  } else if (!disabled.has("animeav1") && !list.includes("animeav1")) {
+    list.push("animeav1");
   }
 
   return list;

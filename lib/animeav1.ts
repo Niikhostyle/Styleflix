@@ -49,6 +49,14 @@ const AV1_FAIL_COOLDOWN_MS = 5 * 60 * 1000;
 const av1PageCache = new Map<string, { at: number; items: Av1CatalogItem[] }>();
 const AV1_PAGE_CACHE_MS = 20 * 60 * 1000;
 
+/** animeav1-api loguea parse fallido aunque el HTML fallback funcione. */
+const _origConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  const msg = String(args[0] ?? "");
+  if (msg.includes("Failed to parse catalog data")) return;
+  _origConsoleError(...args);
+};
+
 
 export function isAnimeAv1ZillaUrl(url: string): boolean {
   return ZILLA_HASH_RE.test(url);
@@ -126,24 +134,12 @@ export async function fetchAnimeAv1CatalogPages(opts?: {
 
   for (let page = 1; page <= pages; page++) {
     try {
-      // animeav1-api loguea "Failed to parse catalog data" aunque el HTML fallback funcione
-      const prevErr = console.error;
-      console.error = (...args: unknown[]) => {
-        const msg = String(args[0] ?? "");
-        if (msg.includes("Failed to parse catalog data")) return;
-        prevErr.apply(console, args as Parameters<typeof console.error>);
-      };
-      let items: Av1CatalogItem[] = [];
-      try {
-        const res = await getCatalog({
-          page,
-          order,
-          ...(opts?.category ? { category: opts.category } : {}),
-        });
-        items = res.items || [];
-      } finally {
-        console.error = prevErr;
-      }
+      const res = await getCatalog({
+        page,
+        order,
+        ...(opts?.category ? { category: opts.category } : {}),
+      });
+      const items = res.items || [];
       if (!items?.length) {
         emptyPages += 1;
         continue;

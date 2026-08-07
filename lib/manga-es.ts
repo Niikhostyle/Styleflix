@@ -151,7 +151,7 @@ export async function getMangaEsCatalogCachedOnly(
   return [];
 }
 
-/** Catálogo: YupManga primero; fallback MangaDex (caché o live). */
+/** Catálogo: YupManga primero (si está habilitado); fallback MangaDex. */
 export async function getMangaEsCatalog(
   limit = 48
 ): Promise<MangaCatalogEntry[]> {
@@ -163,29 +163,37 @@ export async function getMangaEsCatalog(
     return catalogMem.items.slice(0, limit);
   }
 
-  try {
-    const yup = await getYupMangaCatalog(limit);
-    if (yup.length) {
-      const items: MangaCatalogEntry[] = yup.map((m) => ({
-        id: m.id,
-        slug: m.slug,
-        title: m.title,
-        titleEs: m.titleEs,
-        poster: m.poster,
-        synopsis: m.synopsis,
-        status: m.status,
-        year: m.year,
-        genres: m.genres,
-        lastChapter: m.lastChapter,
-        chapterCount: m.chapterCount,
-        source: "yupmanga" as const,
-      }));
-      catalogMem = { at: Date.now(), items };
-      return items.slice(0, limit);
+  const { isSourceEnabled } = await import("@/lib/sources/types");
+  const yupOn = isSourceEnabled("yupmanga");
+  const mdOn = isSourceEnabled("mangadex");
+
+  if (yupOn) {
+    try {
+      const yup = await getYupMangaCatalog(limit);
+      if (yup.length) {
+        const items: MangaCatalogEntry[] = yup.map((m) => ({
+          id: m.id,
+          slug: m.slug,
+          title: m.title,
+          titleEs: m.titleEs,
+          poster: m.poster,
+          synopsis: m.synopsis,
+          status: m.status,
+          year: m.year,
+          genres: m.genres,
+          lastChapter: m.lastChapter,
+          chapterCount: m.chapterCount,
+          source: "yupmanga" as const,
+        }));
+        catalogMem = { at: Date.now(), items };
+        return items.slice(0, limit);
+      }
+    } catch {
+      /* fallback MangaDex */
     }
-  } catch {
-    /* fallback MangaDex */
   }
+
+  if (!mdOn && !yupOn) return [];
 
   const cached = await readJson<CatalogFile>(
     path.join(CACHE_DIR, "catalog.json")
@@ -201,12 +209,14 @@ export async function getMangaEsCatalog(
 
   const items =
     fromCache ||
-    (await fetchLiveCatalog(Math.max(limit * 2, 64))).map((m) => ({
-      ...m,
-      source: "mangadex" as const,
-    }));
+    (mdOn
+      ? (await fetchLiveCatalog(Math.max(limit * 2, 64))).map((m) => ({
+          ...m,
+          source: "mangadex" as const,
+        }))
+      : []);
 
-  catalogMem = { at: Date.now(), items };
+  if (items.length) catalogMem = { at: Date.now(), items };
   return items.slice(0, limit);
 }
 
