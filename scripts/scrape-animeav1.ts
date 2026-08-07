@@ -183,11 +183,15 @@ function ensureDir(dir: string) {
 }
 
 function safeName(title: string) {
-  return title
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80) || "anime";
+  return (
+    title
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[.\s]+$/g, "")
+      .slice(0, 80)
+      .replace(/[.\s]+$/g, "") || "anime"
+  );
 }
 
 function episodeKey(slug: string, ep: number) {

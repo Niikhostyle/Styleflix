@@ -13,7 +13,7 @@ import { getOrCreateDeviceId } from "@/lib/device-id";
 import { withPlaybackLockQuery } from "@/lib/playback-lock-url";
 import HlsVideoPlayer from "@/components/HlsVideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
-import { reportWatchProgress } from "@/lib/watch-client";
+import { reportWatchProgress, loadLocalWatchPosition } from "@/lib/watch-client";
 
 function attachLockToPlayUrl(
   url: string,
@@ -80,6 +80,8 @@ export default function ModalPlayer({
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
   const [lockConflict, setLockConflict] = useState(false);
+  /** Segundos guardados para retomar (Drive / HLS). */
+  const [resumeAt, setResumeAt] = useState(0);
   const backBtnRef = useRef<HTMLButtonElement>(null);
   const pushedRef = useRef(false);
   const closingRef = useRef(false);
@@ -331,9 +333,57 @@ export default function ModalPlayer({
     isAdmin,
   ]);
 
-  // Progreso estimado mientras el player está abierto (embeds sin timeupdate)
+  // Cargar posición guardada (local + API) al abrir / cambiar episodio
   useEffect(() => {
-    if (!open || !embedPath) return;
+    if (!open) {
+      setResumeAt(0);
+      return;
+    }
+
+    const local = loadLocalWatchPosition({
+      mediaType,
+      tmdbId: mediaId,
+      season: mediaType === "tv" ? currentSeason : null,
+      episode: mediaType === "tv" ? currentEpisode : null,
+    });
+    if (local?.positionSeconds && local.positionSeconds >= 5) {
+      setResumeAt(local.positionSeconds);
+    } else {
+      setResumeAt(0);
+    }
+
+    let cancelled = false;
+    void fetch("/api/watch", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mediaType, tmdbId: mediaId }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const p = data.progress;
+        if (!p || p.completed) return;
+        if (mediaType === "tv") {
+          const sameEp =
+            (p.season ?? 1) === currentSeason &&
+            (p.episode ?? 1) === currentEpisode;
+          if (!sameEp) return;
+        }
+        const secs = Number(p.positionSeconds);
+        if (Number.isFinite(secs) && secs >= 5) {
+          setResumeAt((prev) => (secs > prev ? secs : prev));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mediaId, mediaType, currentSeason, currentEpisode]);
+
+  // Progreso estimado SOLO para embeds iframe (sin timeupdate real)
+  useEffect(() => {
+    if (!open || !embedPath || playKind !== "iframe") return;
     let pct = mediaType === "tv" ? 15 : 10;
     const id = window.setInterval(() => {
       pct = Math.min(mediaType === "movie" ? 85 : 70, pct + 4);
@@ -352,6 +402,7 @@ export default function ModalPlayer({
   }, [
     open,
     embedPath,
+    playKind,
     mediaId,
     mediaType,
     title,
@@ -567,7 +618,8 @@ export default function ModalPlayer({
       key={`hls-${mediaId}-${season}-${episode}-${frameNonce}`}
       src={embedPath}
       title={title}
-      onProgress={(progressPct, completed) =>
+      startAtSeconds={resumeAt}
+      onProgress={(progressPct, completed, positionSeconds) =>
         reportWatchProgress({
           mediaType,
           tmdbId: mediaId,
@@ -576,6 +628,7 @@ export default function ModalPlayer({
           season: mediaType === "tv" ? currentSeason : null,
           episode: mediaType === "tv" ? currentEpisode : null,
           progressPct,
+          positionSeconds,
           completed,
         })
       }
@@ -585,7 +638,8 @@ export default function ModalPlayer({
       key={`video-${mediaId}-${season}-${episode}-${frameNonce}`}
       src={embedPath}
       title={title}
-      onProgress={(progressPct, completed) =>
+      startAtSeconds={resumeAt}
+      onProgress={(progressPct, completed, positionSeconds) =>
         reportWatchProgress({
           mediaType,
           tmdbId: mediaId,
@@ -594,6 +648,7 @@ export default function ModalPlayer({
           season: mediaType === "tv" ? currentSeason : null,
           episode: mediaType === "tv" ? currentEpisode : null,
           progressPct,
+          positionSeconds,
           completed,
         })
       }

@@ -119,15 +119,18 @@ function log(...args: unknown[]) {
 }
 
 function safeName(input: string, max = 80): string {
-  return (
+  // Windows no permite nombres que terminen en punto o espacio ("Your Name.")
+  const cleaned =
     input
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, max) || "sin-titulo"
-  );
+      .replace(/[.\s]+$/g, "")
+      .slice(0, max)
+      .replace(/[.\s]+$/g, "") || "sin-titulo";
+  return cleaned;
 }
 
 function ensureDir(path: string) {
@@ -1054,7 +1057,14 @@ async function main() {
     log(
       `cola ${n}/${work.length} · videos=${progress.stats.videos} err=${progress.stats.errors} · «${entryLabel(entry)}»`
     );
+  try {
     await processEntry(outRoot, entry, progress, { downloadVideo, postersOnly }, progressPath);
+  } catch (err) {
+    progress.failed[entry.key] = String(err);
+    progress.stats.errors++;
+    log(`FAIL «${entryLabel(entry)}»`, String(err));
+    saveProgress(progressPath, progress);
+  }
     await sleep(800);
   });
 

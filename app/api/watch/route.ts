@@ -11,6 +11,7 @@ const upsertSchema = z.object({
   season: z.number().int().positive().nullable().optional(),
   episode: z.number().int().positive().nullable().optional(),
   progressPct: z.number().min(0).max(100).optional(),
+  positionSeconds: z.number().min(0).nullable().optional(),
   completed: z.boolean().optional(),
 });
 
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
     season: row.season,
     episode: row.episode,
     progressPct: row.progressPct,
+    positionSeconds: row.positionSeconds ?? null,
     completed: opts?.forceCompleted ?? row.completed,
     lastWatchedAt: row.lastWatchedAt.toISOString(),
   });
@@ -100,6 +102,12 @@ export async function POST(request: Request) {
         season: data.season ?? (data.mediaType === "tv" ? 1 : null),
         episode: data.episode ?? (data.mediaType === "tv" ? 1 : null),
         progressPct: data.progressPct ?? 5,
+        positionSeconds:
+          data.completed
+            ? 0
+            : data.positionSeconds != null
+              ? data.positionSeconds
+              : null,
         completed: data.completed ?? false,
         lastWatchedAt: new Date(),
       },
@@ -109,6 +117,11 @@ export async function POST(request: Request) {
         season: data.season ?? undefined,
         episode: data.episode ?? undefined,
         progressPct: data.progressPct ?? undefined,
+        positionSeconds: data.completed
+          ? 0
+          : data.positionSeconds !== undefined
+            ? data.positionSeconds
+            : undefined,
         completed: data.completed ?? undefined,
         lastWatchedAt: new Date(),
       },

@@ -151,6 +151,8 @@ model WatchProgress {
   episode       Int?
   /// 0–100 aproximado
   progressPct   Float    @default(5)
+  /// Posición exacta en segundos (player nativo / HLS / Drive)
+  positionSeconds Float?
   completed     Boolean  @default(false)
   lastWatchedAt DateTime @default(now())
   createdAt     DateTime @default(now())
