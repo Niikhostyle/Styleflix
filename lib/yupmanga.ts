@@ -244,34 +244,145 @@ async function ensureSeriesSession(seriesId: string): Promise<{
 }
 
 export async function fetchYupPopular(limit = 48): Promise<YupMangaEntry[]> {
+  const all = await fetchYupAllCatalog();
+  return all.slice(0, limit);
+}
+
+/**
+ * Catálogo completo: /all + home paginado + /top + búsquedas.
+ * Deduplica por series id.
+ */
+export async function fetchYupAllCatalog(
+  onProgress?: (msg: string) => void
+): Promise<YupMangaEntry[]> {
   const byId = new Map<string, YupMangaEntry>();
+  const log = onProgress || ((m: string) => console.log(m));
 
-  const top = yupRequest({ url: `${YUP_BASE}/top` });
-  if (top.ok) {
-    for (const m of parseComicCards(top.body)) byId.set(m.id, m);
-  }
-
-  for (let page = 1; page <= 8 && byId.size < limit; page++) {
-    const res = yupRequest({
-      url: page === 1 ? `${YUP_BASE}/` : `${YUP_BASE}/?page=${page}`,
-    });
-    if (!res.ok) break;
-    for (const m of parseComicCards(res.body)) {
+  function ingest(html: string) {
+    for (const m of parseComicCards(html)) {
       if (!byId.has(m.id)) byId.set(m.id, m);
     }
-    await sleep(200);
   }
 
-  if (byId.size < limit) {
-    const all = yupRequest({ url: `${YUP_BASE}/all` });
-    if (all.ok) {
-      for (const m of parseComicCards(all.body)) {
-        if (!byId.has(m.id)) byId.set(m.id, m);
-      }
+  function maxPage(html: string): number {
+    const nums = [...html.matchAll(/[?&]page=(\d+)/gi)].map((m) =>
+      Number(m[1])
+    );
+    return nums.length ? Math.max(...nums) : 1;
+  }
+
+  // 1) /all
+  const all1 = yupRequest({ url: `${YUP_BASE}/all` });
+  if (all1.ok) {
+    ingest(all1.body);
+    const last = maxPage(all1.body);
+    log(`[yupmanga] /all páginas 1..${last}`);
+    for (let p = 2; p <= last; p++) {
+      const res = yupRequest({ url: `${YUP_BASE}/all?page=${p}` });
+      if (!res.ok) break;
+      ingest(res.body);
+      await sleep(150);
     }
   }
+  log(`[yupmanga] tras /all: ${byId.size}`);
 
-  return [...byId.values()].slice(0, limit);
+  // 2) home latest hasta estancar
+  let stagnant = 0;
+  for (let p = 1; p <= 300; p++) {
+    const res = yupRequest({
+      url: p === 1 ? `${YUP_BASE}/` : `${YUP_BASE}/?page=${p}`,
+    });
+    if (!res.ok) break;
+    const before = byId.size;
+    ingest(res.body);
+    const cards = parseComicCards(res.body).length;
+    if (!cards) break;
+    const grew = byId.size - before;
+    if (p === 1 || p % 10 === 0 || grew === 0) {
+      log(`[yupmanga] home p=${p} +${grew} total=${byId.size}`);
+    }
+    if (grew === 0) {
+      stagnant += 1;
+      if (stagnant >= 3) break;
+    } else stagnant = 0;
+    await sleep(120);
+  }
+  log(`[yupmanga] tras home: ${byId.size}`);
+
+  // 3) top
+  const top = yupRequest({ url: `${YUP_BASE}/top` });
+  if (top.ok) ingest(top.body);
+  log(`[yupmanga] tras /top: ${byId.size}`);
+
+  // 4) búsquedas (mín. 3 chars en YupManga)
+  const queries = new Set<string>();
+  for (const c of "abcdefghijklmnopqrstuvwxyz") {
+    queries.add(`${c}a`);
+    queries.add(`${c}e`);
+    queries.add(`${c}i`);
+    queries.add(`${c}o`);
+    queries.add(`${c}u`);
+  }
+  for (const w of [
+    "el ", // will skip len
+    "amor",
+    "odio",
+    "rey",
+    "magia",
+    "dragon",
+    "school",
+    "high",
+    "solo",
+    "black",
+    "one",
+    "naruto",
+    "bleach",
+    "jujutsu",
+    "omega",
+    "alfa",
+    "luna",
+    "noche",
+    "vida",
+    "muerte",
+    "amor",
+    "dios",
+    "hero",
+    "vill",
+    "duke",
+    "emper",
+    "casar",
+    "novia",
+    "espos",
+    "secre",
+    "demon",
+    "angel",
+    "blood",
+    "game",
+    "world",
+    "isekai",
+    "manhwa",
+    "manga",
+  ]) {
+    if (w.trim().length >= 3) queries.add(w.trim());
+  }
+
+  for (const q of queries) {
+    if (q.length < 3) continue;
+    for (let page = 1; page <= 15; page++) {
+      const res = yupRequest({
+        url: `${YUP_BASE}/search.php?q=${encodeURIComponent(q)}&page=${page}`,
+      });
+      if (!res.ok) break;
+      const before = byId.size;
+      ingest(res.body);
+      const n = parseComicCards(res.body).length;
+      if (!n) break;
+      if (byId.size === before && page > 1) break;
+      await sleep(100);
+    }
+  }
+  log(`[yupmanga] catálogo total único: ${byId.size}`);
+  return [...byId.values()];
 }
 
 export async function fetchYupMangaDetails(
