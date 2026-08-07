@@ -150,24 +150,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const email = parsed.data.email.toLowerCase().trim();
-        let user = await prisma.user.findUnique({ where: { email } });
+        let user;
+        try {
+          const { withPrismaRetry } = await import("@/lib/prisma");
+          user = await withPrismaRetry(() =>
+            prisma.user.findUnique({ where: { email } })
+          );
+        } catch (err) {
+          console.error("[auth] DB unavailable during login", err);
+          return null;
+        }
         if (!user) return null;
 
         const valid = await compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
 
         if (!user.emailVerified) {
-          const pending = await prisma.authToken.findFirst({
-            where: {
-              userId: user.id,
-              type: "EMAIL_VERIFY",
-              usedAt: null,
-              expiresAt: { gt: new Date() },
-            },
-            select: { id: true },
-          });
-          if (pending) {
-            throw new EmailNotVerifiedError();
+          try {
+            const pending = await prisma.authToken.findFirst({
+              where: {
+                userId: user.id,
+                type: "EMAIL_VERIFY",
+                usedAt: null,
+                expiresAt: { gt: new Date() },
+              },
+              select: { id: true },
+            });
+            if (pending) {
+              throw new EmailNotVerifiedError();
+            }
+          } catch (err) {
+            if (err instanceof EmailNotVerifiedError) throw err;
+            console.error("[auth] verify-token check failed", err);
+            return null;
           }
         }
 

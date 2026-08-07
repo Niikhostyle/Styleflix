@@ -9,7 +9,8 @@ export const metadata = {
 };
 
 export default async function AnimesPage() {
-  const { featured, rows } = await getAnimeCatalog();
+  const empty = { featured: [], rows: [] };
+  const { featured, rows } = await getAnimeCatalog().catch(() => empty);
 
   return (
     <CatalogClient

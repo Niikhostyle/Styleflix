@@ -19,6 +19,7 @@ function isPublicPath(pathname: string) {
   if (pathname.startsWith("/api/auth")) return true;
   if (pathname === "/api/billing/webhook") return true;
   if (pathname === "/api/pricing") return true;
+  if (pathname === "/api/health") return true;
   if (pathname === "/api/settings/preview") return true;
   if (pathname === "/api/internal/security-ingest") return true;
   // HLS Zilla: auth por token firmado (si middleware redirige a /login, hls.js rompe)

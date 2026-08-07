@@ -9,7 +9,8 @@ export const metadata = {
 };
 
 export default async function MangasPage() {
-  const { featured, rows } = await getMangaCatalog();
+  const empty = { featured: [], rows: [] };
+  const { featured, rows } = await getMangaCatalog().catch(() => empty);
 
   return <MangaCatalogClient featured={featured} rows={rows} />;
 }

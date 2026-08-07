@@ -23,7 +23,16 @@ async function HomeShell() {
     );
   }
 
-  const { featured, rows, activeSources } = await getHomeCatalog();
+  const empty = {
+    featured: [] as Awaited<ReturnType<typeof getHomeCatalog>>["featured"],
+    rows: [] as Awaited<ReturnType<typeof getHomeCatalog>>["rows"],
+    activeSources: [] as Awaited<
+      ReturnType<typeof getHomeCatalog>
+    >["activeSources"],
+  };
+  const { featured, rows, activeSources } = await getHomeCatalog().catch(
+    () => empty
+  );
 
   if (!featured.length) {
     return (

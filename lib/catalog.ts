@@ -32,7 +32,7 @@ const FAST_TIMEOUT_MS = 6000;
 const SLOW_TIMEOUT_MS = 12000;
 /** Home: nunca esperar YupManga live (curl); solo caché en disco. */
 const MANGA_HOME_TIMEOUT_MS = 2500;
-const MANGA_TIMEOUT_MS = 45000;
+const MANGA_TIMEOUT_MS = 15000;
 
 export type CatalogPage = {
   featured: CatalogItem[];
@@ -291,19 +291,11 @@ async function loadMangaEsRows(): Promise<LoadedRow[]> {
   return withTimeout(getMangaEsRows(), MANGA_TIMEOUT_MS, [], "manga:rows");
 }
 
-export async function getMangaCatalog(): Promise<CatalogPage> {
-  const mangaRows = await loadMangaEsRows();
-  const src: SourceId = enabledSources().includes("yupmanga")
-    ? "yupmanga"
-    : "mangadex";
-  return {
-    featured: mangaRows[0]?.items?.slice(0, 8) || [],
-    rows: finishRows(mangaRows),
-    activeSources: mangaRows.length ? ([src] as SourceId[]) : [],
-  };
-}
+let animeMem: { at: number; data: CatalogPage } | null = null;
+let mangaMem: { at: number; data: CatalogPage } | null = null;
+const SECTION_MEM_TTL_MS = 180_000;
 
-export async function getAnimeCatalog(): Promise<CatalogPage> {
+async function getAnimeCatalogUncached(): Promise<CatalogPage> {
   const [av1Rows, tmdbRows, jikanRows] = await Promise.all([
     loadAnimeAv1Rows(),
     loadTmdbRows("anime", [1, 2]),
@@ -312,8 +304,7 @@ export async function getAnimeCatalog(): Promise<CatalogPage> {
 
   const playableRows: LoadedRow[] = av1Rows.length
     ? av1Rows
-    : // fallback si AnimeAV1 falla: Vimeus
-      vimeusRows([
+    : vimeusRows([
         {
           title: "Recién añadidos",
           items: await loadVimeus("animes", [1]),
@@ -336,6 +327,36 @@ export async function getAnimeCatalog(): Promise<CatalogPage> {
     rows: finishRows(allRows),
     activeSources: collectSources(allRows),
   };
+}
+
+export async function getMangaCatalog(): Promise<CatalogPage> {
+  if (mangaMem && Date.now() - mangaMem.at < SECTION_MEM_TTL_MS) {
+    return mangaMem.data;
+  }
+  const mangaRows = await loadMangaEsRows();
+  const src: SourceId = enabledSources().includes("yupmanga")
+    ? "yupmanga"
+    : "mangadex";
+  const data: CatalogPage = {
+    featured: mangaRows[0]?.items?.slice(0, 8) || [],
+    rows: finishRows(mangaRows),
+    activeSources: mangaRows.length ? ([src] as SourceId[]) : [],
+  };
+  if (data.rows.length || data.featured.length) {
+    mangaMem = { at: Date.now(), data };
+  }
+  return data;
+}
+
+export async function getAnimeCatalog(): Promise<CatalogPage> {
+  if (animeMem && Date.now() - animeMem.at < SECTION_MEM_TTL_MS) {
+    return animeMem.data;
+  }
+  const data = await getAnimeCatalogUncached();
+  if (data.rows.length || data.featured.length) {
+    animeMem = { at: Date.now(), data };
+  }
+  return data;
 }
 
 /**
@@ -412,17 +433,17 @@ async function buildHomeCatalog(): Promise<CatalogPage> {
 
 /** Caché proceso + Next: evita stampede de catálogo en cada visita concurrente. */
 let homeMem: { at: number; data: CatalogPage } | null = null;
-const HOME_MEM_TTL_MS = 90_000;
+const HOME_MEM_TTL_MS = 180_000;
 
-/** Caché 10 min: el home no debe martillar AnimeAV1/TMDB/Vimeus en cada visita. */
+/** Caché 15 min: el home no debe martillar AnimeAV1/TMDB/Vimeus en cada visita. */
 export async function getHomeCatalog(): Promise<CatalogPage> {
   if (homeMem && Date.now() - homeMem.at < HOME_MEM_TTL_MS) {
     return homeMem.data;
   }
 
   const { unstable_cache } = await import("next/cache");
-  const cached = unstable_cache(buildHomeCatalog, ["veotv-home-catalog-v4"], {
-    revalidate: 600,
+  const cached = unstable_cache(buildHomeCatalog, ["veotv-home-catalog-v5"], {
+    revalidate: 900,
     tags: ["home-catalog"],
   });
   const data = await cached();
