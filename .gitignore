@@ -71,3 +71,6 @@ android-tv/local.properties
 
 # Caché local de mangas (regenerar con npm run mangas:scrape)
 /data/mangas-es/
+
+# Caché local AnimeAV1 (regenerar con npm run animeav1:catalog)
+/data/animeav1/

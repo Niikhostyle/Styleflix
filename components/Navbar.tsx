@@ -234,9 +234,10 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={`veotv-topbar pointer-events-none fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
+        className={`veotv-topbar pointer-events-none fixed inset-x-0 z-50 transition-[colors,top] duration-300 ${
           !hideMobileTabs ? "veotv-has-mobile-tabs" : ""
         }`}
+        style={{ top: "var(--veotv-demo-offset, 0px)" }}
       >
         <div
           className={`pointer-events-auto border-b transition-all duration-300 ${
@@ -245,7 +246,7 @@ export default function Navbar() {
               : "border-transparent bg-gradient-to-b from-[#06080f]/90 via-[#06080f]/55 to-transparent backdrop-blur-md"
           }`}
         >
-          <div className="mx-auto flex h-14 max-w-[1520px] items-center justify-between gap-3 px-3 pt-[env(safe-area-inset-top)] sm:h-16 sm:px-5 md:px-8 lg:px-10">
+          <div className="veotv-topbar-inner mx-auto flex h-14 max-w-[1520px] items-center justify-between gap-3 px-3 pt-[env(safe-area-inset-top)] sm:h-16 sm:px-5 md:px-8 lg:px-10">
             <div className="flex min-w-0 flex-1 items-center gap-4 lg:gap-10">
               <BrandMark className="shrink-0" />
 

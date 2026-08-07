@@ -23,6 +23,7 @@
   --tv-from: #76ead7;
   --tv-via: #a1c4fd;
   --tv-to: #c299ff;
+  --veotv-demo-offset: 0px;
 }
 
 @theme inline {
@@ -83,6 +84,16 @@ select {
   min-height: 100vh;
   background: transparent;
   color: var(--foreground);
+}
+
+/* Empuja el contenido cuando la barra demo fija está visible */
+html.veotv-has-demo .app-page {
+  padding-top: var(--veotv-demo-offset, 2.75rem);
+}
+
+/* Safe-area ya lo absorbe la barra demo; evita doble padding en el topbar */
+html.veotv-has-demo .veotv-topbar-inner {
+  padding-top: 0;
 }
 
 /* Espacio para tabs inferiores en smartphone */

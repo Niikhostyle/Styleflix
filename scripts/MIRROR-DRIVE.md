@@ -3,7 +3,13 @@
 Script descarga: `scripts/mirror-catalog-to-drive.ts`  
 Script registro links: `scripts/register-drive-streams.ts`
 
-## Qué descarga ahora
+## AnimeAV1 (aparte)
+
+Para animes en emisión / populares / resto desde animeav1.com:
+
+ver `scripts/ANIMEAV1.md` → `npm run animeav1:download`
+
+## Qué descarga ahora (Vimeus)
 
 Usa el **mismo botón de descarga del player** Vimeus:
 
