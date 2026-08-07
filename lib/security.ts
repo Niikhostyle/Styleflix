@@ -205,6 +205,48 @@ export async function maybeAutoBlockFromAuthFails(ip: string) {
   }
 }
 
+export async function maybeAutoBlockFromRateLimit(ip: string) {
+  if (!ip || ip === "unknown") return;
+  const since = new Date(Date.now() - 15 * 60_000);
+  const count = await prisma.securityEvent.count({
+    where: { ip, type: "RATE_LIMIT", createdAt: { gte: since } },
+  });
+  if (count >= 3) {
+    const existing = await prisma.blockedIp.findUnique({ where: { ip } });
+    if (!existing) {
+      await blockIp({
+        ip,
+        reason: `Auto-bloqueo: ráfagas de tráfico (${count}) en 15 min`,
+        source: "AUTO_RATE",
+        ttlHours: 2,
+      });
+    }
+  }
+}
+
+export async function maybeAutoBlockFromSuspicious(ip: string) {
+  if (!ip || ip === "unknown") return;
+  const since = new Date(Date.now() - 30 * 60_000);
+  const count = await prisma.securityEvent.count({
+    where: {
+      ip,
+      type: { in: ["SUSPICIOUS", "SCRAPE"] },
+      createdAt: { gte: since },
+    },
+  });
+  if (count >= 5) {
+    const existing = await prisma.blockedIp.findUnique({ where: { ip } });
+    if (!existing) {
+      await blockIp({
+        ip,
+        reason: `Auto-bloqueo: ${count} señales sospechosas/scraper en 30 min`,
+        source: "AUTO_SCAN",
+        ttlHours: 12,
+      });
+    }
+  }
+}
+
 export async function getSecurityDashboard(hours = 24) {
   const since = new Date(Date.now() - hours * 3600_000);
   void pruneOldPresence(45);
@@ -217,11 +259,16 @@ export async function getSecurityDashboard(hours = 24) {
     bySeverity,
     topIps,
     metrics,
+    anomalies,
+    recentTraffic,
   ] = await Promise.all([
     prisma.securityEvent.findMany({
-      where: { createdAt: { gte: since } },
+      where: {
+        createdAt: { gte: since },
+        type: { not: "INFO" },
+      },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 120,
     }),
     prisma.securityEvent.count({
       where: { createdAt: { gte: since } },
@@ -242,12 +289,29 @@ export async function getSecurityDashboard(hours = 24) {
       where: {
         createdAt: { gte: since },
         ip: { not: null },
+        type: { not: "INFO" },
       },
       _count: { _all: true },
       orderBy: { _count: { ip: "desc" } },
       take: 15,
     }),
     getPlatformMetrics(hours),
+    prisma.securityEvent.findMany({
+      where: {
+        createdAt: { gte: since },
+        type: { in: ["SUSPICIOUS", "RATE_LIMIT", "SCRAPE"] },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+    }),
+    prisma.securityEvent.findMany({
+      where: {
+        createdAt: { gte: new Date(Date.now() - 2 * 3600_000) },
+        type: "INFO",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+    }),
   ]);
 
   return {
@@ -259,6 +323,11 @@ export async function getSecurityDashboard(hours = 24) {
       scans: byType.find((t) => t.type === "SCAN")?._count._all || 0,
       scrapes: byType.find((t) => t.type === "SCRAPE")?._count._all || 0,
       authFails: byType.find((t) => t.type === "AUTH_FAIL")?._count._all || 0,
+      suspicious:
+        byType.find((t) => t.type === "SUSPICIOUS")?._count._all || 0,
+      rateLimits:
+        byType.find((t) => t.type === "RATE_LIMIT")?._count._all || 0,
+      trafficSamples: byType.find((t) => t.type === "INFO")?._count._all || 0,
     },
     byType: byType.map((t) => ({ type: t.type, count: t._count._all })),
     bySeverity: bySeverity.map((s) => ({
@@ -269,6 +338,8 @@ export async function getSecurityDashboard(hours = 24) {
       .filter((r) => r.ip)
       .map((r) => ({ ip: r.ip!, count: r._count._all })),
     events,
+    anomalies,
+    recentTraffic,
     blocked,
     metrics,
   };

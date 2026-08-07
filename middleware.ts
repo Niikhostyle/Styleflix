@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import {
+  SCAN_PATH_RE,
+  evaluateRequest,
+  postSecuritySignals,
+} from "@/lib/security-edge";
 
 function isPublicPath(pathname: string) {
   if (pathname === "/") return true;
@@ -106,44 +111,71 @@ function clientIp(request: NextRequest): string {
   );
 }
 
-const SCAN_PATH_RE =
-  /(?:wp-admin|wp-login|xmlrpc\.php|\.env|phpmyadmin|adminer|\.git\/|actuator|composer\.json|vendor\/phpunit|cgi-bin|shell\.php)/i;
-
 /**
- * Paywall: catálogo requiere sesión + (membresía o demo activa).
- * Landing `/` pública; sin acceso → onboarding.
+ * Paywall + señales de seguridad (scans, scrapers, ráfagas, fan-out de rutas).
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = clientIp(request);
+  const ua = request.headers.get("user-agent");
+  const origin = request.nextUrl.origin;
+  const secret =
+    process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
+  const ingestToken = secret.slice(0, 32);
 
-  // Señal de escaneo → ingest (no bloquea el request aquí)
+  // Señal de escaneo clásico → bloqueo inmediato
   if (SCAN_PATH_RE.test(pathname)) {
-    const origin = request.nextUrl.origin;
-    const secret =
-      process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
-    void fetch(`${origin}/api/internal/security-ingest`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-veotv-ingest": secret.slice(0, 32),
-      },
-      body: JSON.stringify({
-        type: "SCAN",
-        severity: "high",
-        ip,
-        path: pathname,
-        method: request.method,
-        userAgent: request.headers.get("user-agent"),
-        detail: `Escaneo detectado: ${pathname}`,
-      }),
-    }).catch(() => undefined);
+    if (ingestToken) {
+      postSecuritySignals(
+        origin,
+        ingestToken,
+        {
+          ip,
+          path: pathname,
+          method: request.method,
+          userAgent: ua,
+        },
+        [
+          {
+            type: "SCAN",
+            severity: "high",
+            detail: `Escaneo detectado: ${pathname}`,
+          },
+        ]
+      );
+    }
     return new NextResponse("Forbidden", { status: 403 });
   }
 
   const token = await readToken(request);
   const loggedIn = isLoggedIn(token);
   const catalogAccess = hasAccess(token);
+  const isAdminRole = token?.role === "SUPER_ADMIN";
+
+  // Anomalías / muestreo (no bloquea; solo registra)
+  if (ingestToken && !pathname.startsWith("/api/internal/")) {
+    const signals = evaluateRequest({
+      ip,
+      path: pathname,
+      method: request.method,
+      ua,
+      loggedIn,
+      isAdminRole: Boolean(isAdminRole),
+    });
+    if (signals.length) {
+      postSecuritySignals(
+        origin,
+        ingestToken,
+        {
+          ip,
+          path: pathname,
+          method: request.method,
+          userAgent: ua,
+        },
+        signals
+      );
+    }
+  }
 
   if (pathname === "/") {
     if (loggedIn && !catalogAccess) {

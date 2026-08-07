@@ -81,11 +81,34 @@ type SecurityPayload = {
     scans: number;
     scrapes: number;
     authFails: number;
+    suspicious?: number;
+    rateLimits?: number;
+    trafficSamples?: number;
   };
   byType: { type: string; count: number }[];
   bySeverity: { severity: string; count: number }[];
   topIps: { ip: string; count: number }[];
   events: Array<{
+    id: string;
+    type: string;
+    severity: string;
+    ip: string | null;
+    path: string | null;
+    detail: string | null;
+    userAgent: string | null;
+    createdAt: string;
+  }>;
+  anomalies?: Array<{
+    id: string;
+    type: string;
+    severity: string;
+    ip: string | null;
+    path: string | null;
+    detail: string | null;
+    userAgent: string | null;
+    createdAt: string;
+  }>;
+  recentTraffic?: Array<{
     id: string;
     type: string;
     severity: string;
@@ -298,10 +321,22 @@ export default function AdminSecurityClient() {
       hint: "wp-admin, .env, etc.",
     },
     {
+      label: "Anomalías",
+      value: data?.totals.suspicious ?? 0,
+      icon: ShieldAlert,
+      hint: "Fan-out / admin / UA raro",
+    },
+    {
+      label: "Ráfagas",
+      value: data?.totals.rateLimits ?? 0,
+      icon: Activity,
+      hint: "Demasiados req/min",
+    },
+    {
       label: "Scrapers",
       value: data?.totals.scrapes ?? 0,
-      icon: Activity,
-      hint: "UA automatizados",
+      icon: Network,
+      hint: "curl, python, bots",
     },
     {
       label: "Auth fallida",
@@ -557,7 +592,7 @@ export default function AdminSecurityClient() {
 
       {tab === "threats" && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {threatCards.map((c) => {
               const Icon = c.icon;
               return (
@@ -576,6 +611,74 @@ export default function AdminSecurityClient() {
               );
             })}
           </div>
+
+          <section className="surface-panel rounded-2xl p-4">
+            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
+              <ShieldAlert className="h-4 w-4 text-amber-300" />
+              Anomalías recientes
+            </h3>
+            <p className="mb-3 text-xs text-white/40">
+              Auditorías, scrapers y ráfagas (lo que antes no se veía).
+            </p>
+            <ul className="max-h-72 space-y-2 overflow-y-auto text-sm">
+              {(data?.anomalies || []).length === 0 && (
+                <li className="text-white/40">Sin anomalías en la ventana.</li>
+              )}
+              {(data?.anomalies || []).map((ev) => (
+                <li
+                  key={ev.id}
+                  className="rounded-xl border border-white/8 bg-black/25 px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${sevClass(ev.severity)}`}
+                    >
+                      {ev.type}
+                    </span>
+                    <span className="font-mono text-xs text-cyan-100/90">
+                      {ev.ip || "—"}
+                    </span>
+                    <span className="text-xs text-white/35">
+                      {fmtDate(ev.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-white/80">{ev.detail || ev.path}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="surface-panel rounded-2xl p-4">
+            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
+              <Globe2 className="h-4 w-4 text-teal-300" />
+              Tráfico muestreado (2 h)
+            </h3>
+            <p className="mb-3 text-xs text-white/40">
+              Muestras de navegación real — útil para ver audits “suaves”.
+              {typeof data?.totals.trafficSamples === "number"
+                ? ` (${data.totals.trafficSamples} en ventana)`
+                : ""}
+            </p>
+            <ul className="max-h-56 space-y-1.5 overflow-y-auto font-mono text-xs">
+              {(data?.recentTraffic || []).length === 0 && (
+                <li className="font-sans text-sm text-white/40">
+                  Aún sin muestras. Aparecen al navegar el sitio tras el deploy.
+                </li>
+              )}
+              {(data?.recentTraffic || []).map((ev) => (
+                <li
+                  key={ev.id}
+                  className="flex flex-wrap gap-x-3 gap-y-0.5 border-b border-white/5 py-1.5 text-white/70"
+                >
+                  <span className="text-cyan-100/80">{ev.ip}</span>
+                  <span className="text-white/45">{fmtDate(ev.createdAt)}</span>
+                  <span className="text-teal-100/90">
+                    {ev.detail || ev.path}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
 
           <div className="grid gap-5 lg:grid-cols-2">
             <section className="surface-panel rounded-2xl p-4">

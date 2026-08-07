@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  maybeAutoBlockFromAuthFails,
+  maybeAutoBlockFromRateLimit,
   maybeAutoBlockFromScans,
+  maybeAutoBlockFromSuspicious,
   recordSecurityEvent,
   type SecurityEventType,
 } from "@/lib/security";
@@ -28,6 +31,7 @@ export async function POST(request: Request) {
     method?: string;
     userAgent?: string;
     detail?: string;
+    meta?: Record<string, unknown>;
   } | null;
 
   if (!body?.type) {
@@ -42,10 +46,16 @@ export async function POST(request: Request) {
     method: body.method,
     userAgent: body.userAgent,
     detail: body.detail,
+    meta: body.meta,
   });
 
-  if (body.type === "SCAN" && body.ip) {
-    await maybeAutoBlockFromScans(body.ip);
+  if (body.ip) {
+    if (body.type === "SCAN") await maybeAutoBlockFromScans(body.ip);
+    if (body.type === "AUTH_FAIL") await maybeAutoBlockFromAuthFails(body.ip);
+    if (body.type === "RATE_LIMIT") await maybeAutoBlockFromRateLimit(body.ip);
+    if (body.type === "SUSPICIOUS" || body.type === "SCRAPE") {
+      await maybeAutoBlockFromSuspicious(body.ip);
+    }
   }
 
   return NextResponse.json({ ok: true });
