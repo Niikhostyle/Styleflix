@@ -25,10 +25,7 @@ export default function OnboardingShell({
   wide?: boolean;
 }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050508] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[url('https://image.tmdb.org/t/p/w1280/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg')] bg-cover bg-center opacity-25 blur-sm" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/85 to-[#050508]" />
-
+    <div className="relative min-h-screen overflow-hidden bg-transparent text-white">
       <header className="relative z-10 flex items-center justify-between gap-4 px-5 py-5 md:px-10">
         <BrandMark className="text-2xl" />
         {backHref && (

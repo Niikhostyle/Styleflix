@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import PosterCollageBackground from "@/components/PosterCollageBackground";
 
 export interface AnimatedMarqueeHeroProps {
   tagline: string;
@@ -79,15 +80,6 @@ export function AnimatedMarqueeHero({
   const duplicatedImages =
     images.length > 0 ? [...images, ...images, ...images] : [];
 
-  // Rellenar collage de fondo (estilo Netflix) reutilizando posters del catálogo
-  const collagePool =
-    images.length > 0
-      ? Array.from({ length: 36 }, (_, i) => images[i % images.length]!)
-      : [];
-  const collageRows = [0, 1, 2, 3].map((row) =>
-    collagePool.slice(row * 9, row * 9 + 9)
-  );
-
   return (
     <section
       className={cn(
@@ -98,47 +90,7 @@ export function AnimatedMarqueeHero({
         className
       )}
     >
-      {collagePool.length > 0 && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1.12 }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-            className="absolute inset-[-8%] flex flex-col justify-center gap-2 md:gap-3"
-          >
-            {collageRows.map((row, rowIndex) => (
-              <div
-                key={rowIndex}
-                className="flex justify-center gap-2 md:gap-3"
-                style={{
-                  transform: `translateX(${rowIndex % 2 === 0 ? "-3%" : "4%"}) rotate(${rowIndex % 2 === 0 ? -1.5 : 1.5}deg)`,
-                }}
-              >
-                {row.map((src, i) => (
-                  <div
-                    key={`${rowIndex}-${i}-${src}`}
-                    className="relative aspect-[2/3] w-[18vw] min-w-[5.5rem] max-w-[9.5rem] flex-shrink-0 overflow-hidden rounded-md md:w-[12vw] md:max-w-[11rem]"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt=""
-                      className="h-full w-full object-cover opacity-70"
-                      loading={rowIndex === 0 && i < 6 ? "eager" : "lazy"}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </motion.div>
-          {/* Vignette para legibilidad del texto */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/55 to-black/90" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.55)_55%,rgba(0,0,0,0.92)_100%)]" />
-        </div>
-      )}
+      <PosterCollageBackground images={images} />
 
       {header && (
         <div className="absolute left-0 right-0 top-0 z-30 bg-gradient-to-b from-black/90 via-black/50 to-transparent px-4 pb-8 pt-4 sm:px-5 sm:pt-5 md:px-10">
