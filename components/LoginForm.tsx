@@ -35,6 +35,7 @@ export default function LoginForm({
   const [name, setName] = useState("");
   const [email, setEmail] = useState(emailParam);
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState(
     verified === "1"
@@ -146,6 +147,10 @@ export default function LoginForm({
     setError("");
     setInfo("");
     setNeedsVerify(false);
+    if (password !== passwordConfirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
@@ -350,6 +355,18 @@ export default function LoginForm({
               placeholder="Contraseña"
             />
           </div>
+          {mode === "register" && (
+            <input
+              type="password"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              className={inputClass}
+              placeholder="Reescribe la contraseña"
+            />
+          )}
 
           {info && (
             <p className="rounded-lg bg-emerald-500/15 px-3 py-2 text-xs text-emerald-300">

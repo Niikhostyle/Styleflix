@@ -12,6 +12,7 @@ export default function OnboardingCuentaClient() {
   const [email, setEmail] = useState(initialEmail);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,6 +50,10 @@ export default function OnboardingCuentaClient() {
     e.preventDefault();
     setError("");
     setInfo("");
+    if (password !== passwordConfirm) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setLoading(true);
     try {
       const normalized = email.trim().toLowerCase();
@@ -160,6 +165,15 @@ export default function OnboardingCuentaClient() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Crea una contraseña (mínimo 8 caracteres)"
+          className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-teal-300/50"
+        />
+        <input
+          type="password"
+          required
+          minLength={8}
+          value={passwordConfirm}
+          onChange={(e) => setPasswordConfirm(e.target.value)}
+          placeholder="Reescribe la contraseña"
           className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-3 text-sm outline-none focus:border-teal-300/50"
         />
         {error && <p className="text-sm text-red-300">{error}</p>}
