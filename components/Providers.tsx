@@ -8,6 +8,7 @@ import DemoBanner from "@/components/DemoBanner";
 import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 import ProfileGate from "@/components/ProfileGate";
 import PricingProvider from "@/components/PricingProvider";
+import { Toaster } from "@/components/ui/sonner";
 import type { Pricing } from "@/lib/pricing";
 
 function isNgrokHost() {
@@ -51,6 +52,7 @@ export default function Providers({
             <PresenceHeartbeat />
             <ProfileGate>{children}</ProfileGate>
             <BraveTipToast />
+            <Toaster />
           </TvRemoteProvider>
         </NgrokFetchPatch>
       </PricingProvider>

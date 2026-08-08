@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { toast } from "sonner";
 import OnboardingShell from "@/components/OnboardingShell";
+import { ButtonSpinner } from "@/components/ui/loading-bits";
 
 export default function OnboardingCuentaClient() {
   const router = useRouter();
@@ -52,6 +54,9 @@ export default function OnboardingCuentaClient() {
     setInfo("");
     if (password !== passwordConfirm) {
       setError("Las contraseñas no coinciden.");
+      toast.error("Contraseñas distintas", {
+        description: "Reescribe la misma clave en ambos campos.",
+      });
       return;
     }
     setLoading(true);
@@ -71,21 +76,27 @@ export default function OnboardingCuentaClient() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409) {
+        toast.message("Ya tienes cuenta", {
+          description: "Te llevamos al inicio de sesión.",
+        });
         router.replace(
           `/login?email=${encodeURIComponent(normalized)}&existing=1`
         );
         return;
       }
       if (!res.ok) {
-        setError(data.error || "No se pudo crear la cuenta.");
+        const msg = data.error || "No se pudo crear la cuenta.";
+        setError(msg);
+        toast.error("No se creó la cuenta", { description: msg });
         setLoading(false);
         return;
       }
 
       if (data.needsVerification) {
-        setInfo(
-          "Te enviamos un correo para confirmar tu cuenta. Luego inicia sesión y elige tu plan."
-        );
+        const msg =
+          "Te enviamos un correo para confirmar tu cuenta. Luego inicia sesión y elige tu plan.";
+        setInfo(msg);
+        toast.success("Revisa tu bandeja", { description: msg });
         setLoading(false);
         return;
       }
@@ -181,9 +192,10 @@ export default function OnboardingCuentaClient() {
         <button
           type="submit"
           disabled={loading}
-          className="brand-button w-full rounded-lg py-3 text-sm font-bold disabled:opacity-60"
+          className="brand-button inline-flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-bold disabled:opacity-60"
         >
-          {loading ? "Creando…" : "Siguiente"}
+          {loading && <ButtonSpinner />}
+          {loading ? "Creando magia…" : "Siguiente"}
         </button>
       </form>
     </OnboardingShell>

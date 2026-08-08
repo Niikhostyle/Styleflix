@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { auth } from "@/auth";
 import HomeClient from "@/components/HomeClient";
 import LandingHero from "@/components/LandingHero";
+import LoadingScreen from "@/components/LoadingScreen";
 import { getHomeCatalog, getPopularCatalogPosters } from "@/lib/catalog";
 import { redirect } from "next/navigation";
 
@@ -58,9 +59,14 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <div className="app-page flex min-h-screen items-center justify-center text-slate-400">
-          Cargando VeoTV…
-        </div>
+        <LoadingScreen
+          label="Despertando VeoTV…"
+          lines={[
+            "Buscando lo más visto…",
+            "Preparando portadas…",
+            "Casi en pantalla…",
+          ]}
+        />
       }
     >
       <HomeShell />

@@ -4,10 +4,13 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { getSession, signIn, useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { membershipHint } from "@/lib/brand-ui";
 import { useMembershipPrice } from "@/components/PricingProvider";
 import BrandMark from "@/components/BrandMark";
+import LoadingScreen from "@/components/LoadingScreen";
 import { AnimatedMarqueeHero } from "@/components/ui/hero-3";
+import { ButtonSpinner } from "@/components/ui/loading-bits";
 
 function safeCallback(callbackUrl: string) {
   return callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
@@ -125,19 +128,29 @@ export default function LoginForm({
           String(res.error).includes("email_not_verified")
         ) {
           setNeedsVerify(true);
-          setError(
-            "Debes confirmar tu correo antes de entrar. Revisa tu bandeja o reenvía el enlace."
-          );
+          const msg =
+            "Debes confirmar tu correo antes de entrar. Revisa tu bandeja o reenvía el enlace.";
+          setError(msg);
+          toast.error("Correo sin confirmar", { description: msg });
         } else {
           setError("Email o contraseña incorrectos.");
+          toast.error("No pudimos entrar", {
+            description: "Revisa tu email y contraseña.",
+          });
         }
         setLoading(false);
         return;
       }
+      toast.success("¡Bienvenido de nuevo!", {
+        description: "Entrando a VeoTV…",
+      });
       await getSession();
       await afterAuth();
     } catch {
       setError("No se pudo iniciar sesión. Intenta de nuevo.");
+      toast.error("Error de red", {
+        description: "Intenta de nuevo en unos segundos.",
+      });
       setLoading(false);
     }
   }
@@ -149,6 +162,9 @@ export default function LoginForm({
     setNeedsVerify(false);
     if (password !== passwordConfirm) {
       setError("Las contraseñas no coinciden.");
+      toast.error("Contraseñas distintas", {
+        description: "Reescribe la misma clave en ambos campos.",
+      });
       return;
     }
     setLoading(true);
@@ -164,18 +180,21 @@ export default function LoginForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "No se pudo crear la cuenta.");
+        const msg = data.error || "No se pudo crear la cuenta.";
+        setError(msg);
+        toast.error("No se creó la cuenta", { description: msg });
         setLoading(false);
         return;
       }
 
       if (data.needsVerification) {
         setMode("login");
-        setInfo(
+        const msg =
           data.message ||
-            "Te enviamos un correo de confirmación. Ábrelo y luego inicia sesión."
-        );
+          "Te enviamos un correo de confirmación. Ábrelo y luego inicia sesión.";
+        setInfo(msg);
         setNeedsVerify(true);
+        toast.success("Revisa tu bandeja", { description: msg });
         setLoading(false);
         return;
       }
@@ -189,12 +208,19 @@ export default function LoginForm({
       if (sign?.error) {
         setError("Cuenta creada. Inicia sesión con tus datos.");
         setMode("login");
+        toast.success("Cuenta lista", {
+          description: "Ahora inicia sesión con tu email.",
+        });
         setLoading(false);
         return;
       }
+      toast.success("Cuenta creada", { description: "¡A disfrutar VeoTV!" });
       await afterAuth();
     } catch {
       setError("No se pudo crear la cuenta.");
+      toast.error("Error de red", {
+        description: "Intenta crear la cuenta otra vez.",
+      });
       setLoading(false);
     }
   }
@@ -230,9 +256,16 @@ export default function LoginForm({
 
   if (status === "authenticated" || status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#050508] text-white/70">
-        {status === "loading" ? "Cargando…" : "Entrando…"}
-      </div>
+      <LoadingScreen
+        label={
+          status === "loading" ? "Despertando VeoTV…" : "Abriendo tu espacio…"
+        }
+        lines={[
+          "Verificando sesión…",
+          "Preparando perfiles…",
+          "Casi dentro…",
+        ]}
+      />
     );
   }
 
@@ -393,12 +426,13 @@ export default function LoginForm({
             type="submit"
             disabled={loading}
             data-tv-focus
-            className="brand-button w-full rounded-full py-3 text-sm font-extrabold transition disabled:opacity-60"
+            className="brand-button inline-flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-extrabold transition disabled:opacity-60"
           >
+            {loading && <ButtonSpinner />}
             {loading
               ? mode === "login"
-                ? "Entrando..."
-                : "Creando..."
+                ? "Abriendo sesión…"
+                : "Creando magia…"
               : mode === "login"
                 ? "Entrar"
                 : "Crear cuenta"}

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import LoadingScreen from "@/components/LoadingScreen";
 
 const EXEMPT = [
   "/perfiles",
@@ -78,9 +79,12 @@ export default function ProfileGate({ children }: { children: ReactNode }) {
 
   if (!ready && status === "authenticated") {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-white/45">
-        Cargando perfil…
-      </div>
+      <LoadingScreen
+        compact
+        label="Eligiendo tu perfil…"
+        lines={["Sincronizando…", "Casi en el catálogo…"]}
+        className="min-h-[50vh]"
+      />
     );
   }
 
