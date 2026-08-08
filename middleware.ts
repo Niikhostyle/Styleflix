@@ -155,8 +155,13 @@ export async function middleware(request: NextRequest) {
   const catalogAccess = hasAccess(token);
   const isAdminRole = token?.role === "SUPER_ADMIN";
 
-  // Anomalías / muestreo (no bloquea; solo registra)
-  if (ingestToken && !pathname.startsWith("/api/internal/")) {
+  // Anomalías / muestreo (no bloquea; solo registra).
+  // /api/health = Docker/Coolify HEALTHCHECK (curl a 127.0.0.1) → no clasificar.
+  if (
+    ingestToken &&
+    !pathname.startsWith("/api/internal/") &&
+    pathname !== "/api/health"
+  ) {
     const signals = evaluateRequest({
       ip,
       path: pathname,

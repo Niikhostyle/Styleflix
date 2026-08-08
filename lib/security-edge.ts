@@ -88,6 +88,15 @@ export type EdgeSignal = {
  * Evalúa el request y decide qué señales emitir (0..N).
  * Contadores por IP en memoria del proceso Node/Edge.
  */
+function isLoopbackIp(ip: string): boolean {
+  return (
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip === "localhost" ||
+    ip === "::ffff:127.0.0.1"
+  );
+}
+
 export function evaluateRequest(opts: {
   ip: string;
   path: string;
@@ -102,11 +111,13 @@ export function evaluateRequest(opts: {
   const { ip, path, method, ua, loggedIn, isAdminRole } = opts;
 
   if (ip === "unknown" || !ip) return signals;
+  // Healthchecks / probes locales no son amenazas
+  if (isLoopbackIp(ip)) return signals;
+  const clean = path.split("?")[0] || path;
+  if (clean === "/api/health") return signals;
 
   const bucket = getBucket(ip, now);
   bucket.hits += 1;
-  // Normalizar path (sin query)
-  const clean = path.split("?")[0] || path;
   if (clean.length < 200) bucket.paths.add(clean);
 
   // Intentos a /admin sin ser SUPER_ADMIN

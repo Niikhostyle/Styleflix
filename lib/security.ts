@@ -20,6 +20,15 @@ const SCRAPER_UA_RE =
 
 const LEGIT_BOT_RE = /(?:googlebot|bingbot|applebot|duckduckbot|yandexbot|facebookexternalhit|twitterbot|slackbot|discordbot)/i;
 
+function isLoopbackIp(ip: string): boolean {
+  return (
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip === "localhost" ||
+    ip === "::ffff:127.0.0.1"
+  );
+}
+
 export function clientIpFromHeaders(
   h: Headers | { get(name: string): string | null }
 ): string {
@@ -104,6 +113,7 @@ export async function recordSecurityEvent(opts: {
 
 export async function isIpBlocked(ip: string): Promise<boolean> {
   if (!ip || ip === "unknown") return false;
+  if (isLoopbackIp(ip)) return false;
   try {
     const row = await prisma.blockedIp.findUnique({ where: { ip } });
     if (!row) return false;
@@ -128,6 +138,9 @@ export async function blockIp(opts: {
 }) {
   const ip = opts.ip.trim();
   if (!ip || ip === "unknown") throw new Error("IP inválida");
+  if (isLoopbackIp(ip)) {
+    throw new Error("No se puede bloquear localhost / loopback");
+  }
   const expiresAt =
     opts.ttlHours != null && opts.ttlHours > 0
       ? new Date(Date.now() + opts.ttlHours * 3600_000)
@@ -168,7 +181,7 @@ export async function unblockIp(ip: string) {
 
 /** Tras varios SCAN desde la misma IP en ventana corta → auto-bloqueo. */
 export async function maybeAutoBlockFromScans(ip: string) {
-  if (!ip || ip === "unknown") return;
+  if (!ip || ip === "unknown" || isLoopbackIp(ip)) return;
   const since = new Date(Date.now() - 15 * 60_000);
   const count = await prisma.securityEvent.count({
     where: { ip, type: "SCAN", createdAt: { gte: since } },
@@ -187,7 +200,7 @@ export async function maybeAutoBlockFromScans(ip: string) {
 }
 
 export async function maybeAutoBlockFromAuthFails(ip: string) {
-  if (!ip || ip === "unknown") return;
+  if (!ip || ip === "unknown" || isLoopbackIp(ip)) return;
   const since = new Date(Date.now() - 15 * 60_000);
   const count = await prisma.securityEvent.count({
     where: { ip, type: "AUTH_FAIL", createdAt: { gte: since } },
@@ -206,7 +219,7 @@ export async function maybeAutoBlockFromAuthFails(ip: string) {
 }
 
 export async function maybeAutoBlockFromRateLimit(ip: string) {
-  if (!ip || ip === "unknown") return;
+  if (!ip || ip === "unknown" || isLoopbackIp(ip)) return;
   const since = new Date(Date.now() - 15 * 60_000);
   const count = await prisma.securityEvent.count({
     where: { ip, type: "RATE_LIMIT", createdAt: { gte: since } },
@@ -225,7 +238,7 @@ export async function maybeAutoBlockFromRateLimit(ip: string) {
 }
 
 export async function maybeAutoBlockFromSuspicious(ip: string) {
-  if (!ip || ip === "unknown") return;
+  if (!ip || ip === "unknown" || isLoopbackIp(ip)) return;
   const since = new Date(Date.now() - 30 * 60_000);
   const count = await prisma.securityEvent.count({
     where: {

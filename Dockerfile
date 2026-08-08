@@ -69,6 +69,6 @@ RUN printf '%s\n' '#!/bin/sh' 'exec node /app/node_modules/prisma/build/index.js
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
+  CMD curl -fsS -A "VeoTV-HealthCheck/1.0" http://127.0.0.1:3000/api/health || exit 1
 # standalone genera server.js en la raíz del artefacto
 CMD ["sh", "-c", "node scripts/db-setup.cjs && node server.js"]
