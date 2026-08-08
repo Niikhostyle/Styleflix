@@ -48,6 +48,9 @@ export default function LandingHero({
       }
     >
       <form onSubmit={onStart} className="mx-auto flex w-full flex-col gap-3">
+        <p className="text-center text-sm font-medium text-teal-200/90">
+          Disfruta 15 días gratis al crear tu cuenta.
+        </p>
         <p className="text-center text-sm text-white/55">
           ¿Listo para ver? Ingresa tu email para crear o reingresar a tu cuenta.
         </p>
