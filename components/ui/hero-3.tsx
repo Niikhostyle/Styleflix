@@ -91,7 +91,10 @@ export function AnimatedMarqueeHero({
   return (
     <section
       className={cn(
-        "relative flex h-screen w-full flex-col items-center justify-center overflow-hidden bg-black px-4 text-center",
+        "relative flex min-h-screen w-full flex-col items-center overflow-hidden bg-black px-4 text-center",
+        header
+          ? "justify-start pt-24 pb-8 sm:pt-28 md:justify-center md:pt-0 md:pb-0"
+          : "justify-center",
         className
       )}
     >
@@ -138,17 +141,17 @@ export function AnimatedMarqueeHero({
       )}
 
       {header && (
-        <div className="absolute left-0 right-0 top-0 z-20 px-5 py-5 md:px-10">
+        <div className="absolute left-0 right-0 top-0 z-30 bg-gradient-to-b from-black/90 via-black/50 to-transparent px-4 pb-8 pt-4 sm:px-5 sm:pt-5 md:px-10">
           {header}
         </div>
       )}
 
-      <div className="relative z-10 flex max-w-3xl flex-col items-center pb-[30vh] md:pb-[34vh]">
+      <div className="relative z-10 flex w-full max-w-3xl flex-col items-center pb-[22vh] md:pb-[34vh]">
         <motion.div
           initial="hidden"
           animate="show"
           variants={fade}
-          className="mb-4 inline-block rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/70 backdrop-blur-sm"
+          className="mb-3 inline-block max-w-[min(100%,18rem)] truncate rounded-full border border-white/20 bg-black/40 px-3 py-1 text-xs font-medium text-white/70 backdrop-blur-sm sm:mb-4 sm:max-w-none sm:px-4 sm:py-1.5 sm:text-sm"
         >
           {tagline}
         </motion.div>
@@ -160,7 +163,7 @@ export function AnimatedMarqueeHero({
             hidden: {},
             show: { transition: { staggerChildren: 0.1 } },
           }}
-          className="font-[family-name:var(--font-display)] text-5xl font-bold tracking-tighter text-white md:text-7xl"
+          className="font-[family-name:var(--font-display)] text-[2.15rem] font-bold leading-[1.1] tracking-tighter text-white sm:text-5xl md:text-7xl"
         >
           {typeof title === "string" ? (
             title.split(" ").map((word, i) => (
@@ -178,7 +181,7 @@ export function AnimatedMarqueeHero({
           animate="show"
           variants={fade}
           transition={{ delay: 0.5 }}
-          className="mt-6 max-w-xl text-lg text-white/60"
+          className="mt-4 max-w-xl px-1 text-base leading-snug text-white/60 sm:mt-6 sm:text-lg"
         >
           {description}
         </motion.p>
@@ -191,7 +194,7 @@ export function AnimatedMarqueeHero({
           className={children ? "mt-2 w-full max-w-md" : undefined}
         >
           {children ? (
-            <div className="mt-6 text-left">{children}</div>
+            <div className="mt-5 text-left sm:mt-6">{children}</div>
           ) : ctaText ? (
             <ActionButton href={ctaHref} onClick={onCtaClick}>
               {ctaText}

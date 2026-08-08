@@ -36,11 +36,11 @@ export default function LandingHero({
       description="Cancela cuando quieras. Empieza eligiendo tu plan y mira lo que ya está en VeoTV."
       images={posterUrls}
       header={
-        <div className="flex items-center justify-between">
-          <BrandMark className="text-2xl md:text-3xl" />
+        <div className="flex items-center justify-between gap-3">
+          <BrandMark className="shrink-0 text-2xl md:text-3xl" />
           <Link
             href="/login"
-            className="brand-button rounded-full px-4 py-2 text-sm font-semibold"
+            className="brand-button shrink-0 rounded-full px-3 py-2 text-xs font-semibold sm:px-4 sm:text-sm"
           >
             Iniciar sesión
           </Link>

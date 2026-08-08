@@ -248,11 +248,11 @@ export default function LoginForm({
       description={membershipHint(membershipPriceClp)}
       images={posterUrls}
       header={
-        <div className="flex items-center justify-between">
-          <BrandMark className="text-2xl md:text-3xl" />
+        <div className="flex items-center justify-between gap-3">
+          <BrandMark className="shrink-0 text-2xl md:text-3xl" />
           <Link
             href="/"
-            className="text-sm text-white/55 underline hover:text-white"
+            className="shrink-0 text-sm text-white/55 underline hover:text-white"
           >
             Inicio
           </Link>
