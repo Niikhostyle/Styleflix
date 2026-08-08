@@ -1,11 +1,12 @@
 # VeoTV — APKs
 
-| Archivo en `/public/downloads/` | Dispositivo | Proyecto |
-|---|---|---|
-| `veotv-celular.apk` | Celular / tablet | `styleflix-capacitor` |
-| `veotv-tv.apk` | Android TV / Google TV | `android-tv` |
+| Archivo en `/public/downloads/` | Dispositivo | Proyecto | Versión |
+|---|---|---|---|
+| `veotv-celular.apk` | Celular / tablet | `styleflix-capacitor` | 1.5.0-mobile |
+| `veotv-tv.apk` | Android TV / Google TV | `android-tv` | 1.3.0-tv |
 
-URL por defecto: `https://veotv.cloud`
+URL por defecto: `https://veotv.cloud`  
+Descargas: `https://veotv.cloud/descargar`
 
 ## Celular
 

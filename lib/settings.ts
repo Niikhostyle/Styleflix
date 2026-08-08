@@ -38,8 +38,8 @@ export const DOWNLOADS_ENABLED_KEY = "downloadsEnabled";
 export const DEMO_CATALOG_MINUTES_KEY = "demoCatalogMinutes";
 
 export const DEFAULT_PREVIEW_MINUTES = 0;
-/** Por defecto off: aún no hay APKs publicados. */
-export const DEFAULT_DOWNLOADS_ENABLED = false;
+/** Por defecto on: APKs en /public/downloads. */
+export const DEFAULT_DOWNLOADS_ENABLED = true;
 
 /** Alineado al mínimo de suscripciones Mercado Pago Chile ($950). */
 const MIN_PRICE_CLP = MP_MIN_AMOUNT_CLP;

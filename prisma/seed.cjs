@@ -32,7 +32,13 @@ async function main() {
     where: { email: "admin@styleflix.com" },
   });
 
-  console.log("Seed listo: SUPER_ADMIN actualizado.");
+  await prisma.appSetting.upsert({
+    where: { key: "downloadsEnabled" },
+    create: { key: "downloadsEnabled", value: "true" },
+    update: { value: "true" },
+  });
+
+  console.log("Seed listo: SUPER_ADMIN actualizado; descargas APK activadas.");
 }
 
 main()

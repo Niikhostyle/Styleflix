@@ -66,6 +66,7 @@ prisma/dev.db-journal
 !public/downloads/*.apk
 **/.idea/
 **/captures/
+**/.android-signing/
 styleflix-capacitor/.env*
 android-tv/local.properties
 
