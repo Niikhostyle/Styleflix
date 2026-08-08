@@ -3,6 +3,10 @@ import { auth } from "@/auth";
 import { hasActiveMembership } from "@/lib/access";
 import OnboardingShell from "@/components/OnboardingShell";
 import PlanPicker from "@/components/PlanPicker";
+import {
+  formatDemoDuration,
+  getDemoCatalogMinutes,
+} from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +33,8 @@ export default async function OnboardingPlanesPage({
   const sp = await searchParams;
   const failed = sp.status === "failure";
   const demoExpired = sp.demo === "expired";
+  const demoMinutes = await getDemoCatalogMinutes();
+  const demoLabel = formatDemoDuration(demoMinutes);
 
   return (
     <OnboardingShell
@@ -42,7 +48,8 @@ export default async function OnboardingPlanesPage({
     >
       {demoExpired && (
         <p className="mb-6 text-center text-sm text-cyan-100/90">
-          Tu demo de 30 minutos terminó. Elige un plan para seguir viendo VeoTV.
+          Tu demo de {demoLabel} terminó. Elige un plan para seguir viendo
+          VeoTV.
         </p>
       )}
       {failed && (

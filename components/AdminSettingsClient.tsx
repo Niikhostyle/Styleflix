@@ -9,6 +9,7 @@ import {
   type PlansCatalog,
   type PlanTierDef,
 } from "@/lib/plans";
+import { formatDemoDuration } from "@/lib/demo-format";
 
 export default function AdminSettingsClient() {
   const refreshPricing = useRefreshPricing();
@@ -149,13 +150,7 @@ export default function AdminSettingsClient() {
   }
 
   function formatDemoLabel(m: number): string {
-    if (m <= 0) return "desactivada";
-    if (m % (24 * 60) === 0) {
-      const d = m / (24 * 60);
-      return `${d} día${d === 1 ? "" : "s"}`;
-    }
-    if (m % 60 === 0) return `${m / 60} h`;
-    return `${m} min`;
+    return formatDemoDuration(m);
   }
 
   async function saveDemo() {

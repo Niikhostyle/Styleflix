@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Clock } from "lucide-react";
+import { formatDemoRemaining } from "@/lib/demo-format";
 
 /** Barra superior cuando la sesión es demo (sin membresía paga). */
 export default function DemoBanner() {
@@ -96,10 +97,7 @@ export default function DemoBanner() {
 
   if (!showBanner) return null;
 
-  const totalSec = Math.ceil(remainingMs / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  const label = `${m}:${String(s).padStart(2, "0")}`;
+  const label = formatDemoRemaining(remainingMs);
 
   return (
     <div

@@ -16,6 +16,17 @@ import {
   type PlansCatalog,
   type PlanTier,
 } from "@/lib/plans";
+import {
+  clampDemoMinutes,
+  DEFAULT_DEMO_CATALOG_MINUTES,
+} from "@/lib/demo-format";
+
+export {
+  clampDemoMinutes,
+  DEFAULT_DEMO_CATALOG_MINUTES,
+  formatDemoDuration,
+  formatDemoRemaining,
+} from "@/lib/demo-format";
 
 export const PREVIEW_MINUTES_KEY = "previewMinutes";
 export const MEMBERSHIP_PRICE_KEY = "membershipPriceClp";
@@ -29,11 +40,6 @@ export const DEMO_CATALOG_MINUTES_KEY = "demoCatalogMinutes";
 export const DEFAULT_PREVIEW_MINUTES = 0;
 /** Por defecto off: aún no hay APKs publicados. */
 export const DEFAULT_DOWNLOADS_ENABLED = false;
-/** Fallback si no hay setting (30 min). */
-export const DEFAULT_DEMO_CATALOG_MINUTES = 30;
-
-const MIN_DEMO_MINUTES = 0;
-const MAX_DEMO_MINUTES = 30 * 24 * 60; // 30 días
 
 /** Alineado al mínimo de suscripciones Mercado Pago Chile ($950). */
 const MIN_PRICE_CLP = MP_MIN_AMOUNT_CLP;
@@ -182,11 +188,6 @@ export async function setDownloadsEnabled(enabled: boolean): Promise<boolean> {
   return enabled;
 }
 
-function clampDemoMinutes(n: number): number {
-  if (!Number.isFinite(n)) return DEFAULT_DEMO_CATALOG_MINUTES;
-  return Math.min(MAX_DEMO_MINUTES, Math.max(MIN_DEMO_MINUTES, Math.round(n)));
-}
-
 /** Minutos de demo configurados en admin (0 = off). */
 export async function getDemoCatalogMinutes(): Promise<number> {
   try {
@@ -211,21 +212,6 @@ export async function setDemoCatalogMinutes(minutes: number): Promise<number> {
     update: { value: String(value) },
   });
   return value;
-}
-
-/** Etiqueta legible: "30 min" | "2 h" | "3 días". */
-export function formatDemoDuration(minutes: number): string {
-  const m = clampDemoMinutes(minutes);
-  if (m <= 0) return "desactivada";
-  if (m % (24 * 60) === 0) {
-    const d = m / (24 * 60);
-    return `${d} día${d === 1 ? "" : "s"}`;
-  }
-  if (m % 60 === 0) {
-    const h = m / 60;
-    return `${h} h`;
-  }
-  return `${m} min`;
 }
 
 export const PRICING_CODE_DEFAULTS = {
