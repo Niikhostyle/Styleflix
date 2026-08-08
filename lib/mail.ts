@@ -1,8 +1,14 @@
 import nodemailer from "nodemailer";
 import { APP_NAME } from "@/lib/brand";
 import { contactEmail, publicBaseUrl } from "@/lib/public-url";
+import {
+  isResendConfigured,
+  sendWithResend,
+} from "@/lib/resend";
 
+/** Correo listo si hay Resend o SMTP clásico. */
 export function isMailConfigured() {
+  if (isResendConfigured()) return true;
   return Boolean(
     process.env.SMTP_HOST?.trim() &&
       process.env.SMTP_USER?.trim() &&
@@ -24,7 +30,7 @@ function transporter() {
   const pass = process.env.SMTP_PASS?.trim();
   if (!host || !user || !pass) {
     throw new Error(
-      "Correo no configurado. Define SMTP_HOST, SMTP_USER y SMTP_PASS."
+      "Correo no configurado. Define RESEND_API_KEY o SMTP_HOST/USER/PASS."
     );
   }
   const port = Number(process.env.SMTP_PORT || 587);
@@ -77,9 +83,29 @@ async function sendMail(opts: {
   text: string;
 }) {
   if (!isMailConfigured()) {
-    console.warn("[mail] SMTP no configurado. Correo no enviado:", opts.subject, "→", opts.to);
+    console.warn(
+      "[mail] Correo no configurado (RESEND_API_KEY o SMTP). No enviado:",
+      opts.subject,
+      "→",
+      opts.to
+    );
     console.warn("[mail] Texto:", opts.text);
     return { ok: false as const, skipped: true as const };
+  }
+
+  // Preferir Resend si hay API key
+  if (isResendConfigured()) {
+    try {
+      return await sendWithResend({
+        to: opts.to,
+        subject: opts.subject,
+        html: opts.html,
+        text: opts.text,
+      });
+    } catch (err) {
+      console.error("[mail] Resend excepción:", err);
+      return { ok: false as const, skipped: false as const };
+    }
   }
 
   const transport = transporter();

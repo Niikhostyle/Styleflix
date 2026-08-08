@@ -204,7 +204,7 @@ export default function AdminUserDetailClient({ userId }: { userId: string }) {
             <h2 className="text-lg font-bold">Cambiar contraseña</h2>
             <p className="text-sm text-neutral-400">
               Define una nueva clave para este usuario (se notifica por correo
-              si SMTP está activo).
+              si el correo está activo).
             </p>
             <div className="flex flex-wrap gap-2">
               <input

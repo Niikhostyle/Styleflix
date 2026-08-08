@@ -72,7 +72,7 @@ export default function AdminRequestsClient() {
   return (
     <AdminShell
       title="Solicitudes"
-      subtitle="Cuando un usuario con plan Premium/Plus pide un título, aparece aquí y te llega un correo (si SMTP está configurado)."
+      subtitle="Cuando un usuario con plan Premium/Plus pide un título, aparece aquí y te llega un correo (si Resend/SMTP está configurado)."
     >
       <div className="mb-5 flex flex-wrap gap-2">
         {[
