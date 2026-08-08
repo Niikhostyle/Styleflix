@@ -14,13 +14,39 @@ export default function LandingHero({
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function onStart(e: FormEvent) {
+  async function onStart(e: FormEvent) {
     e.preventDefault();
-    const q = email.trim()
-      ? `?email=${encodeURIComponent(email.trim().toLowerCase())}`
-      : "";
-    router.push(`/onboarding/cuenta${q}`);
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return;
+
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalized }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo verificar el email.");
+        setLoading(false);
+        return;
+      }
+
+      const q = `?email=${encodeURIComponent(normalized)}`;
+      if (data.exists) {
+        router.push(`/login${q}`);
+      } else {
+        router.push(`/onboarding/cuenta${q}`);
+      }
+    } catch {
+      setError("Error de red. Intenta de nuevo.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -61,15 +87,20 @@ export default function LandingHero({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="min-h-12 flex-1 rounded-full border border-white/20 bg-black/55 px-5 text-base text-white outline-none placeholder:text-white/40 focus:border-teal-300/60"
+            disabled={loading}
+            className="min-h-12 flex-1 rounded-full border border-white/20 bg-black/55 px-5 text-base text-white outline-none placeholder:text-white/40 focus:border-teal-300/60 disabled:opacity-60"
           />
           <button
             type="submit"
-            className="brand-button min-h-12 rounded-full px-7 text-base font-semibold"
+            disabled={loading}
+            className="brand-button min-h-12 rounded-full px-7 text-base font-semibold disabled:opacity-60"
           >
-            Comenzar
+            {loading ? "…" : "Comenzar"}
           </button>
         </div>
+        {error && (
+          <p className="text-center text-sm text-red-300">{error}</p>
+        )}
         <p className="text-center text-xs text-white/35">{APP_NAME}</p>
       </form>
     </AnimatedMarqueeHero>

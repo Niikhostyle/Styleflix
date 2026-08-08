@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import OnboardingShell from "@/components/OnboardingShell";
@@ -8,12 +8,42 @@ import OnboardingShell from "@/components/OnboardingShell";
 export default function OnboardingCuentaClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState(searchParams.get("email") || "");
+  const initialEmail = (searchParams.get("email") || "").trim().toLowerCase();
+  const [email, setEmail] = useState(initialEmail);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(Boolean(initialEmail));
+
+  useEffect(() => {
+    if (!initialEmail) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/check-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: initialEmail }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data.exists) {
+          router.replace(
+            `/login?email=${encodeURIComponent(initialEmail)}&existing=1`
+          );
+          return;
+        }
+      } catch {
+        // Si falla el check, dejamos crear cuenta (register igual valida 409)
+      }
+      if (!cancelled) setChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialEmail, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -21,16 +51,26 @@ export default function OnboardingCuentaClient() {
     setInfo("");
     setLoading(true);
     try {
+      const normalized = email.trim().toLowerCase();
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: (name.trim() || email.split("@")[0] || "Usuario").slice(0, 60),
-          email: email.trim().toLowerCase(),
+          name: (name.trim() || normalized.split("@")[0] || "Usuario").slice(
+            0,
+            60
+          ),
+          email: normalized,
           password,
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        router.replace(
+          `/login?email=${encodeURIComponent(normalized)}&existing=1`
+        );
+        return;
+      }
       if (!res.ok) {
         setError(data.error || "No se pudo crear la cuenta.");
         setLoading(false);
@@ -46,7 +86,7 @@ export default function OnboardingCuentaClient() {
       }
 
       const login = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
+        email: normalized,
         password,
         redirect: false,
       });
@@ -60,6 +100,20 @@ export default function OnboardingCuentaClient() {
       setError("Error de red.");
       setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <OnboardingShell
+        step={1}
+        title="Crea tu cuenta"
+        subtitle="Verificando tu email…"
+        backHref="/login"
+        signOutOnBack
+      >
+        <p className="text-center text-sm text-white/50">Un momento…</p>
+      </OnboardingShell>
+    );
   }
 
   return (

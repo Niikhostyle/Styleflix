@@ -26,18 +26,22 @@ export default function LoginForm({
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const modeParam = searchParams.get("mode");
   const verified = searchParams.get("verified");
+  const emailParam = (searchParams.get("email") || "").trim().toLowerCase();
+  const existingAccount = searchParams.get("existing") === "1";
 
   const [mode, setMode] = useState<"login" | "register">(
     modeParam === "register" ? "register" : "login"
   );
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailParam);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState(
     verified === "1"
       ? "Correo confirmado. Ya puedes iniciar sesión."
-      : ""
+      : existingAccount
+        ? "Ya tienes cuenta con este email. Inicia sesión para continuar."
+        : ""
   );
   const [loading, setLoading] = useState(false);
   const [needsVerify, setNeedsVerify] = useState(false);
