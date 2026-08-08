@@ -9,7 +9,7 @@ export const metadata = {
 };
 
 async function LoginWithPosters() {
-  const posterUrls = await getPopularCatalogPosters(16).catch(() => [] as string[]);
+  const posterUrls = await getPopularCatalogPosters(28).catch(() => [] as string[]);
   return <LoginForm posterUrls={posterUrls} />;
 }
 

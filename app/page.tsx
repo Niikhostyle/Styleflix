@@ -11,7 +11,7 @@ async function HomeShell() {
   const session = await auth();
 
   if (!session?.user) {
-    const posterUrls = await getPopularCatalogPosters(16).catch(() => [] as string[]);
+    const posterUrls = await getPopularCatalogPosters(28).catch(() => [] as string[]);
     return <LandingHero posterUrls={posterUrls} />;
   }
 
