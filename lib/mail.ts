@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { APP_NAME } from "@/lib/brand";
+import { stripEnv } from "@/lib/env";
 import { contactEmail, publicBaseUrl } from "@/lib/public-url";
 import {
   isResendConfigured,
@@ -10,33 +11,33 @@ import {
 export function isMailConfigured() {
   if (isResendConfigured()) return true;
   return Boolean(
-    process.env.SMTP_HOST?.trim() &&
-      process.env.SMTP_USER?.trim() &&
-      process.env.SMTP_PASS?.trim()
+    stripEnv(process.env.SMTP_HOST) &&
+      stripEnv(process.env.SMTP_USER) &&
+      stripEnv(process.env.SMTP_PASS)
   );
 }
 
 function fromAddress() {
-  return (
-    process.env.EMAIL_FROM?.trim() ||
-    process.env.SMTP_USER?.trim() ||
-    `noreply@veotv.cloud`
-  );
+  const emailFrom = stripEnv(process.env.EMAIL_FROM);
+  if (emailFrom.includes("@")) return emailFrom;
+  const smtpUser = stripEnv(process.env.SMTP_USER);
+  if (smtpUser.includes("@")) return smtpUser;
+  return "noreply@veotv.cloud";
 }
 
 function transporter() {
-  const host = process.env.SMTP_HOST?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
+  const host = stripEnv(process.env.SMTP_HOST);
+  const user = stripEnv(process.env.SMTP_USER);
+  const pass = stripEnv(process.env.SMTP_PASS);
   if (!host || !user || !pass) {
     throw new Error(
       "Correo no configurado. Define RESEND_API_KEY o SMTP_HOST/USER/PASS."
     );
   }
-  const port = Number(process.env.SMTP_PORT || 587);
+  const port = Number(stripEnv(process.env.SMTP_PORT) || 587);
   const secure =
-    process.env.SMTP_SECURE === "true" ||
-    process.env.SMTP_SECURE === "1" ||
+    stripEnv(process.env.SMTP_SECURE) === "true" ||
+    stripEnv(process.env.SMTP_SECURE) === "1" ||
     port === 465;
 
   return nodemailer.createTransport({
